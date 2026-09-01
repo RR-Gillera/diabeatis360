@@ -1,0 +1,12 @@
+import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { AuthButton, authColors, authStyles } from '@/features/auth/auth-ui';
+import { saveOnboardingValue } from '@/features/auth/onboarding';
+import { useAuth } from '@/features/auth/auth-context';
+import { Choice } from '@/features/auth/onboarding-ui';
+
+export default function DietaryScreen() { const router = useRouter(); const { email } = useAuth(); const [diet, setDiet] = useState('Diabetic Diet'); const next = async () => { if (email) await saveOnboardingValue(email, 'diet', diet); router.push('/onboarding/notifications'); }; return <View style={[authStyles.screen, styles.screen]}><Progress /><Text style={styles.back} onPress={() => router.back()}>‹  Back</Text><Text style={styles.title}>Any dietary{`\n`}preferences?</Text><Text style={styles.subtitle}>We&apos;ll tailor your meal recommendations based on your selection.</Text><Choice title="Everything" detail="No specific restrictions" selected={diet === 'Everything'} onPress={() => setDiet('Everything')} /><Choice title="Vegetarian" detail="Plant-based diet, no meat" selected={diet === 'Vegetarian'} onPress={() => setDiet('Vegetarian')} /><Choice title="No Pork" detail="All meats except pork products" selected={diet === 'No Pork'} onPress={() => setDiet('No Pork')} /><Choice title="Diabetic Diet" detail="Low sugar & glycemic index focus" selected={diet === 'Diabetic Diet'} onPress={() => setDiet('Diabetic Diet')} /><View style={styles.bottom}><AuthButton title="Next  ›" onPress={next} /></View></View>; }
+function Progress() { return <><View style={styles.progress}><Text style={styles.section}>DIETARY PROFILE</Text><Text style={styles.step}>80% Complete</Text></View><View style={styles.track}><View style={[styles.fill, { width: '80%' }]} /></View></>; }
+const styles = StyleSheet.create({ screen: { padding: 24 }, progress: { flexDirection: 'row', justifyContent: 'space-between' }, section: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 }, step: { color: '#91A4BF', fontSize: 11, fontWeight: '700' }, track: { backgroundColor: '#DDE5EF', height: 6, marginTop: 10 }, fill: { backgroundColor: authColors.green, height: '100%' }, back: { color: '#91A4BF', fontSize: 15, marginTop: 44 }, title: { color: authColors.navy, fontSize: 31, fontWeight: '900', lineHeight: 38, marginTop: 26 }, subtitle: { color: authColors.muted, fontSize: 16, lineHeight: 25, marginTop: 14 }, bottom: { marginTop: 'auto', paddingTop: 24 } });
