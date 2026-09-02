@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { BookingHeader, bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { createBooking } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
+import { auth } from '@/firebase';
 import type { PaymentMethod } from '@/features/booking/types';
 
 const methods: { name: PaymentMethod; detail: string; icon: string }[] = [
@@ -27,7 +28,8 @@ export default function ConsultationFeeScreen() {
     setLoading(true); setError('');
     try {
       await new Promise((resolve) => setTimeout(resolve, 900));
-      const bookingId = await createBooking(provider.id, selectedDate, fee);
+      const patientId = auth.currentUser?.uid ?? 'test-patient-001';
+      const bookingId = await createBooking(patientId, provider.id, selectedDate, fee);
       setBookingId(bookingId);
       router.replace('/booking/payment-successful');
     } catch (value) { setError(value instanceof Error ? value.message : 'Unable to create booking.'); }

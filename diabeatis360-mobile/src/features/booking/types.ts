@@ -20,11 +20,32 @@ export type BookingDraft = {
   bookingId: string | null;
 };
 
+export type BookingStatus = 'scheduled' | 'accepted' | 'declined';
+
 export type BookingRecord = {
   patient_id: string;
   provider_id: string;
-  status: 'scheduled';
+  status: BookingStatus;
   scheduled_at: Timestamp;
   fee: number;
   created_at: ReturnType<typeof import('firebase/firestore').serverTimestamp>;
+};
+
+export type AppointmentHistoryEntry = {
+  id: string;
+  provider: Provider | null;
+  status: string;
+  scheduledAt: Date | null;
+  fee: number;
+};
+
+// The doctor-side mirror of AppointmentHistoryEntry — needs patient identity, not
+// provider identity, since this is the doctor's own booking queue.
+export type ProviderBookingEntry = {
+  id: string;
+  patientId: string;
+  patientName: string;
+  scheduledAt: Date | null;
+  fee: number;
+  status: BookingStatus;
 };

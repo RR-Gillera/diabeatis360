@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
 import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
@@ -10,7 +10,7 @@ import { auth, db } from '@/firebase';
 
 export default function ProfileTypeScreen() {
   const router = useRouter();
-  const { email } = useAuth();
+  const { email, displayName } = useAuth();
   const [profileType, setProfileType] = useState<'patient' | 'doctor'>('patient');
   const finish = async () => {
     if (!email) return;
@@ -18,7 +18,22 @@ export default function ProfileTypeScreen() {
     if (profileType === 'doctor') {
       // Users.role is written as 'patient' at verification time by default — flip it here so
       // Firestore reflects the doctor choice made during onboarding, not just local storage.
-      if (auth.currentUser) await updateDoc(doc(db, 'Users', auth.currentUser.uid), { role: 'doctor' });
+      if (auth.currentUser) {
+        const uid = auth.currentUser.uid;
+        await updateDoc(doc(db, 'Users', uid), { role: 'doctor' });
+        // Doctors need a bookable Providers doc too — Providers doc ID = Auth UID, the same
+        // identity convention already used for Users. merge:true so re-onboarding doesn't
+        // clobber fields the doctor already edited later (e.g. specialty, fee).
+        await setDoc(doc(db, 'Providers', uid), {
+          full_name: displayName ?? 'Diabeatis360 Doctor',
+          specialty: '',
+          prc_license_number: '',
+          city: '',
+          consultation_fee: 0,
+          is_verified: false,
+          created_at: serverTimestamp(),
+        }, { merge: true });
+      }
       await completeOnboarding(email, profileType);
       router.replace('/doctor-home');
     } else {

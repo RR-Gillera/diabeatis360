@@ -23,6 +23,11 @@ export function AuthButton({ title, onPress, disabled }: { title: string; onPres
   return <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text></Pressable>;
 }
 
+// Shared card-section shell used by the user-home and doctor-home screens.
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text>{children}</View>;
+}
+
 export const authStyles = StyleSheet.create({
   screen: { backgroundColor: authColors.background, flex: 1 },
   scroll: { flexGrow: 1, padding: 24 },
@@ -44,4 +49,6 @@ const styles = StyleSheet.create({
   buttonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.82 },
+  section: { backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 18, borderWidth: 1, gap: 12, marginTop: 18, padding: 18 },
+  sectionTitle: { color: authColors.navy, fontSize: 16, fontWeight: '800' },
 });

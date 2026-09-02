@@ -12,3 +12,7 @@ export async function completeOnboarding(email: string, profileType: 'patient' |
 export async function saveOnboardingValue(email: string, key: string, value: string) {
   await AsyncStorage.setItem(`diabeatis360:onboarding:${email.trim().toLowerCase()}:${key}`, value);
 }
+
+export async function getOnboardingValue(email: string, key: string) {
+  return AsyncStorage.getItem(`diabeatis360:onboarding:${email.trim().toLowerCase()}:${key}`);
+}
