@@ -1,119 +1,185 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
-import { BookingHeader, bookingColors, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
-import { addGlucoseLog, getInterpretation, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import type { GlucoseLogEntry, MealContext } from '@/features/glucose/types';
+import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { AddReadingModal } from '@/features/glucose/glucose-ui';
+import type { GlucoseLogEntry } from '@/features/glucose/types';
+import { BottomNav, homeColors, WeeklyChart } from '@/features/home/home-ui';
 
-const contexts: { value: MealContext; label: string }[] = [
-  { value: 'before_meal', label: 'Before Meal' },
-  { value: 'after_meal', label: 'After Meal' },
-];
+// Purely a decorative "time of day" theme for the history list (sun/moon/fork
+// icon + matching badge color) — not a clinical read on the value, which is
+// why it's driven by the hour logged rather than getInterpretation(). The
+// live add-reading preview below still uses the real clinical thresholds.
+function timeTheme(hour: number) {
+  if (hour >= 21 || hour < 7) return { icon: 'moon.stars.fill', iconAndroid: 'bedtime', iconBg: '#F8FAFC', iconColor: '#94A3B8', badgeBg: '#F1F5F9', badgeColor: '#475569' } as const;
+  if (hour < 11) return { icon: 'sun.max.fill', iconAndroid: 'wb_sunny', iconBg: homeColors.greenTint, iconColor: homeColors.green, badgeBg: homeColors.greenTint, badgeColor: homeColors.green } as const;
+  return { icon: 'fork.knife', iconAndroid: 'restaurant', iconBg: '#FFFBEB', iconColor: '#F59E0B', badgeBg: '#FEF3C7', badgeColor: '#B45309' } as const;
+}
 
-const interpretationCopy: Record<GlucoseLogEntry['interpretation'], { label: string; color: string; background: string }> = {
-  low: { label: 'Low', color: '#B8791E', background: '#F6EAD5' },
-  normal: { label: 'Normal', color: bookingColors.green, background: '#E6F6EF' },
-  high: { label: 'High', color: '#D9364F', background: '#FBE6E9' },
-};
+function groupLabel(date: Date) {
+  const startOfDay = (value: Date) => { const copy = new Date(value); copy.setHours(0, 0, 0, 0); return copy; };
+  const today = startOfDay(new Date());
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
+  const target = startOfDay(date);
+  const shortDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (target.getTime() === today.getTime()) return `TODAY, ${shortDate}`.toUpperCase();
+  if (target.getTime() === yesterday.getTime()) return `YESTERDAY, ${shortDate}`.toUpperCase();
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
+}
+
+const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Buckets this calendar week's (Mon–Sun) entries by day, averaging same-day
+// readings — days with no reading stay null so the chart leaves them out
+// rather than fabricating a value.
+function currentWeek(entries: GlucoseLogEntry[]) {
+  const now = new Date();
+  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const days = weekdayLabels.map((label, index) => {
+    const dayStart = new Date(monday); dayStart.setDate(monday.getDate() + index);
+    const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate() + 1);
+    const dayEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= dayStart && entry.loggedAt < dayEnd);
+    const value = dayEntries.length ? Math.round(dayEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / dayEntries.length) : null;
+    return { label, value };
+  });
+  const weekEnd = new Date(monday); weekEnd.setDate(monday.getDate() + 7);
+  const weekEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= monday && entry.loggedAt < weekEnd);
+  const average = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / weekEntries.length) : null;
+  return { days, average };
+}
+
+const HISTORY_PAGE_SIZE = 10;
 
 export default function GlucoseLogScreen() {
   const router = useRouter();
   const { uid } = useAuth();
-  const [reading, setReading] = useState('');
-  const [context, setContext] = useState<MealContext>('before_meal');
-  const [notes, setNotes] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    if (!uid) { setLoadingHistory(false); return; }
-    const unsubscribe = subscribeToGlucoseHistory(uid, (value) => { setEntries(value); setLoadingHistory(false); }, (value) => { setError(value.message); setLoadingHistory(false); });
+    if (!uid) return;
+    const unsubscribe = subscribeToGlucoseHistory(uid, setEntries, () => {});
     return unsubscribe;
   }, [uid]);
 
-  const readingValue = Number(reading);
-  const isValidReading = reading.trim() !== '' && Number.isFinite(readingValue) && readingValue > 0;
-  const livePreview = useMemo(() => (isValidReading ? interpretationCopy[getInterpretation(readingValue, context)] : null), [context, isValidReading, readingValue]);
+  const { days: weekDays, average: weekAverage } = useMemo(() => currentWeek(entries), [entries]);
 
-  const save = async () => {
-    if (!uid || !isValidReading) return;
-    setSaving(true); setError(''); setMessage('');
-    try {
-      await addGlucoseLog(uid, readingValue, context, notes, new Date());
-      setReading(''); setNotes(''); setMessage('Reading saved.');
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save this reading.');
-    } finally {
-      setSaving(false);
+  const groups = useMemo(() => {
+    const visible = expanded ? entries : entries.slice(0, HISTORY_PAGE_SIZE);
+    const result: { label: string; items: GlucoseLogEntry[] }[] = [];
+    for (const entry of visible) {
+      const label = entry.loggedAt ? groupLabel(entry.loggedAt) : 'UNDATED';
+      const last = result[result.length - 1];
+      if (last && last.label === label) last.items.push(entry);
+      else result.push({ label, items: [entry] });
     }
-  };
+    return result;
+  }, [entries, expanded]);
 
-  return <View style={ui.screen}>
-    <BookingHeader title="Blood Sugar Log" subtitle="Track your glucose readings" onBack={() => router.back()} />
-    <ScrollView contentContainerStyle={ui.content}>
-      <View style={ui.card}>
-        <Text style={ui.sectionTitle}>Add a reading</Text>
-        <View style={styles.readingRow}>
-          <TextInput value={reading} onChangeText={setReading} placeholder="0" keyboardType="numeric" style={styles.readingInput} />
-          <Text style={styles.unit}>mg/dL</Text>
-          {livePreview ? <View style={[styles.badge, { backgroundColor: livePreview.background }]}><Text style={[styles.badgeText, { color: livePreview.color }]}>{livePreview.label}</Text></View> : null}
+  const onReadingSaved = () => { setModalVisible(false); router.push('/glucose-result'); };
+
+  return (
+    <View style={styles.screen}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Glucose Log</Text>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.headerButton} onPress={() => Alert.alert('Coming Soon', 'Filtering by date is on the way.')}>
+            <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor="#64748B" />
+          </Pressable>
+          <Pressable style={styles.headerButton} onPress={() => Alert.alert('Coming Soon', 'More options are on the way.')}>
+            <SymbolView name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={16} tintColor="#64748B" />
+          </Pressable>
         </View>
-        <View style={styles.contextRow}>
-          {contexts.map((item) => (
-            <Pressable key={item.value} onPress={() => setContext(item.value)} style={[styles.contextPill, context === item.value && styles.contextPillActive]}>
-              <Text style={[styles.contextText, context === item.value && styles.contextTextActive]}>{item.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional)" style={styles.notesInput} multiline />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {message ? <Text style={styles.success}>{message}</Text> : null}
-        <PrimaryButton title={saving ? 'Saving...' : 'Save Reading'} onPress={save} disabled={saving || !isValidReading} />
       </View>
 
-      <Text style={[ui.sectionTitle, styles.historyTitle]}>History</Text>
-      {loadingHistory ? <Text style={styles.empty}>Loading...</Text> : entries.length === 0 ? <Text style={styles.empty}>No readings logged yet.</Text> : entries.map((entry) => {
-        const copy = interpretationCopy[entry.interpretation];
-        return (
-          <View key={entry.id} style={[ui.card, styles.historyCard]}>
-            <View style={styles.historyTop}>
-              <Text style={styles.historyReading}>{entry.readingMgdl} <Text style={styles.historyUnit}>mg/dL</Text></Text>
-              <View style={[styles.badge, { backgroundColor: copy.background }]}><Text style={[styles.badgeText, { color: copy.color }]}>{copy.label}</Text></View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Weekly Overview</Text>
+            <View style={styles.avgRow}>
+              <Text style={styles.avgValue}>Avg: {weekAverage ?? '—'}</Text>
+              <Text style={styles.avgUnit}>mg/dL</Text>
             </View>
-            <Text style={styles.historyMeta}>{entry.context === 'before_meal' ? 'Before Meal' : 'After Meal'} · {entry.loggedAt ? entry.loggedAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}</Text>
-            {entry.notes ? <Text style={styles.historyNotes}>{entry.notes}</Text> : null}
           </View>
-        );
-      })}
-    </ScrollView>
-  </View>;
+          <WeeklyChart days={weekDays} />
+        </View>
+
+        <View style={styles.historyHeader}>
+          <Text style={styles.historyTitle}>History</Text>
+          {!expanded && entries.length > HISTORY_PAGE_SIZE ? (
+            <Pressable onPress={() => setExpanded(true)}><Text style={styles.seeAll}>See All</Text></Pressable>
+          ) : null}
+        </View>
+
+        {entries.length === 0 ? (
+          <Text style={styles.empty}>No readings logged yet. Tap + to add your first one.</Text>
+        ) : groups.map((group) => (
+          <View key={group.label + group.items[0].id} style={styles.group}>
+            <Text style={styles.groupLabel}>{group.label}</Text>
+            {group.items.map((entry) => {
+              const theme = timeTheme(entry.loggedAt?.getHours() ?? 12);
+              return (
+                <View key={entry.id} style={styles.entryCard}>
+                  <View style={styles.entryLeft}>
+                    <View style={[styles.entryIconWrap, { backgroundColor: theme.iconBg }]}>
+                      <SymbolView name={{ ios: theme.icon, android: theme.iconAndroid, web: theme.iconAndroid }} size={20} tintColor={theme.iconColor} />
+                    </View>
+                    <View>
+                      <Text style={styles.entryReading}>{entry.readingMgdl} <Text style={styles.entryUnit}>mg/dL</Text></Text>
+                      <Text style={styles.entryTime}>{entry.loggedAt ? entry.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.entryBadge, { backgroundColor: theme.badgeBg }]}>
+                    <Text style={[styles.entryBadgeText, { color: theme.badgeColor }]}>{entry.context === 'after_meal' ? 'After Meal' : 'Before Meal'}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </ScrollView>
+
+      <Pressable style={styles.fab} onPress={() => setModalVisible(true)}>
+        <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={24} tintColor="#FFF" />
+      </Pressable>
+      <BottomNav active="log" />
+
+      <AddReadingModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={onReadingSaved} />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  readingRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  readingInput: { borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, color: bookingColors.navy, flex: 1, fontSize: 28, fontWeight: '800', paddingHorizontal: 16, paddingVertical: 10 },
-  unit: { color: bookingColors.muted, fontSize: 14, fontWeight: '700' },
-  badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  badgeText: { fontSize: 12, fontWeight: '800' },
-  contextRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  contextPill: { alignItems: 'center', backgroundColor: '#F5F7F9', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, flex: 1, paddingVertical: 12 },
-  contextPillActive: { backgroundColor: bookingColors.green, borderColor: bookingColors.green },
-  contextText: { color: bookingColors.muted, fontSize: 13, fontWeight: '700' },
-  contextTextActive: { color: '#FFF' },
-  notesInput: { borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, color: bookingColors.navy, fontSize: 14, marginTop: 16, minHeight: 60, padding: 14, textAlignVertical: 'top' },
-  error: { color: '#D9364F', fontSize: 13, marginTop: 14 },
-  success: { color: bookingColors.green, fontSize: 13, fontWeight: '700', marginTop: 14 },
-  historyTitle: { marginTop: 8 },
-  empty: { color: bookingColors.muted, fontSize: 14 },
-  historyCard: { gap: 6 },
-  historyTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  historyReading: { color: bookingColors.navy, fontSize: 18, fontWeight: '800' },
-  historyUnit: { color: bookingColors.muted, fontSize: 12, fontWeight: '600' },
-  historyMeta: { color: bookingColors.muted, fontSize: 12 },
-  historyNotes: { color: bookingColors.navy, fontSize: 13, marginTop: 2 },
+  screen: { backgroundColor: homeColors.background, flex: 1 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 24 },
+  headerTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '800', letterSpacing: -0.6 },
+  headerActions: { flexDirection: 'row', gap: 12 },
+  headerButton: { alignItems: 'center', backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
+  scroll: { padding: 24, paddingBottom: 150 },
+  card: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 32, borderWidth: 1, padding: 24, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  cardTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '700' },
+  avgRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  avgValue: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600' },
+  avgUnit: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 14 },
+  historyHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 32 },
+  historyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 20, fontWeight: '700' },
+  seeAll: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  empty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 14, marginTop: 20, textAlign: 'center' },
+  group: { gap: 12, marginTop: 16 },
+  groupLabel: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '700', letterSpacing: 1.2, paddingLeft: 4, textTransform: 'uppercase' },
+  entryCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 24, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', padding: 20, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  entryLeft: { alignItems: 'center', flexDirection: 'row', gap: 16 },
+  entryIconWrap: { alignItems: 'center', borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
+  entryReading: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '700' },
+  entryUnit: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500' },
+  entryTime: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500', marginTop: 2 },
+  entryBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
+  entryBadgeText: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '800', letterSpacing: -0.5, textTransform: 'uppercase' },
+  fab: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 16, bottom: 112, elevation: 4, height: 64, justifyContent: 'center', position: 'absolute', right: 24, shadowColor: homeColors.green, shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.2, shadowRadius: 15, width: 64 },
 });

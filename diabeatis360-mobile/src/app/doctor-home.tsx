@@ -61,6 +61,7 @@ export default function DoctorHomeScreen() {
         <View key={entry.id} style={styles.appointmentCard}>
           <Text style={styles.appointmentName}>{entry.patientName}</Text>
           <Text style={styles.appointmentMeta}>{entry.scheduledAt ? formatDate(entry.scheduledAt) : '—'} · {formatFee(entry.fee)}</Text>
+          <Text style={styles.bookingId} selectable>Booking ID: {entry.id}</Text>
           {entry.status === 'scheduled' ? (
             <View style={styles.actions}>
               <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'accepted')} style={[styles.actionButton, styles.acceptButton]}><Text style={styles.acceptText}>Accept</Text></Pressable>
@@ -87,6 +88,7 @@ const styles = StyleSheet.create({
   appointmentCard: { backgroundColor: '#F5F7F9', borderRadius: 12, gap: 6, padding: 14 },
   appointmentName: { color: authColors.navy, fontSize: 15, fontWeight: '800' },
   appointmentMeta: { color: authColors.muted, fontSize: 12 },
+  bookingId: { color: authColors.muted, fontFamily: 'monospace', fontSize: 11, marginTop: 2 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   actionButton: { alignItems: 'center', borderRadius: 10, flex: 1, paddingVertical: 10 },
   acceptButton: { backgroundColor: authColors.green },

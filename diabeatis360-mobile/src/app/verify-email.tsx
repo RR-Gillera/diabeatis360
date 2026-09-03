@@ -18,7 +18,7 @@ export default function VerifyEmailScreen() {
     setLoading(true); setError(''); setMessage('');
     try {
       const verified = await verifyAccount(code);
-      if (verified) { setMessage('Account registered successfully!'); setTimeout(() => router.replace('/onboarding/language'), 900); }
+      if (verified) { setMessage('Account registered successfully!'); setTimeout(() => router.replace('/landing'), 900); }
       else setError('Enter the 6-character code from your email to continue.');
     } catch { setError('We could not verify your account. Please try again.'); }
     finally { setLoading(false); }

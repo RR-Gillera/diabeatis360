@@ -113,3 +113,32 @@ export function subscribeToBookingsForProvider(
 export async function updateBookingStatus(bookingId: string, status: BookingStatus) {
   await updateDoc(doc(db, 'Bookings', bookingId), { status });
 }
+
+// Which "09:30 AM"-style slots are already taken for one provider on one day,
+// so the time picker can gray those out instead of allowing a double-book.
+// Same single-equality-filter, sort/filter-client-side shape as the other
+// subscribe* functions here, to avoid needing a composite index.
+export function subscribeToBookedTimes(
+  providerId: string,
+  date: Date,
+  onChange: (bookedTimes: Set<string>) => void,
+  onError: (error: Error) => void,
+) {
+  const bookingsQuery = query(collection(db, 'Bookings'), where('provider_id', '==', providerId));
+  return onSnapshot(
+    bookingsQuery,
+    (snapshot) => {
+      const bookedTimes = new Set<string>();
+      for (const document of snapshot.docs) {
+        const data = document.data();
+        if (data.status === 'declined') continue;
+        const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
+        if (!scheduledAt || scheduledAt.toDateString() !== date.toDateString()) continue;
+        // hour: '2-digit' zero-pads to match the "09:30 AM"-style labels in the time picker.
+        bookedTimes.add(scheduledAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+      }
+      onChange(bookedTimes);
+    },
+    (error) => onError(error),
+  );
+}
