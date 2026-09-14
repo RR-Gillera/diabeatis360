@@ -10,7 +10,7 @@ const presets = ['Nuts', 'Dairy', 'Eggs', 'Seafood'];
 
 export default function AllergiesScreen() {
   const router = useRouter();
-  const { email } = useAuth();
+  const { email, uid } = useAuth();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [showOtherInput, setShowOtherInput] = useState(false);
@@ -31,7 +31,7 @@ export default function AllergiesScreen() {
   const visiblePresets = presets.filter((item) => item.toLowerCase().includes(search.toLowerCase()));
 
   const next = async () => {
-    if (email) await saveOnboardingValue(email, 'allergy', selected.join(', '));
+    if (email) await saveOnboardingValue(email, 'allergy', selected.join(', '), uid);
     router.push('/onboarding/activity');
   };
 

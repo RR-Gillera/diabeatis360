@@ -5,10 +5,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { authColors, authStyles, AuthButton, Section } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { getOnboardingValue, saveOnboardingValue } from '@/features/auth/onboarding';
-import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
-import { formatDate, formatFee } from '@/features/booking/booking-ui';
+import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { BottomNav } from '@/features/home/home-ui';
-import type { AppointmentHistoryEntry, Provider } from '@/features/booking/types';
 
 const healthFields: { key: string; label: string }[] = [
   { key: 'dateOfBirth', label: 'Date of Birth' },
@@ -34,11 +32,6 @@ export default function ProfileScreen() {
   const [healthSaved, setHealthSaved] = useState(false);
   const [loadingHealth, setLoadingHealth] = useState(true);
 
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [appointments, setAppointments] = useState<AppointmentHistoryEntry[]>([]);
-  const [loadingAppointments, setLoadingAppointments] = useState(true);
-  const [appointmentsError, setAppointmentsError] = useState('');
-
   useEffect(() => { setName(displayName ?? ''); }, [displayName]);
 
   useEffect(() => {
@@ -51,17 +44,6 @@ export default function ProfileScreen() {
     return () => { cancelled = true; };
   }, [email]);
 
-  useEffect(() => {
-    const unsubscribe = subscribeToProviders(setProviders, () => {});
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    if (!uid) { setLoadingAppointments(false); return; }
-    const unsubscribe = subscribeToBookingHistory(uid, providers, (entries) => { setAppointments(entries); setLoadingAppointments(false); }, (error) => { setAppointmentsError(error.message); setLoadingAppointments(false); });
-    return unsubscribe;
-  }, [providers, uid]);
-
   const saveName = async () => {
     if (!name.trim()) return;
     setSavingName(true); setNameSaved(false);
@@ -72,7 +54,7 @@ export default function ProfileScreen() {
     if (!email) return;
     setSavingHealth(true); setHealthSaved(false);
     try {
-      await Promise.all(healthFields.map((field) => saveOnboardingValue(email, field.key, health[field.key] ?? '')));
+      await Promise.all(healthFields.map((field) => saveOnboardingValue(email, field.key, health[field.key] ?? '', uid)));
       setHealthSaved(true);
     } finally { setSavingHealth(false); }
   };
@@ -101,13 +83,7 @@ export default function ProfileScreen() {
         </Section>
 
         <Section title="Appointment History">
-          {appointmentsError ? <Text style={styles.error}>{appointmentsError}</Text> : null}
-          {loadingAppointments ? <ActivityIndicator color={authColors.green} /> : appointments.length === 0 ? <Text style={styles.empty}>No appointments booked yet.</Text> : appointments.map((entry) => (
-            <View key={entry.id} style={styles.appointmentCard}>
-              <Text style={styles.appointmentName}>{entry.provider?.fullName ?? 'Unknown provider'}</Text>
-              <Text style={styles.appointmentMeta}>{entry.scheduledAt ? formatDate(entry.scheduledAt) : '—'} · {formatFee(entry.fee)} · {entry.status.toUpperCase()}</Text>
-            </View>
-          ))}
+          <AppointmentHistoryList patientId={uid} />
           <Pressable onPress={() => router.push('/booking/find-doctor')}><Text style={styles.link}>Book a new appointment →</Text></Pressable>
         </Section>
 
@@ -125,11 +101,6 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, color: authColors.navy, fontSize: 15, minHeight: 46, paddingHorizontal: 14 },
   fieldRow: { gap: 6 },
   fieldLabel: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
-  empty: { color: authColors.muted, fontSize: 14 },
-  error: { color: '#D9364F', fontSize: 13 },
-  appointmentCard: { backgroundColor: '#F5F7F9', borderRadius: 12, gap: 4, padding: 14 },
-  appointmentName: { color: authColors.navy, fontSize: 15, fontWeight: '800' },
-  appointmentMeta: { color: authColors.muted, fontSize: 12 },
   link: { color: authColors.green, fontSize: 14, fontWeight: '700' },
   logout: { color: '#D9364F', fontSize: 16, fontWeight: '800', marginTop: 32, textAlign: 'center' },
 });

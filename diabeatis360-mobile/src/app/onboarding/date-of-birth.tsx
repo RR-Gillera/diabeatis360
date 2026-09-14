@@ -16,7 +16,7 @@ function daysInMonth(monthIndex: number, year: number) {
 
 export default function DateOfBirthScreen() {
   const router = useRouter();
-  const { email } = useAuth();
+  const { email, uid } = useAuth();
   const [monthName, setMonthName] = useState<string | null>(null);
   const [day, setDay] = useState<number | null>(null);
   const [year, setYear] = useState<number | null>(null);
@@ -47,7 +47,7 @@ export default function DateOfBirthScreen() {
 
   const save = async () => {
     if (!email || !formatted) return;
-    await saveOnboardingValue(email, 'dateOfBirth', formatted);
+    await saveOnboardingValue(email, 'dateOfBirth', formatted, uid);
     router.push('/onboarding/condition');
   };
 

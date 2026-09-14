@@ -23,7 +23,7 @@ export function AuthButton({ title, onPress, disabled }: { title: string; onPres
   return <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text></Pressable>;
 }
 
-// Shared card-section shell used by the user-home and doctor-home screens.
+// Shared card-section shell used by the profile screens.
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text>{children}</View>;
 }

@@ -20,7 +20,7 @@ export default function LoginScreen() {
     setError(''); setMessage(''); setLoading(true);
     try {
       const role = await signIn(email, password);
-      if (await hasCompletedOnboarding(email)) router.replace(role === 'doctor' ? '/doctor-home' : '/user-home');
+      if (await hasCompletedOnboarding(email)) router.replace(role === 'doctor' ? '/doctor' : '/user-home');
       else router.replace('/onboarding/language');
     } catch (value) {
       setError(getLoginError(value));

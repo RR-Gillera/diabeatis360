@@ -49,7 +49,7 @@ export default function PaymentSuccessfulScreen() {
         {bookingId ? <Text style={styles.hint}>Show this Booking ID to your doctor to confirm your appointment.</Text> : null}
       </ScrollView>
       <View style={styles.button}>
-        <PrimaryButton title="View Appointment" onPress={() => router.replace('/booking/appointment')} />
+        <PrimaryButton title="View Appointment" onPress={() => router.replace({ pathname: '/booking/appointment', params: { id: bookingId ?? '' } })} />
       </View>
     </View>
   );

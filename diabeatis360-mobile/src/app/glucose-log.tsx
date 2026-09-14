@@ -5,7 +5,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AddReadingModal } from '@/features/glucose/glucose-ui';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav, homeColors, WeeklyChart } from '@/features/home/home-ui';
@@ -31,27 +31,6 @@ function groupLabel(date: Date) {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
 }
 
-const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-// Buckets this calendar week's (Mon–Sun) entries by day, averaging same-day
-// readings — days with no reading stay null so the chart leaves them out
-// rather than fabricating a value.
-function currentWeek(entries: GlucoseLogEntry[]) {
-  const now = new Date();
-  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  const days = weekdayLabels.map((label, index) => {
-    const dayStart = new Date(monday); dayStart.setDate(monday.getDate() + index);
-    const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate() + 1);
-    const dayEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= dayStart && entry.loggedAt < dayEnd);
-    const value = dayEntries.length ? Math.round(dayEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / dayEntries.length) : null;
-    return { label, value };
-  });
-  const weekEnd = new Date(monday); weekEnd.setDate(monday.getDate() + 7);
-  const weekEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= monday && entry.loggedAt < weekEnd);
-  const average = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / weekEntries.length) : null;
-  return { days, average };
-}
-
 const HISTORY_PAGE_SIZE = 10;
 
 export default function GlucoseLogScreen() {
@@ -67,7 +46,7 @@ export default function GlucoseLogScreen() {
     return unsubscribe;
   }, [uid]);
 
-  const { days: weekDays, average: weekAverage } = useMemo(() => currentWeek(entries), [entries]);
+  const { days: weekDays, average: weekAverage } = useMemo(() => bucketCurrentWeek(entries), [entries]);
 
   const groups = useMemo(() => {
     const visible = expanded ? entries : entries.slice(0, HISTORY_PAGE_SIZE);

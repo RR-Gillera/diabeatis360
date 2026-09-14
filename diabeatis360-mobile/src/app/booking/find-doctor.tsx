@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
+import { useAuth } from '@/features/auth/auth-context';
 import { bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { subscribeToProviders } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
@@ -14,6 +16,7 @@ const filters = ['All', 'Endocrinologist', 'Diabetologist', 'Nutritionist'];
 
 export default function FindDoctorScreen() {
   const router = useRouter();
+  const { uid } = useAuth();
   const { selectProvider } = useBooking();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [search, setSearch] = useState('');
@@ -59,6 +62,12 @@ export default function FindDoctorScreen() {
             <Text style={[styles.filterText, filter === item && styles.activeFilterText]}>{item}</Text>
           </Pressable>
         )} />
+        <View style={styles.historySection}>
+          <Text style={styles.sectionTitle}>Your Appointments</Text>
+          <AppointmentHistoryList patientId={uid} />
+        </View>
+
+        <Text style={styles.sectionTitle}>All Doctors</Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {!error && visibleProviders.length === 0 ? <Text style={styles.empty}>No providers match your search.</Text> : null}
         {visibleProviders.map((provider) => (
@@ -104,6 +113,8 @@ const styles = StyleSheet.create({
   activeFilterText: { color: '#FFF' },
   error: { color: '#D9364F', fontSize: 14 },
   empty: { color: bookingColors.muted, paddingVertical: 20, textAlign: 'center' },
+  historySection: { gap: 12 },
+  sectionTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
   doctorTop: { flexDirection: 'row', gap: 14 },
   avatar: { alignItems: 'center', backgroundColor: '#DFF2E8', borderRadius: 14, height: 64, justifyContent: 'center', width: 64 },
   avatarText: { color: bookingColors.green, fontSize: 20, fontWeight: '800' },
