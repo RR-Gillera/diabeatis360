@@ -27,6 +27,28 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
   return reference.id;
 }
 
+export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// Buckets this calendar week's (Mon–Sun) entries by day, averaging same-day
+// readings — days with no reading stay null so charts leave them out rather
+// than fabricating a value. Shared by the patient's Log tab and the doctor's
+// patient-detail view so both read the same week the same way.
+export function bucketCurrentWeek(entries: GlucoseLogEntry[]) {
+  const now = new Date();
+  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const days = WEEKDAY_LABELS.map((label, index) => {
+    const dayStart = new Date(monday); dayStart.setDate(monday.getDate() + index);
+    const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate() + 1);
+    const dayEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= dayStart && entry.loggedAt < dayEnd);
+    const value = dayEntries.length ? Math.round(dayEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / dayEntries.length) : null;
+    return { label, value };
+  });
+  const weekEnd = new Date(monday); weekEnd.setDate(monday.getDate() + 7);
+  const weekEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= monday && entry.loggedAt < weekEnd);
+  const average = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / weekEntries.length) : null;
+  return { days, average };
+}
+
 // Single equality filter only, sorted client-side — matches the no-composite-index
 // convention already used by subscribeToBookingHistory in the booking feature.
 export function subscribeToGlucoseHistory(

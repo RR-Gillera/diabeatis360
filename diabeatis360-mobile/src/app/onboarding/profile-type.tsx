@@ -35,7 +35,7 @@ export default function ProfileTypeScreen() {
         }, { merge: true });
       }
       await completeOnboarding(email, profileType);
-      router.replace('/doctor-home');
+      router.replace('/doctor');
     } else {
       router.push('/onboarding/date-of-birth');
     }

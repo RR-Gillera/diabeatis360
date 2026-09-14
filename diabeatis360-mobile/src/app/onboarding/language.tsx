@@ -3,11 +3,20 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
+import { saveOnboardingValue } from '@/features/auth/onboarding';
+import { useAuth } from '@/features/auth/auth-context';
 
 export default function LanguageScreen() {
   const router = useRouter();
+  const { email, uid } = useAuth();
   const [language, setLanguage] = useState('English');
-  return <View style={[authStyles.screen, styles.screen]}><View style={styles.progress}><Text style={styles.progressLabel}>INITIAL SETUP</Text><Text style={styles.step}>10% Complete</Text></View><View style={styles.track}><View style={styles.fill} /></View><Text style={styles.back} onPress={() => router.back()}>‹  Back</Text><Text style={styles.title}>Language &{`\n`}Region</Text><Text style={styles.subtitle}>Choose your preferred language for a better health management experience.</Text><Option title="🇺🇸   English" detail="System Default" selected={language === 'English'} onPress={() => setLanguage('English')} /><Option title="🇵🇭   Filipino / Tagalog" detail="Lokal na Wika" selected={language === 'Filipino'} onPress={() => setLanguage('Filipino')} /><View style={styles.info}><Text style={styles.infoIcon}>●</Text><Text style={styles.infoText}>You can change your language preferences at any time in the app settings.</Text></View><View style={styles.bottom}><AuthButton title="Next  ›" onPress={() => router.push('/onboarding/profile-type')} /><Text style={styles.hint}>◉    Content will adapt based on your selection.</Text></View></View>;
+  // This screen used to drop the chosen language on the floor — it was never
+  // persisted anywhere, so the preference silently vanished on Next.
+  const next = async () => {
+    if (email) await saveOnboardingValue(email, 'language', language, uid);
+    router.push('/onboarding/profile-type');
+  };
+  return <View style={[authStyles.screen, styles.screen]}><View style={styles.progress}><Text style={styles.progressLabel}>INITIAL SETUP</Text><Text style={styles.step}>10% Complete</Text></View><View style={styles.track}><View style={styles.fill} /></View><Text style={styles.back} onPress={() => router.back()}>‹  Back</Text><Text style={styles.title}>Language &{`\n`}Region</Text><Text style={styles.subtitle}>Choose your preferred language for a better health management experience.</Text><Option title="🇺🇸   English" detail="System Default" selected={language === 'English'} onPress={() => setLanguage('English')} /><Option title="🇵🇭   Filipino / Tagalog" detail="Lokal na Wika" selected={language === 'Filipino'} onPress={() => setLanguage('Filipino')} /><View style={styles.info}><Text style={styles.infoIcon}>●</Text><Text style={styles.infoText}>You can change your language preferences at any time in the app settings.</Text></View><View style={styles.bottom}><AuthButton title="Next  ›" onPress={next} /><Text style={styles.hint}>◉    Content will adapt based on your selection.</Text></View></View>;
 }
 
 function Option({ title, detail, selected, onPress }: { title: string; detail: string; selected: boolean; onPress: () => void }) { return <Pressable onPress={onPress} style={[styles.option, selected && styles.selected]}><View style={styles.optionText}><Text style={styles.optionTitle}>{title}</Text><Text style={styles.detail}>{detail}</Text></View><View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <Text style={styles.check}>✓</Text> : null}</View></Pressable>; }
