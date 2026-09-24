@@ -3,7 +3,7 @@ import type { DocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 
-import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, Provider, ProviderBookingEntry } from './types';
+import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, PaymentMethod, PaymentStatus, Provider, ProviderBookingEntry } from './types';
 
 // Shared Firestore-doc-to-Provider mapping, used by both subscribeToProviders
 // (list) and subscribeToBooking (single join) so the field mapping only lives
@@ -32,17 +32,30 @@ export function subscribeToProviders(
   );
 }
 
-export async function createBooking(patientId: string, providerId: string, selectedDate: Date, fee: number) {
+// Creates the booking as a REQUEST: the doctor has to accept before the patient
+// is asked to pay, so no payment method is chosen here and nothing is marked paid.
+export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number) {
   const record: BookingRecord = {
     patient_id: patientId,
     provider_id: providerId,
     status: 'scheduled',
     scheduled_at: Timestamp.fromDate(selectedDate),
     fee,
+    payment_status: 'unpaid',
+    payment_method: null,
     created_at: serverTimestamp(),
   };
   const reference = await addDoc(collection(db, 'Bookings'), record);
   return reference.id;
+}
+
+// Settles payment on an already-accepted booking. Paying on-site records the
+// intent rather than money received — the clinic collects it in person.
+export async function payForBooking(bookingId: string, method: PaymentMethod) {
+  await updateDoc(doc(db, 'Bookings', bookingId), {
+    payment_method: method,
+    payment_status: method === 'Pay On-Site' ? 'onsite' : 'paid',
+  });
 }
 
 // Joins each booking with its provider client-side (Bookings only stores provider_id,
@@ -66,9 +79,13 @@ export function subscribeToBookingHistory(
           return {
             id: document.id,
             provider,
+            patientId: String(data.patient_id ?? ''),
+            patientName: '',
             status: String(data.status ?? 'scheduled'),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
+            paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
+            paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
           };
         })
         .sort((a, b) => (b.scheduledAt?.getTime() ?? 0) - (a.scheduledAt?.getTime() ?? 0));
@@ -93,13 +110,23 @@ export function subscribeToBooking(
         if (!snapshot.exists()) { onChange(null); return; }
         const data = snapshot.data();
         const providerId = String(data.provider_id ?? '');
-        const providerSnapshot = providerId ? await getDoc(doc(db, 'Providers', providerId)) : null;
+        const patientId = String(data.patient_id ?? '');
+        // Both sides of the booking are joined here so a consultation can name
+        // the person on the other end, whichever role is viewing.
+        const [providerSnapshot, patientSnapshot] = await Promise.all([
+          providerId ? getDoc(doc(db, 'Providers', providerId)) : Promise.resolve(null),
+          patientId ? getDoc(doc(db, 'Users', patientId)) : Promise.resolve(null),
+        ]);
         onChange({
           id: snapshot.id,
           provider: providerSnapshot?.exists() ? providerFromDoc(providerSnapshot) : null,
+          patientId,
+          patientName: String(patientSnapshot?.data()?.full_name ?? ''),
           status: String(data.status ?? 'scheduled'),
           scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
           fee: Number(data.fee ?? 0),
+          paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
+          paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
         });
       })();
     },
@@ -132,6 +159,8 @@ export function subscribeToBookingsForProvider(
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
             status: (data.status ?? 'scheduled') as BookingStatus,
+            paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
+            paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
           };
         }));
         entries.sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0));

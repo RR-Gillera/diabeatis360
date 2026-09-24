@@ -1,3 +1,5 @@
+import type { TimeRange } from './time-slots';
+
 // The doctor's own bookable profile (Providers doc, ID == Auth UID), plus the
 // availability fields that back the "Manage Schedule" module. Availability is
 // stored on the Providers doc rather than a new collection — it's a property of
@@ -14,8 +16,8 @@ export type DoctorProfile = {
   isActive: boolean;
   /** Weekday indexes the doctor works, Mon=0 … Sun=6. Empty means "not set yet". */
   availableDays: number[];
-  /** "09:00 AM"-style slot labels the doctor offers. Empty means "not set yet". */
-  availableTimes: string[];
+  /** Free-form availability windows, e.g. 7:00 PM - 9:00 PM. Empty means "not set yet". */
+  availableRanges: TimeRange[];
 };
 
 // A patient as the doctor sees them: identity from the Users doc plus the

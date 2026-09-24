@@ -29,8 +29,10 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
     <View style={styles.nav}>
       {navItems.map((item) => {
         const color = item.key === active ? homeColors.green : homeColors.textMuted;
+        // dismissTo rather than push, for the same reason as the patient nav:
+        // switching tabs should move between them, not stack another copy.
         return (
-          <Pressable key={item.key} onPress={() => router.push(item.href)} style={styles.navItem}>
+          <Pressable key={item.key} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
             <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={20} tintColor={color} />
             <Text style={[styles.navLabel, { color }]}>{item.label}</Text>
           </Pressable>
@@ -55,7 +57,7 @@ export function DoctorHeader({ title, subtitle, onBack, badgeCount }: { title: s
           {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
-      <Pressable style={styles.bellButton} onPress={() => router.push('/doctor/notifications')} hitSlop={8}>
+      <Pressable style={styles.bellButton} onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}>
         <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
         {badgeCount ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{badgeCount > 9 ? '9+' : badgeCount}</Text></View> : null}
       </Pressable>

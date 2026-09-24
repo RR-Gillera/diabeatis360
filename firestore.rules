@@ -1,0 +1,95 @@
+rules_version = '2';
+
+// Diabeatis360 Firestore security rules.
+//
+// These replace the default "test mode" rules, which allowed anyone in the world
+// to read and write the whole database and expired on 2026-09-22 (after which
+// every client request was denied — the "Missing or insufficient permissions"
+// error). These rules do not expire.
+//
+// SCOPE / KNOWN LIMITATION, to be honest about what this does and does not do:
+// reads are allowed to any *signed-in* user, while writes are restricted to the
+// record's owner. Tighter per-record read rules are not practical here because
+// Firestore evaluates rules per document but cannot run a query inside a rule —
+// e.g. proving "this doctor may read this patient" would require looking up the
+// Bookings collection, which rules cannot query. The app relies on several such
+// cross-user reads:
+//   * a patient reads other patients' bookings for a doctor, to grey out slots
+//     that are already taken (subscribeToBookedTimes)
+//   * a doctor reads the Users and Glucose_Logs docs of patients who booked them
+// Locking reads down further needs either denormalised membership fields on each
+// document or Cloud Functions, which is the right follow-up before this handles
+// real patient data.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Account + health profile. Document ID is the Firebase Auth UID.
+    match /Users/{userId} {
+      allow read: if signedIn();
+      allow create, update: if isUser(userId);
+      allow delete: if false;
+    }
+
+    // A doctor's bookable profile. Document ID is also their Auth UID, so only
+    // they can edit it, while any signed-in patient can browse it.
+    match /Providers/{providerId} {
+      allow read: if signedIn();
+      allow create, update: if isUser(providerId);
+      allow delete: if false;
+    }
+
+    // Only the patient can raise a booking request; either side can update it
+    // afterwards (the doctor accepts/declines, the patient pays, and both can
+    // open the consultation).
+    match /Bookings/{bookingId} {
+      allow read: if signedIn();
+      allow create: if isUser(request.resource.data.patient_id);
+      allow update: if isUser(resource.data.patient_id) || isUser(resource.data.provider_id);
+      allow delete: if false;
+    }
+
+    // Readings belong to the patient who logged them. Doctors read them for the
+    // blood-sugar history and charts.
+    match /Glucose_Logs/{logId} {
+      allow read: if signedIn();
+      allow create: if isUser(request.resource.data.patient_id);
+      allow update, delete: if isUser(resource.data.patient_id);
+    }
+
+    // Consultation chat. Messages are immutable once sent, so the transcript
+    // cannot be quietly rewritten after the fact.
+    match /Messages/{messageId} {
+      allow read: if signedIn();
+      allow create: if isUser(request.resource.data.sender_id);
+      allow update, delete: if false;
+    }
+
+    // Notifications are written FOR another user (the recipient of a message,
+    // for instance), so creation only requires being signed in — but only the
+    // recipient can mark their own as read.
+    match /Notifications/{notificationId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if isUser(resource.data.user_id);
+      allow delete: if false;
+    }
+
+    // Collections seeded for the ERD that no app code writes yet
+    // (Food_Database, Badges, Subscription_Plans, and the rest). Readable so
+    // features can be built against them, but not client-writable until those
+    // features exist and can be given real rules.
+    match /{collection}/{docId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+  }
+}

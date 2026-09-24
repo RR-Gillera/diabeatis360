@@ -10,10 +10,16 @@ import { formatFee } from '@/features/booking/booking-ui';
 import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
+import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
+import { useSafeBack } from '@/hooks/use-safe-back';
 
 type Notice = {
   id: string;
   patientId: string;
+  /** Set when the notice is a stored Notifications doc rather than derived. */
+  notificationId?: string;
+  bookingId?: string;
+  unread?: boolean;
   title: string;
   detail: string;
   when: Date | null;
@@ -56,36 +62,69 @@ function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
 
 export default function DoctorNotificationsScreen() {
   const router = useRouter();
+  const goBack = useSafeBack('/doctor');
   const { uid } = useAuth();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const [error, setError] = useState('');
+  const [stored, setStored] = useState<NotificationEntry[]>([]);
 
   useEffect(() => {
     if (!uid) return;
     return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
   }, [uid]);
 
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToNotifications(uid, setStored, () => {});
+  }, [uid]);
+
   const notices = useMemo(() => {
-    const list = toNotices(appointments);
+    // Chat notifications are real Notifications docs; booking activity is derived
+    // from the bookings themselves. Both belong in one list for the doctor.
+    const messageNotices: Notice[] = stored
+      .filter((entry) => entry.type === 'message')
+      .map((entry) => ({
+        id: entry.id,
+        patientId: '',
+        notificationId: entry.id,
+        bookingId: entry.relatedId,
+        unread: !entry.isRead,
+        title: 'New message',
+        detail: entry.message,
+        when: entry.sentAt,
+        icon: 'bubble.left.and.bubble.right.fill' as const,
+        iconAndroid: 'forum' as const,
+        color: homeColors.green,
+        background: homeColors.greenTint,
+      }));
+    const list = [...messageNotices, ...toNotices(appointments)];
     // Pending requests first, then most recent — the doctor's action queue
     // matters more than strict chronology.
     return list.sort((a, b) => {
-      const aPending = a.title === 'New booking request' ? 0 : 1;
-      const bPending = b.title === 'New booking request' ? 0 : 1;
+      const aPending = a.unread || a.title === 'New booking request' ? 0 : 1;
+      const bPending = b.unread || b.title === 'New booking request' ? 0 : 1;
       if (aPending !== bPending) return aPending - bPending;
       return (b.when?.getTime() ?? 0) - (a.when?.getTime() ?? 0);
     });
-  }, [appointments]);
+  }, [appointments, stored]);
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Notifications" subtitle="Booking activity from your patients" onBack={() => router.back()} />
+      <DoctorHeader title="Notifications" subtitle="Booking activity from your patients" onBack={() => goBack()} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
         {notices.length === 0 ? (
           <EmptyState icon="bell.fill" iconAndroid="inbox" title="Nothing yet" detail="Booking requests and updates from your patients will show up here." />
         ) : notices.map((notice) => (
-          <Pressable key={notice.id} style={[doctorStyles.card, styles.card]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: notice.patientId } })}>
+          <Pressable
+            key={notice.id}
+            style={[doctorStyles.card, styles.card, notice.unread ? styles.cardUnread : null]}
+            onPress={() => {
+              if (notice.notificationId) void markNotificationRead(notice.notificationId);
+              if (notice.bookingId) router.push({ pathname: '/consultation/[id]', params: { id: notice.bookingId } });
+              else if (notice.patientId) router.push({ pathname: '/doctor/patient/[id]', params: { id: notice.patientId } });
+            }}
+          >
             <View style={[styles.icon, { backgroundColor: notice.background }]}>
               <SymbolView name={{ ios: notice.icon, android: notice.iconAndroid, web: notice.iconAndroid }} size={16} tintColor={notice.color} />
             </View>
@@ -102,6 +141,7 @@ export default function DoctorNotificationsScreen() {
 
 const styles = StyleSheet.create({
   card: { alignItems: 'flex-start', flexDirection: 'row', gap: 14, marginTop: 12 },
+  cardUnread: { borderColor: 'rgba(98, 156, 44, 0.4)' },
   icon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   copy: { flex: 1, gap: 3 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },

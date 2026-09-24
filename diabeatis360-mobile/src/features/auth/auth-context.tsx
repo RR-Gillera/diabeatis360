@@ -129,7 +129,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     resendVerificationCode,
     resetPassword,
     updateDisplayName,
-    hasCompletedOnboarding,
+    // uid is supplied here so every caller checks Firestore, not just local storage.
+    hasCompletedOnboarding: (value: string) => hasCompletedOnboarding(value, auth.currentUser?.uid ?? null),
     signOut: () => { void firebaseSignOut(auth); setRole('guest'); setUid(null); setEmail(null); setDisplayName(null); },
   }}>{children}</AuthContext.Provider>;
 }

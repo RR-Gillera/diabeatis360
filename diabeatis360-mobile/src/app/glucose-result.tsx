@@ -7,6 +7,7 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AiRecommendations } from '@/features/glucose/glucose-ui';
+import { glucoseAlert } from '@/features/notifications/notification-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { homeColors } from '@/features/home/home-ui';
 
@@ -42,6 +43,7 @@ export default function GlucoseResultScreen() {
   }
 
   const badge = badgeStyle[latest.interpretation];
+  const alert = glucoseAlert(latest.readingMgdl, latest.interpretation);
   const time = latest.loggedAt ? latest.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—';
 
   return (
@@ -69,6 +71,22 @@ export default function GlucoseResultScreen() {
         <Text style={styles.whatTitle}>What this means</Text>
         <Text style={styles.whatText}>{explanation[latest.interpretation]}</Text>
       </View>
+
+      {alert ? (
+        <View style={[styles.alertCard, alert.severity === 'critical' ? styles.alertCritical : styles.alertWarning]}>
+          <View style={styles.alertHeader}>
+            <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={18} tintColor={alert.severity === 'critical' ? homeColors.red : homeColors.orange} />
+            <Text style={[styles.alertTitle, { color: alert.severity === 'critical' ? homeColors.red : '#B45309' }]}>
+              {alert.severity === 'critical' ? 'Seek medical help now' : 'Worth getting checked'}
+            </Text>
+          </View>
+          <Text style={styles.alertText}>{alert.message}</Text>
+          <Pressable style={[styles.alertButton, { backgroundColor: alert.severity === 'critical' ? homeColors.red : homeColors.orange }]} onPress={() => router.push('/booking/find-doctor')}>
+            <SymbolView name={{ ios: 'stethoscope', android: 'medical_services', web: 'medical_services' }} size={15} tintColor="#FFF" />
+            <Text style={styles.alertButtonText}>See a Doctor</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <View style={styles.recommendations}>
         <AiRecommendations interpretation={latest.interpretation} />
@@ -99,5 +117,13 @@ const styles = StyleSheet.create({
   divider: { alignSelf: 'stretch', backgroundColor: '#F1F5F9', height: 1, marginTop: 24 },
   whatTitle: { alignSelf: 'flex-start', color: '#111827', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '700', marginTop: 24 },
   whatText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 22, marginTop: 8, textAlign: 'left' },
+  alertCard: { borderRadius: 24, borderWidth: 1, gap: 12, marginTop: 24, padding: 20 },
+  alertWarning: { backgroundColor: 'rgba(251, 146, 60, 0.08)', borderColor: 'rgba(251, 146, 60, 0.35)' },
+  alertCritical: { backgroundColor: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.35)' },
+  alertHeader: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  alertTitle: { fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  alertText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
+  alertButton: { alignItems: 'center', borderRadius: 12, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46 },
+  alertButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   recommendations: { marginTop: 32 },
 });

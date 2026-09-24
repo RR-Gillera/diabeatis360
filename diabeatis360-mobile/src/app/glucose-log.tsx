@@ -39,6 +39,7 @@ export default function GlucoseLogScreen() {
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editing, setEditing] = useState<GlucoseLogEntry | null>(null);
 
   useEffect(() => {
     if (!uid) return;
@@ -60,7 +61,14 @@ export default function GlucoseLogScreen() {
     return result;
   }, [entries, expanded]);
 
-  const onReadingSaved = () => { setModalVisible(false); router.push('/glucose-result'); };
+  // Editing an existing reading just closes the sheet — the interpretation
+  // screen is for a reading the patient has only just taken.
+  const onReadingSaved = () => {
+    const wasEditing = Boolean(editing);
+    setModalVisible(false);
+    setEditing(null);
+    if (!wasEditing) router.push('/glucose-result');
+  };
 
   return (
     <View style={styles.screen}>
@@ -103,7 +111,7 @@ export default function GlucoseLogScreen() {
             {group.items.map((entry) => {
               const theme = timeTheme(entry.loggedAt?.getHours() ?? 12);
               return (
-                <View key={entry.id} style={styles.entryCard}>
+                <Pressable key={entry.id} style={styles.entryCard} onPress={() => { setEditing(entry); setModalVisible(true); }}>
                   <View style={styles.entryLeft}>
                     <View style={[styles.entryIconWrap, { backgroundColor: theme.iconBg }]}>
                       <SymbolView name={{ ios: theme.icon, android: theme.iconAndroid, web: theme.iconAndroid }} size={20} tintColor={theme.iconColor} />
@@ -116,19 +124,19 @@ export default function GlucoseLogScreen() {
                   <View style={[styles.entryBadge, { backgroundColor: theme.badgeBg }]}>
                     <Text style={[styles.entryBadgeText, { color: theme.badgeColor }]}>{entry.context === 'after_meal' ? 'After Meal' : 'Before Meal'}</Text>
                   </View>
-                </View>
+                </Pressable>
               );
             })}
           </View>
         ))}
       </ScrollView>
 
-      <Pressable style={styles.fab} onPress={() => setModalVisible(true)}>
+      <Pressable style={styles.fab} onPress={() => { setEditing(null); setModalVisible(true); }}>
         <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={24} tintColor="#FFF" />
       </Pressable>
       <BottomNav active="log" />
 
-      <AddReadingModal visible={modalVisible} onClose={() => setModalVisible(false)} onSaved={onReadingSaved} />
+      <AddReadingModal visible={modalVisible} entry={editing} onClose={() => { setModalVisible(false); setEditing(null); }} onSaved={onReadingSaved} />
     </View>
   );
 }

@@ -47,16 +47,16 @@ export default function DoctorPatientsScreen() {
           />
         ) : visible.map((patient) => (
           <Pressable key={patient.id} style={[doctorStyles.card, styles.card]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: patient.id } })}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{patient.fullName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
-            <View style={styles.copy}>
-              <Text style={styles.name}>{patient.fullName}</Text>
-              <Text style={styles.meta}>
-                {patient.appointmentCount} appointment{patient.appointmentCount === 1 ? '' : 's'}
-                {patient.lastAppointmentAt ? ` · last ${patient.lastAppointmentAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
-              </Text>
-            </View>
-            {patient.hasPendingRequest ? <View style={styles.pendingDot} /> : null}
-            <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={homeColors.textFaint} />
+              <View style={styles.avatar}><Text style={styles.avatarText}>{patient.fullName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
+              <View style={styles.copy}>
+                <Text style={styles.name}>{patient.fullName}</Text>
+                <Text style={styles.meta}>
+                  {patient.appointmentCount} appointment{patient.appointmentCount === 1 ? '' : 's'}
+                  {patient.lastAppointmentAt ? ` · last ${patient.lastAppointmentAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                </Text>
+              </View>
+              {patient.hasPendingRequest ? <View style={styles.pendingDot} /> : null}
+              <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={homeColors.textFaint} />
           </Pressable>
         ))}
       </ScrollView>

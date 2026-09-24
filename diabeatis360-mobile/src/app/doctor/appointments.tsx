@@ -10,6 +10,7 @@ import { formatFee } from '@/features/booking/booking-ui';
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState, StatusPill } from '@/features/doctor/doctor-ui';
 import type { BookingStatus, ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
+import { subscribeToNotifications } from '@/features/notifications/notification-service';
 
 type FilterKey = 'pending' | 'accepted' | 'declined' | 'all';
 
@@ -45,10 +46,16 @@ export default function DoctorAppointmentsScreen() {
   const [filter, setFilter] = useState<FilterKey>('pending');
   const [error, setError] = useState('');
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (!uid) return;
     return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToNotifications(uid, (items) => setUnread(items.filter((item) => !item.isRead).length), () => {});
   }, [uid]);
 
   const pendingCount = appointments.filter((entry) => entry.status === 'scheduled').length;
@@ -72,7 +79,7 @@ export default function DoctorAppointmentsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Appointments" subtitle="Accept, decline, and review bookings" badgeCount={pendingCount} />
+      <DoctorHeader title="Appointments" subtitle="Accept, decline, and review bookings" badgeCount={pendingCount + unread} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         <View style={styles.filterRow}>
           {filters.map((item) => (
@@ -119,10 +126,18 @@ export default function DoctorAppointmentsScreen() {
                     </Pressable>
                   </View>
                 ) : (
-                  <Pressable style={styles.viewPatient} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
-                    <SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={15} tintColor={homeColors.green} />
-                    <Text style={styles.viewPatientText}>View patient records</Text>
-                  </Pressable>
+                  <>
+                    <Pressable style={styles.viewPatient} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
+                      <SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={15} tintColor={homeColors.green} />
+                      <Text style={styles.viewPatientText}>View patient records</Text>
+                    </Pressable>
+                    {entry.status === 'accepted' ? (
+                      <Pressable style={styles.chatAction} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
+                        <SymbolView name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }} size={15} tintColor="#FFF" />
+                        <Text style={styles.chatActionText}>Open Chat</Text>
+                      </Pressable>
+                    ) : null}
+                  </>
                 )}
               </View>
             ))}
@@ -158,4 +173,6 @@ const styles = StyleSheet.create({
   declineText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   viewPatient: { alignItems: 'center', borderTopColor: homeColors.borderSoft, borderTopWidth: 1, flexDirection: 'row', gap: 8, paddingTop: 14 },
   viewPatientText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
+  chatAction: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 12, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46 },
+  chatActionText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
 });

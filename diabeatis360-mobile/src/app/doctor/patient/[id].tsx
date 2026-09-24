@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
+import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
+import { useAuth } from '@/features/auth/auth-context';
+import type { ProviderBookingEntry } from '@/features/booking/types';
 import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { PatientProfile } from '@/features/doctor/types';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { homeColors, WeeklyChart } from '@/features/home/home-ui';
+import { useSafeBack } from '@/hooks/use-safe-back';
 
 const readingStyle: Record<Interpretation, { label: string; color: string; background: string }> = {
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
@@ -28,6 +32,9 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 
 export default function DoctorPatientDetailScreen() {
   const router = useRouter();
+  const goBack = useSafeBack('/doctor/patients');
+  const { uid } = useAuth();
+  const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
@@ -44,10 +51,19 @@ export default function DoctorPatientDetailScreen() {
     return subscribeToGlucoseHistory(id, setEntries, (value) => setError(value.message));
   }, [id]);
 
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToBookingsForProvider(uid, setAppointments, () => {});
+  }, [uid]);
+
   const { days: weekDays, average: weekAverage } = useMemo(() => bucketCurrentWeek(entries), [entries]);
   const latest = entries[0];
   const highCount = entries.filter((entry) => entry.interpretation === 'high').length;
   const lowCount = entries.filter((entry) => entry.interpretation === 'low').length;
+
+  const consultations = useMemo(() => appointments
+    .filter((entry) => entry.patientId === id && entry.status === 'accepted')
+    .sort((a, b) => (b.scheduledAt?.getTime() ?? 0) - (a.scheduledAt?.getTime() ?? 0)), [appointments, id]);
 
   // Captured once on mount rather than read during render — age shouldn't be
   // recomputed from a moving clock on every re-render.
@@ -56,7 +72,7 @@ export default function DoctorPatientDetailScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title={profile?.fullName ?? 'Patient'} subtitle={profile?.email} onBack={() => router.back()} />
+      <DoctorHeader title={profile?.fullName ?? 'Patient'} subtitle={profile?.email} onBack={() => goBack()} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         {!id ? (
           <EmptyState icon="person.crop.circle.badge.questionmark" iconAndroid="person_search" title="Patient not found" />
@@ -102,6 +118,27 @@ export default function DoctorPatientDetailScreen() {
                 <WeeklyChart days={weekDays} width={252} />
               </View>
             </View>
+
+            {consultations.length ? (
+              <>
+                <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Consultations</Text>
+                {consultations.map((entry) => (
+                  <Pressable key={entry.id} style={[doctorStyles.card, styles.consultCard]} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
+                    <View style={styles.consultIcon}>
+                      <SymbolView name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }} size={16} tintColor={homeColors.green} />
+                    </View>
+                    <View style={styles.consultCopy}>
+                      <Text style={styles.consultTitle}>Open Chat</Text>
+                      <Text style={styles.consultMeta}>
+                        {entry.scheduledAt ? entry.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Appointment'}
+                        {entry.scheduledAt ? ` · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+                      </Text>
+                    </View>
+                    <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />
+                  </Pressable>
+                ))}
+              </>
+            ) : null}
 
             <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Reading History</Text>
             {entries.length === 0 ? (
@@ -150,6 +187,11 @@ const styles = StyleSheet.create({
   summaryValueLow: { color: homeColors.orange },
   summaryLabel: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '600', marginTop: 2 },
   chartWrap: { borderTopColor: homeColors.borderSoft, borderTopWidth: 1, paddingTop: 16 },
+  consultCard: { alignItems: 'center', flexDirection: 'row', gap: 14, marginTop: 12 },
+  consultIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  consultCopy: { flex: 1 },
+  consultTitle: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  consultMeta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 2 },
   entryCard: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between', marginTop: 12 },
   entryLeft: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14 },
   entryIcon: { alignItems: 'center', borderRadius: 16, height: 40, justifyContent: 'center', width: 40 },

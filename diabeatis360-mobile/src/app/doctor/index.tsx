@@ -12,6 +12,7 @@ import { DoctorBottomNav, doctorStyles, EmptyState, StatusPill } from '@/feature
 import type { DoctorProfile } from '@/features/doctor/types';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
+import { subscribeToNotifications } from '@/features/notifications/notification-service';
 
 function isSameDay(a: Date | null, b: Date) {
   return Boolean(a) && a!.toDateString() === b.toDateString();
@@ -24,6 +25,7 @@ export default function DoctorHomeScreen() {
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [error, setError] = useState('');
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (!uid) return;
@@ -33,6 +35,11 @@ export default function DoctorHomeScreen() {
   useEffect(() => {
     if (!uid) return;
     return subscribeToDoctorProfile(uid, setProfile, () => {});
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToNotifications(uid, (items) => setUnread(items.filter((item) => !item.isRead).length), () => {});
   }, [uid]);
 
   const stats = useMemo(() => {
@@ -67,9 +74,9 @@ export default function DoctorHomeScreen() {
             <Text style={styles.hello}>Hello,</Text>
             <Text style={styles.greeting}>{greeting},{'\n'}Dr. {firstName}!</Text>
           </View>
-          <Pressable style={styles.bellButton} onPress={() => router.push('/doctor/notifications')} hitSlop={8}>
+          <Pressable style={styles.bellButton} onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}>
             <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-            {stats.pending.length ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{stats.pending.length > 9 ? '9+' : stats.pending.length}</Text></View> : null}
+            {stats.pending.length + unread ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{stats.pending.length + unread > 9 ? '9+' : stats.pending.length + unread}</Text></View> : null}
           </Pressable>
         </View>
 

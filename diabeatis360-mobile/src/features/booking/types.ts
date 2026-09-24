@@ -10,7 +10,12 @@ export type Provider = {
   isVerified: boolean;
 };
 
-export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card';
+export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';
+
+// Payment now happens AFTER the doctor accepts, so a booking carries a payment
+// state of its own rather than only existing once money changed hands.
+// 'onsite' means settled in person at the clinic, not online.
+export type PaymentStatus = 'unpaid' | 'paid' | 'onsite';
 
 export type BookingDraft = {
   provider: Provider | null;
@@ -28,15 +33,24 @@ export type BookingRecord = {
   status: BookingStatus;
   scheduled_at: Timestamp;
   fee: number;
+  payment_status: PaymentStatus;
+  payment_method: PaymentMethod | null;
   created_at: ReturnType<typeof import('firebase/firestore').serverTimestamp>;
 };
 
 export type AppointmentHistoryEntry = {
   id: string;
   provider: Provider | null;
+  patientId: string;
+  /** Resolved by subscribeToBooking only — the list query would need one extra
+   *  read per booking, and the patient viewing their own history already knows
+   *  their name. Empty string when not resolved. */
+  patientName: string;
   status: string;
   scheduledAt: Date | null;
   fee: number;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod | null;
 };
 
 // The doctor-side mirror of AppointmentHistoryEntry — needs patient identity, not
@@ -48,4 +62,6 @@ export type ProviderBookingEntry = {
   scheduledAt: Date | null;
   fee: number;
   status: BookingStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod | null;
 };

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AddReadingModal, AiRecommendations } from '@/features/glucose/glucose-ui';
+import { wellnessStats } from '@/features/gamification/gamification-service';
+import { subscribeToNotifications } from '@/features/notifications/notification-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { BottomNav, homeColors, RingProgress, Sparkline } from '@/features/home/home-ui';
 
@@ -18,13 +20,23 @@ const exerciseGoal = 60;
 const hydrationLiters = 1.5;
 const hydrationGoal = 2.5;
 
-// Same story for Recent Activity/gamification — the Gamification/Badges
-// collections exist in Firestore but no read/write service has been built for
-// them yet, so this list is static sample content matching the design.
-const recentActivity = [
-  { icon: 'square.and.pencil', iconAndroid: 'edit_note', title: 'Daily Log Completed', when: 'Today, 8:30 AM', points: '0.5 pts' },
-  { icon: 'figure.walk', iconAndroid: 'directions_walk', title: '10k Steps Milestone', when: 'Yesterday, 6:45 PM', points: '2 pts' },
-] as const;
+const POINTS_PER_LOG = 5;
+
+// Recent Activity is now driven by real Glucose_Logs: each of the last two
+// readings is one activity row, worth the same points the rewards screen
+// counts it for. The old hardcoded "10k Steps Milestone" row is gone because
+// there is no step data anywhere in the app to back it up.
+function activityWhen(date: Date | null) {
+  if (!date) return '—';
+  const startOfDay = (value: Date) => { const copy = new Date(value); copy.setHours(0, 0, 0, 0); return copy; };
+  const today = startOfDay(new Date());
+  const target = startOfDay(date);
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const DAY = 24 * 60 * 60 * 1000;
+  if (target.getTime() === today.getTime()) return `Today, ${time}`;
+  if (target.getTime() === today.getTime() - DAY) return `Yesterday, ${time}`;
+  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
+}
 
 const badgeStyle: Record<Interpretation, { label: string; color: string; background: string }> = {
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
@@ -44,6 +56,7 @@ export default function UserHomeScreen() {
   const { uid, email, displayName } = useAuth();
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
   const [logModalVisible, setLogModalVisible] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!uid) return;
@@ -51,7 +64,14 @@ export default function UserHomeScreen() {
     return unsubscribe;
   }, [uid]);
 
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToNotifications(uid, (items) => setUnreadCount(items.filter((item) => !item.isRead).length), () => {});
+  }, [uid]);
+
   const latest = entries[0];
+  const stats = useMemo(() => wellnessStats(entries), [entries]);
+  const recentActivity = useMemo(() => entries.slice(0, 2), [entries]);
   // Approximation: the average/trend of the most recent readings on hand
   // (up to 7), not a strict trailing-7-calendar-day window.
   const recentReadings = useMemo(() => entries.slice(0, 7).map((entry) => entry.readingMgdl).reverse(), [entries]);
@@ -73,11 +93,11 @@ export default function UserHomeScreen() {
             <Text style={styles.greeting}>{greeting},{'\n'}{firstName}!</Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable style={styles.bellButton} onPress={() => Alert.alert('Notifications', 'You are all caught up.')} hitSlop={8}>
+            <Pressable style={styles.bellButton} onPress={() => router.navigate('/notifications')} hitSlop={8}>
               <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-              <View style={styles.bellDot} />
+              {unreadCount ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}
             </Pressable>
-            <Pressable style={styles.avatar} onPress={() => router.push('/profile')}>
+            <Pressable style={styles.avatar} onPress={() => router.navigate('/profile')}>
               <Text style={styles.avatarText}>{initial}</Text>
             </Pressable>
           </View>
@@ -162,23 +182,42 @@ export default function UserHomeScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.activityCard}>
-          {recentActivity.map((item, index) => (
-            <View key={item.title} style={[styles.activityRow, index > 0 && styles.activityRowBorder]}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <Pressable onPress={() => router.navigate('/rewards')} hitSlop={8}>
+            <Text style={styles.sectionLink}>View Rewards</Text>
+          </Pressable>
+        </View>
+        <Pressable style={styles.activityCard} onPress={() => router.navigate('/rewards')}>
+          <View style={styles.streakRow}>
+            <View style={styles.streakLeft}>
+              <View style={styles.streakIconWrap}>
+                <SymbolView name={{ ios: 'flame.fill', android: 'local_fire_department', web: 'local_fire_department' }} size={16} tintColor="#F59E0B" />
+              </View>
+              <View>
+                <Text style={styles.activityTitle}>{stats.streak}-day logging streak</Text>
+                <Text style={styles.activityWhen}>{stats.points} points earned so far</Text>
+              </View>
+            </View>
+            <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={14} tintColor={homeColors.textFaint} />
+          </View>
+          {recentActivity.length === 0 ? (
+            <Text style={styles.activityEmpty}>Log a reading to start earning points.</Text>
+          ) : recentActivity.map((entry) => (
+            <View key={entry.id} style={[styles.activityRow, styles.activityRowBorder]}>
               <View style={styles.activityLeft}>
                 <View style={styles.activityIconWrap}>
-                  <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={14} tintColor={homeColors.green} />
+                  <SymbolView name={{ ios: 'square.and.pencil', android: 'edit_note', web: 'edit_note' }} size={14} tintColor={homeColors.green} />
                 </View>
                 <View>
-                  <Text style={styles.activityTitle}>{item.title}</Text>
-                  <Text style={styles.activityWhen}>{item.when}</Text>
+                  <Text style={styles.activityTitle}>Reading logged — {entry.readingMgdl} mg/dL</Text>
+                  <Text style={styles.activityWhen}>{activityWhen(entry.loggedAt)}</Text>
                 </View>
               </View>
-              <Text style={styles.activityPoints}>{item.points}</Text>
+              <Text style={styles.activityPoints}>{POINTS_PER_LOG} pts</Text>
             </View>
           ))}
-        </View>
+        </Pressable>
 
         <View style={styles.insights}>
           <SymbolView name={{ ios: 'lightbulb.fill', android: 'lightbulb', web: 'lightbulb' }} size={16} tintColor={homeColors.green} />
@@ -202,7 +241,8 @@ const styles = StyleSheet.create({
   greeting: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 24, fontWeight: '800', lineHeight: 32, marginTop: 2 },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   bellButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.border, borderRadius: 22, borderWidth: 1, height: 44, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 44 },
-  bellDot: { backgroundColor: homeColors.red, borderColor: '#FFF', borderRadius: 5, borderWidth: 2, height: 10, position: 'absolute', right: 8, top: 8, width: 10 },
+  bellDot: { alignItems: 'center', backgroundColor: homeColors.red, borderColor: '#FFF', borderRadius: 9, borderWidth: 2, height: 18, justifyContent: 'center', minWidth: 18, paddingHorizontal: 3, position: 'absolute', right: 4, top: 4 },
+  bellDotText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 9, fontWeight: '800' },
   avatar: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.avatarRing, borderRadius: 24, borderWidth: 2, height: 48, justifyContent: 'center', width: 48 },
   avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
   banner: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 24, paddingHorizontal: 16, paddingVertical: 12 },
@@ -238,8 +278,14 @@ const styles = StyleSheet.create({
   hydrationValue: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 20, fontWeight: '700' },
   hydrationUnit: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500' },
   recommendations: { marginHorizontal: 24, marginTop: 32 },
-  sectionTitle: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 20, fontWeight: '800', marginHorizontal: 24, marginTop: 32 },
+  sectionTitle: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 20, fontWeight: '800' },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 24, marginTop: 32 },
+  sectionLink: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
   activityCard: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 24, borderWidth: 1, marginHorizontal: 24, marginTop: 16, paddingHorizontal: 20, paddingVertical: 4, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  streakRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 16 },
+  streakLeft: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  streakIconWrap: { alignItems: 'center', backgroundColor: 'rgba(245, 158, 11, 0.12)', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  activityEmpty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, borderTopColor: homeColors.borderSoft, borderTopWidth: 1, paddingVertical: 16 },
   activityRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 16 },
   activityRowBorder: { borderTopColor: homeColors.borderSoft, borderTopWidth: 1 },
   activityLeft: { alignItems: 'center', flexDirection: 'row', gap: 12 },

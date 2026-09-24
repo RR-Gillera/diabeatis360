@@ -41,11 +41,19 @@ export function BottomNav({ active }: { active: NavTarget }) {
   const router = useRouter();
   const [before, after] = [navItems.slice(0, 2), navItems.slice(2)];
 
+  // dismissTo, not push: a tab bar is not a history. push stacked a fresh copy
+  // of every tab you touched, so bouncing Home → Profile → Home → Notifications
+  // left a pile of screens that each needed their own back press to unwind.
+  // dismissTo pops back to the tab if it is already on the stack and otherwise
+  // replaces the current screen, so the stack never grows from tab switching.
+  // Not skipped when the tab is already active, because leaf screens such as
+  // Notifications and Rewards render this bar with active="home" — a guard
+  // there would leave the tab bar dead on exactly the screens that need it.
   const renderItem = (item: (typeof navItems)[number]) => {
     const isActive = item.key === active;
     const color = isActive ? homeColors.green : homeColors.textMuted;
     return (
-      <Pressable key={item.key} onPress={() => router.push(item.href)} style={styles.navItem}>
+      <Pressable key={item.key} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
         <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={20} tintColor={color} />
         <Text style={[styles.navLabel, { color }]}>{item.label}</Text>
       </Pressable>
