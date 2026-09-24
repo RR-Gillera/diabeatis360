@@ -15,10 +15,10 @@ import { subscribeToNotifications } from '@/features/notifications/notification-
 type FilterKey = 'pending' | 'accepted' | 'declined' | 'all';
 
 const filters: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'accepted', label: 'Accepted' },
   { key: 'declined', label: 'Declined' },
-  { key: 'all', label: 'All' },
 ];
 
 const filterStatus: Record<Exclude<FilterKey, 'all'>, BookingStatus> = {
@@ -43,7 +43,9 @@ export default function DoctorAppointmentsScreen() {
   const router = useRouter();
   const { uid } = useAuth();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
-  const [filter, setFilter] = useState<FilterKey>('pending');
+  // Defaults to All so the doctor opens onto their whole booking list rather
+  // than a pre-filtered slice that hides accepted and declined appointments.
+  const [filter, setFilter] = useState<FilterKey>('all');
   const [error, setError] = useState('');
   const [actingOn, setActingOn] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
@@ -95,8 +97,8 @@ export default function DoctorAppointmentsScreen() {
           <EmptyState
             icon="calendar"
             iconAndroid="event_busy"
-            title={filter === 'pending' ? 'No pending requests' : `No ${filter === 'all' ? '' : filter} appointments`}
-            detail={filter === 'pending' ? 'New booking requests from patients will appear here for you to accept or decline.' : undefined}
+            title={filter === 'pending' ? 'No pending requests' : filter === 'all' ? 'No appointments yet' : `No ${filter} appointments`}
+            detail={filter === 'pending' || filter === 'all' ? 'New booking requests from patients will appear here for you to accept or decline.' : undefined}
           />
         ) : groups.map((group) => (
           <View key={group.label + group.items[0].id} style={styles.group}>
@@ -104,7 +106,13 @@ export default function DoctorAppointmentsScreen() {
             {group.items.map((entry) => (
               <View key={entry.id} style={[doctorStyles.card, styles.card]}>
                 <Pressable style={styles.cardTop} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
-                  <View style={styles.avatar}><Text style={styles.avatarText}>{entry.patientName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
+                  {/* The queue number replaces the initial once assigned, so the
+                      doctor reads the day's running order straight down the list. */}
+                  <View style={[styles.avatar, entry.queueNumber ? styles.avatarQueued : null]}>
+                    <Text style={[styles.avatarText, entry.queueNumber ? styles.avatarTextQueued : null]}>
+                      {entry.queueNumber ? `#${entry.queueNumber}` : entry.patientName.trim().charAt(0).toUpperCase() || '?'}
+                    </Text>
+                  </View>
                   <View style={styles.copy}>
                     <Text style={styles.name}>{entry.patientName}</Text>
                     <Text style={styles.meta}>
@@ -160,7 +168,9 @@ const styles = StyleSheet.create({
   card: { gap: 14 },
   cardTop: { alignItems: 'center', flexDirection: 'row', gap: 14 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  avatarQueued: { backgroundColor: homeColors.green },
   avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
+  avatarTextQueued: { color: '#FFF', fontSize: 16 },
   copy: { flex: 1 },
   name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   meta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 3 },

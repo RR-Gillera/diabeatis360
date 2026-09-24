@@ -27,11 +27,11 @@ export function labelFromMinutes(minutes: number): string {
   return `${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${meridiem}`;
 }
 
-/** Every selectable time of day, used to populate the range pickers. */
-export const TIME_OPTIONS = Array.from(
-  { length: (24 * 60) / SLOT_INTERVAL_MINUTES },
-  (_, index) => labelFromMinutes(index * SLOT_INTERVAL_MINUTES),
-);
+/**
+ * Hours offered for a doctor who has not set any availability yet, so nobody
+ * becomes unbookable just because they skipped the schedule screen.
+ */
+export const DEFAULT_BOOKING_WINDOW: TimeRange = { start: '08:00 AM', end: '06:00 PM' };
 
 /**
  * Expands availability windows into the individual slots a patient can book.

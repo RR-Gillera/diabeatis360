@@ -1,7 +1,8 @@
-import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { createNotification } from '@/features/notifications/notification-service';
 
 import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, PaymentMethod, PaymentStatus, Provider, ProviderBookingEntry } from './types';
 
@@ -43,6 +44,7 @@ export async function createBookingRequest(patientId: string, providerId: string
     fee,
     payment_status: 'unpaid',
     payment_method: null,
+    queue_number: null,
     created_at: serverTimestamp(),
   };
   const reference = await addDoc(collection(db, 'Bookings'), record);
@@ -86,6 +88,7 @@ export function subscribeToBookingHistory(
             fee: Number(data.fee ?? 0),
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
+            queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
           };
         })
         .sort((a, b) => (b.scheduledAt?.getTime() ?? 0) - (a.scheduledAt?.getTime() ?? 0));
@@ -127,6 +130,7 @@ export function subscribeToBooking(
           fee: Number(data.fee ?? 0),
           paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
           paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
+          queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
         });
       })();
     },
@@ -161,6 +165,7 @@ export function subscribeToBookingsForProvider(
             status: (data.status ?? 'scheduled') as BookingStatus,
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
+            queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
           };
         }));
         entries.sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0));
@@ -171,8 +176,77 @@ export function subscribeToBookingsForProvider(
   );
 }
 
+/**
+ * Renumbers a doctor's accepted bookings for one day, earliest slot first.
+ *
+ * Recomputed on every accept/decline rather than handing out an incrementing
+ * counter: slots are booked out of order, so a patient accepted later can hold
+ * an earlier time and genuinely belongs ahead in the queue. A counter would
+ * tell that patient they were last when they are actually seen first, and would
+ * leave gaps behind every declined booking.
+ */
+async function resequenceQueue(providerId: string, day: Date) {
+  const sameProvider = await getDocs(query(collection(db, 'Bookings'), where('provider_id', '==', providerId)));
+  const sameDay = sameProvider.docs
+    .filter((entry) => {
+      const data = entry.data();
+      const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
+      return data.status === 'accepted' && scheduledAt?.toDateString() === day.toDateString();
+    })
+    .sort((a, b) => {
+      const left = (a.data().scheduled_at as Timestamp | undefined)?.toDate()?.getTime() ?? 0;
+      const right = (b.data().scheduled_at as Timestamp | undefined)?.toDate()?.getTime() ?? 0;
+      return left - right;
+    });
+
+  const positions = new Map<string, number>();
+  await Promise.all(sameDay.map((entry, index) => {
+    const position = index + 1;
+    positions.set(entry.id, position);
+    // Skip the write when the stored number is already right, so a decline at
+    // the end of the day doesn't rewrite every earlier booking for nothing.
+    if (entry.data().queue_number === position) return Promise.resolve();
+    return updateDoc(entry.ref, { queue_number: position });
+  }));
+  return positions;
+}
+
+/**
+ * Accepts or declines a booking, then keeps that day's queue numbers correct
+ * and tells the patient where they stand.
+ *
+ * Only the accepted patient is notified. Patients whose number shifts because
+ * someone ahead of them was accepted or declined see the new number on their
+ * appointment screen, but are not re-notified — a queue that pinged everyone
+ * every time it moved would be noise, not news.
+ */
 export async function updateBookingStatus(bookingId: string, status: BookingStatus) {
-  await updateDoc(doc(db, 'Bookings', bookingId), { status });
+  const reference = doc(db, 'Bookings', bookingId);
+  const snapshot = await getDoc(reference);
+  const data = snapshot.data();
+  await updateDoc(reference, { status, ...(status === 'declined' ? { queue_number: null } : {}) });
+  if (!data) return;
+
+  const providerId = String(data.provider_id ?? '');
+  const patientId = String(data.patient_id ?? '');
+  const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null;
+  if (!providerId || !scheduledAt) return;
+
+  const positions = await resequenceQueue(providerId, scheduledAt);
+  if (status !== 'accepted' || !patientId) return;
+
+  const providerSnapshot = await getDoc(doc(db, 'Providers', providerId));
+  const doctorName = String(providerSnapshot.data()?.full_name ?? 'your doctor');
+  const queueNumber = positions.get(bookingId);
+  const when = scheduledAt.toLocaleString('en-US', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const queueLine = queueNumber ? ` You are number ${queueNumber} in the queue for that day.` : '';
+  await createNotification(
+    patientId,
+    'booking_update',
+    `${doctorName} confirmed your consultation on ${when}.${queueLine}`,
+    'info',
+    bookingId,
+  );
 }
 
 // Which "09:30 AM"-style slots are already taken for one provider on one day,

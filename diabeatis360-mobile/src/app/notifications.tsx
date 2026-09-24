@@ -30,6 +30,7 @@ export default function NotificationsScreen() {
   const open = (entry: NotificationEntry) => {
     void markNotificationRead(entry.id);
     if (entry.type === 'message' && entry.relatedId) router.push({ pathname: '/consultation/[id]', params: { id: entry.relatedId } });
+    else if (entry.type === 'booking_update' && entry.relatedId) router.push({ pathname: '/booking/appointment', params: { id: entry.relatedId } });
     else if (entry.type === 'glucose_alert') router.push('/booking/find-doctor');
   };
 
@@ -66,7 +67,9 @@ export default function NotificationsScreen() {
                 <Text style={styles.message}>{entry.message}</Text>
                 <Text style={styles.when}>
                   {entry.sentAt ? entry.sentAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Just now'}
-                  {entry.type === 'glucose_alert' ? ' · Tap to find a doctor' : entry.type === 'message' ? ' · Tap to open chat' : ''}
+                  {entry.type === 'glucose_alert' ? ' · Tap to find a doctor'
+                    : entry.type === 'message' ? ' · Tap to open chat'
+                    : entry.type === 'booking_update' ? ' · Tap to view appointment' : ''}
                 </Text>
               </View>
               {!entry.isRead ? <View style={styles.unreadDot} /> : null}

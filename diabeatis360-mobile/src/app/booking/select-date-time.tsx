@@ -7,7 +7,7 @@ import { BookingHeader, BookingHeaderActions, bookingColors, combineDateAndTime,
 import { createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { bookableSlots, subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
-import { isMorning, slotsFromRanges, TIME_OPTIONS } from '@/features/doctor/time-slots';
+import { DEFAULT_BOOKING_WINDOW, isMorning, slotsFromRanges } from '@/features/doctor/time-slots';
 import { auth } from '@/firebase';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -48,7 +48,7 @@ export default function SelectDateTimeScreen() {
   // Slots come from the doctor's availability windows. A doctor who has not
   // set any hours yet falls back to the full day, so nobody becomes unbookable.
   const doctorSlots = bookableSlots(doctorProfile);
-  const times = doctorSlots.length ? doctorSlots : slotsFromRanges([{ start: TIME_OPTIONS[16], end: TIME_OPTIONS[36] }]);
+  const times = doctorSlots.length ? doctorSlots : slotsFromRanges([DEFAULT_BOOKING_WINDOW]);
   const morningTimes = times.filter(isMorning);
   const afternoonTimes = times.filter((time) => !isMorning(time));
   const workingDays = doctorProfile?.availableDays ?? [];

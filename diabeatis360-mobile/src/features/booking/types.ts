@@ -35,6 +35,8 @@ export type BookingRecord = {
   fee: number;
   payment_status: PaymentStatus;
   payment_method: PaymentMethod | null;
+  /** Assigned when the doctor accepts — null while the request is pending. */
+  queue_number: number | null;
   created_at: ReturnType<typeof import('firebase/firestore').serverTimestamp>;
 };
 
@@ -51,6 +53,8 @@ export type AppointmentHistoryEntry = {
   fee: number;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod | null;
+  /** Position in this doctor's queue for that day. Null until accepted. */
+  queueNumber: number | null;
 };
 
 // The doctor-side mirror of AppointmentHistoryEntry — needs patient identity, not
@@ -64,4 +68,5 @@ export type ProviderBookingEntry = {
   status: BookingStatus;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod | null;
+  queueNumber: number | null;
 };

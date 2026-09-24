@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToDoctorProfile, updateDoctorAvailability, WEEKDAY_LABELS } from '@/features/doctor/doctor-service';
-import { minutesFromLabel, slotsFromRanges, TIME_OPTIONS, type TimeRange } from '@/features/doctor/time-slots';
+import { TimePickerSheet } from '@/features/doctor/time-picker';
+import { labelFromMinutes, minutesFromLabel, slotsFromRanges, type TimeRange } from '@/features/doctor/time-slots';
 import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -49,15 +50,18 @@ export default function DoctorScheduleScreen() {
     setRanges((current) => current.map((range, index) => {
       if (index !== picker.index) return range;
       const next = { ...range, [picker.edge]: label };
-      // Keep the window coherent: dragging one edge past the other pulls the
-      // other edge along instead of saving an impossible range.
+      // Keep the window coherent: moving one edge past the other pulls the other
+      // edge along instead of saving an impossible range. Done in minutes rather
+      // than by index into a list of preset times, because the doctor can now
+      // pick any minute and arbitrary times have no index to step from.
       const start = minutesFromLabel(next.start) ?? 0;
       const end = minutesFromLabel(next.end) ?? 0;
       if (end <= start) {
-        const position = TIME_OPTIONS.indexOf(label);
+        const picked = minutesFromLabel(label) ?? 0;
+        const NUDGE = 60;
         return picker.edge === 'start'
-          ? { start: label, end: TIME_OPTIONS[Math.min(position + 2, TIME_OPTIONS.length - 1)] }
-          : { start: TIME_OPTIONS[Math.max(position - 2, 0)], end: label };
+          ? { start: label, end: labelFromMinutes(Math.min(picked + NUDGE, 24 * 60 - 1)) }
+          : { start: labelFromMinutes(Math.max(picked - NUDGE, 0)), end: label };
       }
       return next;
     }));
@@ -150,29 +154,13 @@ export default function DoctorScheduleScreen() {
         </Pressable>
       </ScrollView>
 
-      <Modal visible={picker !== null} animationType="slide" transparent onRequestClose={() => setPicker(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{picker?.edge === 'end' ? 'End time' : 'Start time'}</Text>
-              <Pressable onPress={() => setPicker(null)} hitSlop={10}>
-                <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" />
-              </Pressable>
-            </View>
-            <ScrollView style={styles.modalList}>
-              {TIME_OPTIONS.map((label) => {
-                const selected = picker ? ranges[picker.index]?.[picker.edge] === label : false;
-                return (
-                  <Pressable key={label} style={[styles.timeOption, selected && styles.timeOptionActive]} onPress={() => pickTime(label)}>
-                    <Text style={[styles.timeOptionText, selected && styles.timeOptionTextActive]}>{label}</Text>
-                    {selected ? <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={15} tintColor="#FFF" /> : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <TimePickerSheet
+        visible={picker !== null}
+        title={picker?.edge === 'end' ? 'End time' : 'Start time'}
+        value={picker ? ranges[picker.index]?.[picker.edge] ?? DEFAULT_RANGE.start : DEFAULT_RANGE.start}
+        onCancel={() => setPicker(null)}
+        onConfirm={pickTime}
+      />
     </View>
   );
 }
