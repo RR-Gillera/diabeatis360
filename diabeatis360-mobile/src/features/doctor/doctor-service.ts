@@ -1,13 +1,11 @@
 import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { parseBirthdate } from '@/features/auth/birthdate';
 
+import { slotsFromRanges, type TimeRange } from './time-slots';
 import type { DoctorProfile, PatientProfile, PatientSummary } from './types';
 
-// The full slot list the app offers; a doctor's "Manage Schedule" picks a
-// subset of these, and the patient's time picker falls back to all of them when
-// a doctor hasn't set their availability yet.
-export const ALL_TIME_SLOTS = ['09:00 AM', '09:30 AM', '10:00 AM', '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '04:30 PM'];
 export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export function subscribeToDoctorProfile(
@@ -31,7 +29,9 @@ export function subscribeToDoctorProfile(
         isVerified: Boolean(data.is_verified),
         isActive: data.is_active !== false,
         availableDays: Array.isArray(data.available_days) ? data.available_days.map(Number) : [],
-        availableTimes: Array.isArray(data.available_times) ? data.available_times.map(String) : [],
+        availableRanges: Array.isArray(data.available_ranges)
+          ? (data.available_ranges as TimeRange[]).filter((range) => range?.start && range?.end).map((range) => ({ start: String(range.start), end: String(range.end) }))
+          : [],
       });
     },
     (error) => onError(error),
@@ -54,11 +54,18 @@ export async function updateDoctorProfile(
   await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
 }
 
-export async function updateDoctorAvailability(providerId: string, availableDays: number[], availableTimes: string[]) {
+export async function updateDoctorAvailability(providerId: string, availableDays: number[], availableRanges: TimeRange[]) {
   await setDoc(doc(db, 'Providers', providerId), {
     available_days: [...availableDays].sort((a, b) => a - b),
-    available_times: ALL_TIME_SLOTS.filter((slot) => availableTimes.includes(slot)),
+    // Stored as the windows the doctor actually picked; the individual bookable
+    // slots are derived from them at read time so the two can never disagree.
+    available_ranges: availableRanges.filter((range) => range.start && range.end).map((range) => ({ start: range.start, end: range.end })),
   }, { merge: true });
+}
+
+/** Bookable slot labels for a doctor, derived from their availability windows. */
+export function bookableSlots(profile: DoctorProfile | null): string[] {
+  return profile ? slotsFromRanges(profile.availableRanges) : [];
 }
 
 export function subscribeToPatientProfile(
@@ -75,7 +82,9 @@ export function subscribeToPatientProfile(
         id: snapshot.id,
         fullName: String(data.full_name ?? 'Unknown patient'),
         email: String(data.email ?? ''),
-        birthdate: (data.birthdate as Timestamp | undefined)?.toDate?.() ?? null,
+        // Tolerates both the Timestamp written now and the plain strings that
+        // earlier records were saved with, so existing patients still show an age.
+        birthdate: parseBirthdate(data.birthdate),
         diabetesType: String(data.diabetes_type ?? ''),
         activityLevel: String(data.activity_level ?? ''),
         dietaryPreference: String(data.dietary_preference ?? ''),

@@ -43,6 +43,7 @@ export function AppointmentHistoryList({ patientId }: { patientId: string | null
             <View style={styles.copy}>
               <Text style={styles.name}>{entry.provider?.fullName ?? 'Unknown provider'}</Text>
               <Text style={styles.meta}>{entry.scheduledAt ? formatDate(entry.scheduledAt) : '—'} · {formatFee(entry.fee)}</Text>
+              {entry.queueNumber ? <Text style={styles.queue}>Queue #{entry.queueNumber}</Text> : null}
             </View>
             <View style={[styles.badge, { backgroundColor: status.background }]}>
               <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
@@ -62,6 +63,7 @@ const styles = StyleSheet.create({
   copy: { flex: 1, gap: 4 },
   name: { color: bookingColors.navy, fontSize: 15, fontWeight: '800' },
   meta: { color: bookingColors.muted, fontSize: 12 },
+  queue: { color: bookingColors.green, fontSize: 12, fontWeight: '800' },
   badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   badgeText: { fontSize: 11, fontWeight: '800' },
 });

@@ -20,6 +20,11 @@ export default function TabLayout() {
             screenOptions={{
               headerShown: false,
               contentStyle: { backgroundColor: '#F5F7F9' },
+              // Without this the platform default is used, which reads as a
+              // screen appearing on top rather than a horizontal push — the
+              // app has no headers, so the slide is the only cue that you have
+              // moved somewhere new.
+              animation: 'slide_from_right',
             }}
           />
         </BookingProvider>

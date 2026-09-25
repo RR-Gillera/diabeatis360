@@ -1,6 +1,7 @@
-import { addDoc, collection, onSnapshot, query, serverTimestamp, Timestamp, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
 
 import type { GlucoseLogEntry, GlucoseLogRecord, Interpretation, MealContext } from './types';
 
@@ -24,7 +25,35 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
     created_at: serverTimestamp(),
   };
   const reference = await addDoc(collection(db, 'Glucose_Logs'), record);
+
+  // A reading outside the target range raises a real notification, so the
+  // patient still gets told to see a doctor even if they leave the result
+  // screen immediately. Failing to notify must never fail the log itself.
+  const alert = glucoseAlert(readingMgdl, getInterpretation(readingMgdl, context));
+  if (alert) {
+    try {
+      await createNotification(patientId, 'glucose_alert', alert.message, alert.severity);
+    } catch {
+      // Swallowed on purpose: the reading is saved and the on-screen result
+      // still shows the same warning.
+    }
+  }
   return reference.id;
+}
+
+// Editing a reading deliberately does NOT re-fire a glucose alert: the patient
+// is correcting a typo they are already looking at, and re-notifying them about
+// their own edit would be noise.
+export async function updateGlucoseLog(logId: string, readingMgdl: number, context: MealContext, notes: string) {
+  await updateDoc(doc(db, 'Glucose_Logs', logId), {
+    reading_mgdl: readingMgdl,
+    context,
+    notes: notes.trim(),
+  });
+}
+
+export async function deleteGlucoseLog(logId: string) {
+  await deleteDoc(doc(db, 'Glucose_Logs', logId));
 }
 
 export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

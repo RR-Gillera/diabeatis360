@@ -10,14 +10,15 @@ import { formatFee } from '@/features/booking/booking-ui';
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState, StatusPill } from '@/features/doctor/doctor-ui';
 import type { BookingStatus, ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
+import { subscribeToNotifications } from '@/features/notifications/notification-service';
 
 type FilterKey = 'pending' | 'accepted' | 'declined' | 'all';
 
 const filters: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
   { key: 'accepted', label: 'Accepted' },
   { key: 'declined', label: 'Declined' },
-  { key: 'all', label: 'All' },
 ];
 
 const filterStatus: Record<Exclude<FilterKey, 'all'>, BookingStatus> = {
@@ -42,13 +43,21 @@ export default function DoctorAppointmentsScreen() {
   const router = useRouter();
   const { uid } = useAuth();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
-  const [filter, setFilter] = useState<FilterKey>('pending');
+  // Defaults to All so the doctor opens onto their whole booking list rather
+  // than a pre-filtered slice that hides accepted and declined appointments.
+  const [filter, setFilter] = useState<FilterKey>('all');
   const [error, setError] = useState('');
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (!uid) return;
     return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
+  }, [uid]);
+
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToNotifications(uid, (items) => setUnread(items.filter((item) => !item.isRead).length), () => {});
   }, [uid]);
 
   const pendingCount = appointments.filter((entry) => entry.status === 'scheduled').length;
@@ -72,7 +81,7 @@ export default function DoctorAppointmentsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Appointments" subtitle="Accept, decline, and review bookings" badgeCount={pendingCount} />
+      <DoctorHeader title="Appointments" subtitle="Accept, decline, and review bookings" badgeCount={pendingCount + unread} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         <View style={styles.filterRow}>
           {filters.map((item) => (
@@ -88,8 +97,8 @@ export default function DoctorAppointmentsScreen() {
           <EmptyState
             icon="calendar"
             iconAndroid="event_busy"
-            title={filter === 'pending' ? 'No pending requests' : `No ${filter === 'all' ? '' : filter} appointments`}
-            detail={filter === 'pending' ? 'New booking requests from patients will appear here for you to accept or decline.' : undefined}
+            title={filter === 'pending' ? 'No pending requests' : filter === 'all' ? 'No appointments yet' : `No ${filter} appointments`}
+            detail={filter === 'pending' || filter === 'all' ? 'New booking requests from patients will appear here for you to accept or decline.' : undefined}
           />
         ) : groups.map((group) => (
           <View key={group.label + group.items[0].id} style={styles.group}>
@@ -97,7 +106,13 @@ export default function DoctorAppointmentsScreen() {
             {group.items.map((entry) => (
               <View key={entry.id} style={[doctorStyles.card, styles.card]}>
                 <Pressable style={styles.cardTop} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
-                  <View style={styles.avatar}><Text style={styles.avatarText}>{entry.patientName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
+                  {/* The queue number replaces the initial once assigned, so the
+                      doctor reads the day's running order straight down the list. */}
+                  <View style={[styles.avatar, entry.queueNumber ? styles.avatarQueued : null]}>
+                    <Text style={[styles.avatarText, entry.queueNumber ? styles.avatarTextQueued : null]}>
+                      {entry.queueNumber ? `#${entry.queueNumber}` : entry.patientName.trim().charAt(0).toUpperCase() || '?'}
+                    </Text>
+                  </View>
                   <View style={styles.copy}>
                     <Text style={styles.name}>{entry.patientName}</Text>
                     <Text style={styles.meta}>
@@ -119,10 +134,18 @@ export default function DoctorAppointmentsScreen() {
                     </Pressable>
                   </View>
                 ) : (
-                  <Pressable style={styles.viewPatient} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
-                    <SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={15} tintColor={homeColors.green} />
-                    <Text style={styles.viewPatientText}>View patient records</Text>
-                  </Pressable>
+                  <>
+                    <Pressable style={styles.viewPatient} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
+                      <SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={15} tintColor={homeColors.green} />
+                      <Text style={styles.viewPatientText}>View patient records</Text>
+                    </Pressable>
+                    {entry.status === 'accepted' ? (
+                      <Pressable style={styles.chatAction} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
+                        <SymbolView name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }} size={15} tintColor="#FFF" />
+                        <Text style={styles.chatActionText}>Open Chat</Text>
+                      </Pressable>
+                    ) : null}
+                  </>
                 )}
               </View>
             ))}
@@ -145,7 +168,9 @@ const styles = StyleSheet.create({
   card: { gap: 14 },
   cardTop: { alignItems: 'center', flexDirection: 'row', gap: 14 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  avatarQueued: { backgroundColor: homeColors.green },
   avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
+  avatarTextQueued: { color: '#FFF', fontSize: 16 },
   copy: { flex: 1 },
   name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   meta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 3 },
@@ -158,4 +183,6 @@ const styles = StyleSheet.create({
   declineText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   viewPatient: { alignItems: 'center', borderTopColor: homeColors.borderSoft, borderTopWidth: 1, flexDirection: 'row', gap: 8, paddingTop: 14 },
   viewPatientText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
+  chatAction: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 12, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46 },
+  chatActionText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
 });

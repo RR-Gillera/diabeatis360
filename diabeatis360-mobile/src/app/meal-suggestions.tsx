@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
@@ -8,6 +7,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
+import { useSafeBack } from '@/hooks/use-safe-back';
 
 // Still no live AI/Gemini call wired up (see the AI Recommendations screen's
 // note) — but rather than one fixed list regardless of the reading, these are
@@ -32,7 +32,7 @@ const mealsByInterpretation: Record<Interpretation, { title: string; description
 };
 
 export default function MealSuggestionsScreen() {
-  const router = useRouter();
+  const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
   const [latest, setLatest] = useState<GlucoseLogEntry | null>(null);
 
@@ -47,7 +47,7 @@ export default function MealSuggestionsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
+          <Pressable style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
             <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
           </Pressable>
           <Text style={styles.title}>Meal Suggestions</Text>

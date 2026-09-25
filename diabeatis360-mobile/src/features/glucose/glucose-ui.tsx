@@ -6,8 +6,8 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
-import { addGlucoseLog, getInterpretation } from './glucose-service';
-import type { Interpretation, MealContext } from './types';
+import { addGlucoseLog, deleteGlucoseLog, getInterpretation, updateGlucoseLog } from './glucose-service';
+import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
 
 const contexts: { value: MealContext; label: string }[] = [
   { value: 'before_meal', label: 'Before Meal' },
@@ -23,13 +23,26 @@ const livePreviewCopy: Record<Interpretation, { label: string; color: string; ba
 // Shared "Add a Reading" bottom sheet — used from the Log tab's FAB and from
 // the Home dashboard's "Log Blood Sugar" button, so the flow is identical
 // (and only written once) no matter where a reading gets logged from.
-export function AddReadingModal({ visible, onClose, onSaved }: { visible: boolean; onClose: () => void; onSaved: () => void }) {
+export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: () => void; entry?: GlucoseLogEntry | null }) {
+  const editing = Boolean(entry);
   const { uid } = useAuth();
   const [reading, setReading] = useState('');
   const [context, setContext] = useState<MealContext>('before_meal');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  // Seed the fields from the entry being edited. Adjusting state during render
+  // rather than in an effect, so the sheet never flashes empty inputs first.
+  const [seededFrom, setSeededFrom] = useState<string | null>(entry?.id ?? null);
+  if ((entry?.id ?? null) !== seededFrom) {
+    setSeededFrom(entry?.id ?? null);
+    setReading(entry ? String(entry.readingMgdl) : '');
+    setContext(entry?.context ?? 'before_meal');
+    setNotes(entry?.notes ?? '');
+    setError('');
+  }
 
   const readingValue = Number(reading);
   const isValidReading = reading.trim() !== '' && Number.isFinite(readingValue) && readingValue > 0;
@@ -42,7 +55,8 @@ export function AddReadingModal({ visible, onClose, onSaved }: { visible: boolea
     if (!uid || !isValidReading) return;
     setSaving(true); setError('');
     try {
-      await addGlucoseLog(uid, readingValue, context, notes, new Date());
+      if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
+      else await addGlucoseLog(uid, readingValue, context, notes, new Date());
       reset();
       onSaved();
     } catch (value) {
@@ -52,16 +66,30 @@ export function AddReadingModal({ visible, onClose, onSaved }: { visible: boolea
     }
   };
 
+  const remove = async () => {
+    if (!entry || deleting) return;
+    setDeleting(true); setError('');
+    try {
+      await deleteGlucoseLog(entry.id);
+      reset();
+      onSaved();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to delete this reading.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>Add a Reading</Text>
+            <Text style={styles.title}>{editing ? 'Edit Reading' : 'Add a Reading'}</Text>
             <Pressable onPress={close} hitSlop={10}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" /></Pressable>
           </View>
           <View style={styles.readingRow}>
-            <TextInput value={reading} onChangeText={setReading} placeholder="0" keyboardType="numeric" style={styles.readingInput} autoFocus />
+            <TextInput value={reading} onChangeText={setReading} placeholder="0" keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
             <Text style={styles.readingUnit}>mg/dL</Text>
             {livePreview ? <View style={[styles.previewBadge, { backgroundColor: livePreview.background }]}><Text style={[styles.previewBadgeText, { color: livePreview.color }]}>{livePreview.label}</Text></View> : null}
           </View>
@@ -75,8 +103,13 @@ export function AddReadingModal({ visible, onClose, onSaved }: { visible: boolea
           <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional)" style={styles.notesInput} multiline />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
-            <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save Reading'}</Text>
+            <Text style={styles.saveButtonText}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Save Reading'}</Text>
           </Pressable>
+          {editing ? (
+            <Pressable style={styles.deleteButton} onPress={remove} disabled={deleting}>
+              <Text style={styles.deleteButtonText}>{deleting ? 'Deleting...' : 'Delete Reading'}</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -157,6 +190,8 @@ const styles = StyleSheet.create({
   saveButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 56 },
   saveButtonDisabled: { opacity: 0.55 },
   saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  deleteButton: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 8, minHeight: 46 },
+  deleteButtonText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
 });
 
 const recStyles = StyleSheet.create({
