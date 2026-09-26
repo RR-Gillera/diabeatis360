@@ -36,7 +36,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [x] Admin: all appointments table + revenue/commission [item 8]: `AppointmentsPage` (status tabs, date range, names, 15% commission with a fallback for older bookings) tested end to end against the emulators (2026-09-26)
 
 ## Tier 4 — AI (P)  ← D1 closed 2026-09-26: Gemini via Firebase Cloud Functions (needs Blaze plan) [items 13a, 13, 14]
-- [ ] Cloud Functions (`functions/`: generateMeals, generateExercises, analyzeLabel; key as a Functions secret; server-side daily limits) + `ai.ts` wrapper calling them + disclaimer component (no Gemini code exists) [items 13a, 13]
+- [~] Cloud Functions (`functions/`: `generateRecommendations`, `analyzeLabel`; key as a Functions secret; server-side daily limits; critical-reading block; allergen filter) BUILT and tested: 18 unit tests, 11 handler tests against the Firestore emulator, 21 end-to-end checks through the callable protocol with a fake Gemini. **Not deployed and never called the real Gemini**: needs Blaze + `firebase functions:secrets:set GEMINI_API_KEY` (see functions/README.md) [item 13a]. Mobile `ai.ts` + screens: next [item 13]
 - [ ] Meal recommendations (grounded in Food_Database) + details (today: static lists in `meal-suggestions.tsx` / `glucose-ui.tsx`)
 - [ ] Exercise recommendations + details (static text only)
 - [ ] Nutrition label scan → analysis → healthier alternatives (center nav camera button is a placeholder)
