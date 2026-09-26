@@ -59,7 +59,8 @@ export default function DoctorHomeScreen() {
     try { await updateBookingStatus(bookingId, status); } finally { setActingOn(null); }
   };
 
-  const firstName = (displayName ?? profile?.fullName ?? 'Doctor').trim().split(' ')[0];
+  // A name that already starts with "Dr." must not become "Dr. Dr.".
+  const firstName = (displayName ?? profile?.fullName ?? 'Doctor').trim().replace(/^dr\.?\s+/i, '').split(' ')[0];
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   // A doctor with no specialty/licence/fee can't be meaningfully booked, so the

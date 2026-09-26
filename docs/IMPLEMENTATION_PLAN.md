@@ -453,3 +453,11 @@ Not agreed yet. `SCHEDULE.md` keeps the original dates until the adviser approve
 | 11 | admin half done | 2026-09-26 | `AnnouncementsPage` (fan-out to Notifications; new type `announcement` on mobile). **Still to do: the 6 local reminder categories on mobile (`expo-notifications`).** |
 | 12 | done | 2026-09-26 | Dashboard (stat cards + 4 Recharts charts) and Reports (3 report types, date range, CSV, print/PDF). |
 Items 6 to 12 were verified with a headless-Edge script driving the real admin UI against the local Auth + Firestore emulators (15 + 18 + 32 = 65 checks, all passing) plus 116 security-rules tests and 9 unit tests. That harness lives outside the repo for now.
+
+### Mobile verification (2026-09-26, Expo web build in headless Edge against the local Auth + Firestore emulators)
+The mobile app runs in a browser (`npx expo start --web`), so items 1 to 5 were exercised through the real screens with real Firebase Auth and Firestore rules (opt-in `EXPO_PUBLIC_USE_EMULATORS=true`; off by default):
+- **Item 3 (account):** 8/8: blank-fields message, wrong password, deactivated account blocked with message, unverified doctor sees the waiting screen, verified doctor and patient reach their homes.
+- **Item 5 (blood sugar):** 20/20: 300 and 45 mg/dL are Critical with emergency guidance, See a Doctor, disclaimer, stored `interpretation`, critical alert notification, critical meal and exercise screens; 150 mg/dL is High before a meal and Normal after one.
+- **Items 1 and 4 (booking lifecycle):** 25/25: verified-only directory, slot-based booking id, 15% commission stored, a second patient cannot take the slot, doctor accepts (queue #2, notification), patient pays (mocked), chat both ways with notifications, the **patient ends the consultation**, the doctor adds the summary afterwards, the patient reads it.
+Findings fixed on the way: the doctor's Bookings tabs broke "Confirmed"/"Completed" across lines (row is now scrollable) and the greeting read "Dr. Dr." for names that already start with "Dr.".
+This is not the same as testing on a physical phone (native gestures, Expo Go, keyboard, notifications), which is still required by `docs/TEST_LOG.md` before any function counts as device-verified.
