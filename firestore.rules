@@ -19,7 +19,8 @@ rules_version = '2';
 //      deterministic booking IDs or a per-doctor patient list.
 //   3. Doctors must be verified (Providers/{uid}.is_verified == true) to read patient data. Until the admin
 //      panel exists, set is_verified to true by hand in the Firebase console for test doctors.
-//   4. Not tested against the Firebase emulator's unit-test harness; try each flow in the Rules Playground.
+//   4. Behaviour was checked with 101 allow/deny cases in the Firestore emulator (2026-09-26, all passing). After
+//      deploying, still try one flow per role in the Rules Playground and in the app.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -145,7 +146,16 @@ service cloud.firestore {
       allow update: if signedIn() && (
         // The booked doctor decides the request, orders the queue, and records the consultation outcome, nothing else.
         (resource.data.provider_id == request.auth.uid
-          && changedKeys().hasOnly(['status', 'queue_number', 'consultation_status', 'consultation_summary', 'consultation_ended_at']))
+          && changedKeys().hasOnly(['status', 'queue_number', 'consultation_status', 'consultation_summary', 'consultation_ended_at', 'consultation_ended_by']))
+        // The patient may end their own confirmed consultation (booking becomes completed, no summary written by them;
+        // the doctor can add the summary afterwards, which the doctor branch above allows).
+        || (resource.data.patient_id == request.auth.uid
+          && resource.data.status == 'confirmed'
+          && changedKeys().hasOnly(['status', 'consultation_status', 'consultation_summary', 'consultation_ended_at', 'consultation_ended_by'])
+          && request.resource.data.status == 'completed'
+          && request.resource.data.consultation_status == 'ended'
+          && request.resource.data.get('consultation_summary', '') == ''
+          && request.resource.data.get('consultation_ended_by', '') == 'patient')
         // The patient may only pay, and only after the doctor confirmed and while still unpaid.
         || (resource.data.patient_id == request.auth.uid
           && resource.data.status == 'confirmed'

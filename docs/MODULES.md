@@ -124,7 +124,7 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 - Chat opens only for `confirmed` bookings (and stays readable once `completed`). Messages live in the top-level `Messages` collection (DECISIONS.md D8),
   realtime with `onSnapshot`, ordered by `sent_at`.
 - Doctor side shows patient's profile + recent glucose logs/interpretations alongside chat (UT-023).
-- End Consultation → booking `completed`; doctor writes summary (diagnosis notes, advice);
+- End Consultation (either side) → booking `completed` and chat read-only. The doctor writes the summary (notes, advice) while ending, or adds it afterwards if the patient ended it; the patient ending writes no summary. Both sides can view it. The other party gets an in-app notification.
   both sides can view it afterwards; chat becomes read-only. UT-013, UT-020, UT-021, IT-006.
 - Figma: Live Consultation Chatroom (patient), Consultation Room D_ROOM (doctor, legacy teal).
 - **Added scope (adviser, not in Table 24): Video Call — P, D.** Ring the other party in-app (a `Calls` doc,

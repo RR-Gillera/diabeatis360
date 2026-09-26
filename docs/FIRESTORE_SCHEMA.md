@@ -49,7 +49,7 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 | Interpretation result (Blood Sugar) | `glucose_logs.interpretation: "low" \| "normal" \| "high" \| "critical"` (the app derives it on read today; `critical` is added with the D4 work) |
 | Doctor schedule (Manage Schedule) | `providers.availability: [{ day: 0-6, start: "09:00", end: "12:00" }]`, `providers.slot_minutes: 30` |
 | Doctor profile extras shown in Figma | `providers.years_experience`, `providers.photo_url` (optional) |
-| Decline reason / consultation summary (Appointment, Chat) | on bookings: `decline_reason`, `summary`, `diagnosis_notes`, `advice`, `ended_at`, `ended_by` |
+| Decline reason / consultation summary (Appointment, Chat) | on bookings: `decline_reason`, as built: `consultation_status` (`not_started`/`active`/`ended`), `consultation_summary`, `consultation_ended_at`, `consultation_ended_by` (`patient`/`doctor`) |
 | Chat messages (Consultation Chat) — no table exists | top-level `Messages` collection (DECISIONS.md D8): booking_id, sender_id, sender_role, message, sent_at |
 | Payment + commission (Book Appointment, admin revenue) | on bookings: `payment_method`, `payment_status` (`unpaid`/`paid`/`onsite`, mocked online payment), `platform_commission` — or a `payments` collection (DECISIONS.md D3) |
 | Announcements (Send Announcements) | `announcements` collection (title, message, created_by, created_at) read by both apps, or fan-out into notifications |

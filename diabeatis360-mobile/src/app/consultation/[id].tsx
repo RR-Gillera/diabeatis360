@@ -6,7 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { endConsultation, sendMessage, subscribeToConsultation, subscribeToMessages, videoRoomUrl, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
+import { endConsultation, saveConsultationSummary, sendMessage, subscribeToConsultation, subscribeToMessages, videoRoomUrl, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
@@ -40,6 +40,8 @@ export default function ConsultationScreen() {
   const [endModal, setEndModal] = useState(false);
   const [summaryDraft, setSummaryDraft] = useState('');
   const [ending, setEnding] = useState(false);
+  const [lateSummary, setLateSummary] = useState('');
+  const [savingSummary, setSavingSummary] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const goBack = useSafeBack(isDoctor ? '/doctor/appointments' : '/profile');
 
@@ -84,12 +86,26 @@ export default function ConsultationScreen() {
     if (!id || ending) return;
     setEnding(true);
     try {
-      await endConsultation(id, summaryDraft);
+      await endConsultation(id, summaryDraft, isDoctor ? 'doctor' : 'patient');
       setEndModal(false);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to end the consultation.');
     } finally {
       setEnding(false);
+    }
+  };
+
+  // The patient may have ended the consultation, so the doctor can add the summary afterwards.
+  const saveLateSummary = async () => {
+    if (!id || savingSummary || !lateSummary.trim()) return;
+    setSavingSummary(true);
+    try {
+      await saveConsultationSummary(id, lateSummary);
+      setLateSummary('');
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'Unable to save the summary.');
+    } finally {
+      setSavingSummary(false);
     }
   };
 
@@ -188,6 +204,25 @@ export default function ConsultationScreen() {
               ) : null}
               <Text style={styles.summaryLabel}>DOCTOR&apos;S SUMMARY</Text>
               <Text style={styles.summaryText}>{consultation.summary || 'No summary was recorded for this consultation.'}</Text>
+              {isDoctor && !consultation.summary ? (
+                <View style={styles.lateSummary}>
+                  <TextInput
+                    value={lateSummary}
+                    onChangeText={setLateSummary}
+                    placeholder="Add a summary for your patient..."
+                    placeholderTextColor="#C6D2E2"
+                    style={styles.summaryInput}
+                    multiline
+                  />
+                  <Pressable
+                    style={[styles.endConfirm, (savingSummary || !lateSummary.trim()) && styles.sendButtonDisabled]}
+                    onPress={saveLateSummary}
+                    disabled={savingSummary || !lateSummary.trim()}
+                  >
+                    <Text style={styles.endConfirmText}>{savingSummary ? 'Saving...' : 'Save Summary'}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </ScrollView>
@@ -233,7 +268,7 @@ export default function ConsultationScreen() {
             <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={17} tintColor="#FFF" />
           </Pressable>
         ) : null}
-        {isDoctor && canConsult && !ended ? (
+        {canConsult && !ended && !(unpaid && !isDoctor) ? (
           <Pressable style={styles.endButton} onPress={() => setEndModal(true)} hitSlop={8}>
             <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#D9364F" />
           </Pressable>
@@ -251,7 +286,8 @@ export default function ConsultationScreen() {
                 <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" />
               </Pressable>
             </View>
-            <Text style={styles.modalHint}>Write a short summary for your patient. They will see this in their appointment history.</Text>
+            <Text style={styles.modalHint}>{isDoctor ? 'Write a short summary for your patient. They will see this in their appointment history.' : 'End this consultation? The chat stays readable, but you will not be able to send more messages. Your doctor can add a summary afterwards.'}</Text>
+            {isDoctor ? (
             <TextInput
               value={summaryDraft}
               onChangeText={setSummaryDraft}
@@ -260,6 +296,7 @@ export default function ConsultationScreen() {
               style={styles.summaryInput}
               multiline
             />
+            ) : null}
             <Pressable style={[styles.endConfirm, ending && styles.sendButtonDisabled]} onPress={finish} disabled={ending}>
               <Text style={styles.endConfirmText}>{ending ? 'Ending...' : 'End Consultation'}</Text>
             </Pressable>
@@ -272,6 +309,7 @@ export default function ConsultationScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
+  lateSummary: { gap: 12, marginTop: 12 },
   header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 12, paddingBottom: 16, paddingHorizontal: 20, paddingTop: 56, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },
