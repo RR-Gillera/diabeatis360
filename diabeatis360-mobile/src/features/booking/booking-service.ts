@@ -39,7 +39,7 @@ export async function createBookingRequest(patientId: string, providerId: string
   const record: BookingRecord = {
     patient_id: patientId,
     provider_id: providerId,
-    status: 'scheduled',
+    status: 'pending',
     scheduled_at: Timestamp.fromDate(selectedDate),
     fee,
     payment_status: 'unpaid',
@@ -83,7 +83,7 @@ export function subscribeToBookingHistory(
             provider,
             patientId: String(data.patient_id ?? ''),
             patientName: '',
-            status: String(data.status ?? 'scheduled'),
+            status: String(data.status ?? 'pending'),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
@@ -125,7 +125,7 @@ export function subscribeToBooking(
           provider: providerSnapshot?.exists() ? providerFromDoc(providerSnapshot) : null,
           patientId,
           patientName: String(patientSnapshot?.data()?.full_name ?? ''),
-          status: String(data.status ?? 'scheduled'),
+          status: String(data.status ?? 'pending'),
           scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
           fee: Number(data.fee ?? 0),
           paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
@@ -162,7 +162,7 @@ export function subscribeToBookingsForProvider(
             patientName: String(patientSnapshot?.data()?.full_name ?? 'Unknown patient'),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
-            status: (data.status ?? 'scheduled') as BookingStatus,
+            status: (data.status ?? 'pending') as BookingStatus,
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
             queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
@@ -191,7 +191,7 @@ async function resequenceQueue(providerId: string, day: Date) {
     .filter((entry) => {
       const data = entry.data();
       const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
-      return data.status === 'accepted' && scheduledAt?.toDateString() === day.toDateString();
+      return data.status === 'confirmed' && scheduledAt?.toDateString() === day.toDateString();
     })
     .sort((a, b) => {
       const left = (a.data().scheduled_at as Timestamp | undefined)?.toDate()?.getTime() ?? 0;
@@ -224,7 +224,7 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   const reference = doc(db, 'Bookings', bookingId);
   const snapshot = await getDoc(reference);
   const data = snapshot.data();
-  await updateDoc(reference, { status, ...(status === 'declined' ? { queue_number: null } : {}) });
+  await updateDoc(reference, { status, ...((status === 'declined' || status === 'cancelled') ? { queue_number: null } : {}) });
   if (!data) return;
 
   const providerId = String(data.provider_id ?? '');
@@ -233,7 +233,7 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   if (!providerId || !scheduledAt) return;
 
   const positions = await resequenceQueue(providerId, scheduledAt);
-  if (status !== 'accepted' || !patientId) return;
+  if (status !== 'confirmed' || !patientId) return;
 
   const providerSnapshot = await getDoc(doc(db, 'Providers', providerId));
   const doctorName = String(providerSnapshot.data()?.full_name ?? 'your doctor');
@@ -266,7 +266,7 @@ export function subscribeToBookedTimes(
       const bookedTimes = new Set<string>();
       for (const document of snapshot.docs) {
         const data = document.data();
-        if (data.status === 'declined') continue;
+        if (data.status === 'declined' || data.status === 'cancelled') continue;
         const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
         if (!scheduledAt || scheduledAt.toDateString() !== date.toDateString()) continue;
         // hour: '2-digit' zero-pads to match the "09:30 AM"-style labels in the time picker.

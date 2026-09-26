@@ -123,7 +123,7 @@ export function subscribeToDoctorPatients(
             fullName: existing?.fullName ?? '',
             appointmentCount: (existing?.appointmentCount ?? 0) + 1,
             lastAppointmentAt: !existing?.lastAppointmentAt || (scheduledAt && scheduledAt > existing.lastAppointmentAt) ? scheduledAt : existing.lastAppointmentAt,
-            hasPendingRequest: (existing?.hasPendingRequest ?? false) || data.status === 'scheduled',
+            hasPendingRequest: (existing?.hasPendingRequest ?? false) || data.status === 'pending',
           });
         }
         // Names come from the Users docs — resolved per unique patient rather

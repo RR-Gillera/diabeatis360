@@ -13,6 +13,7 @@ import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor
 import type { PatientProfile } from '@/features/doctor/types';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { homeColors, WeeklyChart } from '@/features/home/home-ui';
+import { isChatAvailable } from '@/constants/enums';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 const readingStyle: Record<Interpretation, { label: string; color: string; background: string }> = {
@@ -62,7 +63,7 @@ export default function DoctorPatientDetailScreen() {
   const lowCount = entries.filter((entry) => entry.interpretation === 'low').length;
 
   const consultations = useMemo(() => appointments
-    .filter((entry) => entry.patientId === id && entry.status === 'accepted')
+    .filter((entry) => entry.patientId === id && isChatAvailable(entry.status))
     .sort((a, b) => (b.scheduledAt?.getTime() ?? 0) - (a.scheduledAt?.getTime() ?? 0)), [appointments, id]);
 
   // Captured once on mount rather than read during render — age shouldn't be

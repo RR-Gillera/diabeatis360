@@ -10,6 +10,7 @@ import { endConsultation, sendMessage, subscribeToConsultation, subscribeToMessa
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
+import { isChatAvailable } from '@/constants/enums';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 function dayLabel(date: Date | null) {
@@ -99,7 +100,7 @@ export default function ConsultationScreen() {
     ? (booking?.patientName || 'Your patient')
     : (booking?.provider?.fullName || 'Your doctor');
   const ended = consultation.status === 'ended';
-  const canConsult = booking?.status === 'accepted';
+  const canConsult = isChatAvailable(booking?.status ?? '');
   const unpaid = booking?.paymentStatus === 'unpaid';
   // Naming the slot in the header is what stops two people from typing into
   // different appointments and assuming the chat is broken.

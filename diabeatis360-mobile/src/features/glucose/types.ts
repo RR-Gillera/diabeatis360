@@ -1,8 +1,9 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export type MealContext = 'before_meal' | 'after_meal';
+import type { Interpretation, MealContext } from '@/constants/enums';
 
-export type Interpretation = 'low' | 'normal' | 'high';
+// Defined in constants/enums.ts (DECISIONS.md D6); re-exported for existing imports.
+export type { Interpretation, MealContext };
 
 export type GlucoseLogRecord = {
   patient_id: string;
