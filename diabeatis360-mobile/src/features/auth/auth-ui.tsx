@@ -1,12 +1,12 @@
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { Fonts } from '@/constants/theme';
+import { Brand, Fonts } from '@/constants/theme';
 
 export const authColors = {
   navy: '#10182D',
-  green: '#5D9F27',
-  background: '#F5F7F9',
+  green: Brand.colors.primary,
+  background: Brand.colors.background,
   muted: '#6B7D99',
   border: '#DDE5EF',
 };

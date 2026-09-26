@@ -3,19 +3,19 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
-import { Fonts } from '@/constants/theme';
+import { Brand, Fonts } from '@/constants/theme';
 
 // Distinct palette for the dashboard/log screens — matches the Figma spec's exact
 // values rather than reusing authColors/bookingColors, which run a slightly
 // different green (#5D9F27 vs #629C2C here) for their own screens.
 export const homeColors = {
-  background: '#F5F5F5',
-  card: '#FFFFFF',
-  textDark: '#111827',
-  textMuted: '#6B7280',
-  textFaint: '#9CA3AF',
-  green: '#629C2C',
-  greenTint: 'rgba(220, 242, 169, 0.2)',
+  background: Brand.colors.background,
+  card: Brand.colors.card,
+  textDark: Brand.colors.text,
+  textMuted: Brand.colors.textMuted,
+  textFaint: Brand.colors.textFaint,
+  green: Brand.colors.primary,
+  greenTint: Brand.colors.primaryTint,
   border: '#F1F5F9',
   borderSoft: '#F3F4F6',
   orange: '#FB923C',
