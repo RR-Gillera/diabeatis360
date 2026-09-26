@@ -21,9 +21,9 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export const MEAL_CONTEXTS = ['before_meal', 'after_meal'] as const;
 export type MealContext = (typeof MEAL_CONTEXTS)[number];
 
-// 'critical' is required by the manuscript (DECISIONS.md D4) and is added here once the glucose
-// screens have a design for it. Until then the code only produces these three.
-export const INTERPRETATIONS = ['low', 'normal', 'high'] as const;
+// D4 (closed 2026-09-26): the five-way table collapses to four classes. 'critical' covers both dangerously low
+// and dangerously high; constants/glucose.ts tells them apart with glucoseDirection().
+export const INTERPRETATIONS = ['low', 'normal', 'high', 'critical'] as const;
 export type Interpretation = (typeof INTERPRETATIONS)[number];
 
 export const SUBSCRIPTION_STATUSES = ['trial', 'active', 'expired', 'cancelled'] as const;
@@ -71,6 +71,7 @@ export const ENUM_LABELS = {
     low: { en: 'Low', fil: 'Mababa' },
     normal: { en: 'Normal', fil: 'Normal' },
     high: { en: 'High', fil: 'Mataas' },
+    critical: { en: 'Critical', fil: 'Kritikal' },
   } satisfies Labels<Interpretation>,
   subscriptionStatus: {
     trial: { en: 'Trial', fil: 'Pagsubok' },

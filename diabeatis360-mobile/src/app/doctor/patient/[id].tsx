@@ -14,12 +14,14 @@ import type { PatientProfile } from '@/features/doctor/types';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { homeColors, WeeklyChart } from '@/features/home/home-ui';
 import { isChatAvailable } from '@/constants/enums';
+import { glucoseDirection } from '@/constants/glucose';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 const readingStyle: Record<Interpretation, { label: string; color: string; background: string }> = {
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
   low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
   high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
 };
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
@@ -59,8 +61,9 @@ export default function DoctorPatientDetailScreen() {
 
   const { days: weekDays, average: weekAverage } = useMemo(() => bucketCurrentWeek(entries), [entries]);
   const latest = entries[0];
-  const highCount = entries.filter((entry) => entry.interpretation === 'high').length;
-  const lowCount = entries.filter((entry) => entry.interpretation === 'low').length;
+  // A critical reading still counts as high or low, depending on which way it is off.
+  const highCount = entries.filter((entry) => glucoseDirection(entry.readingMgdl, entry.context) === 'high' && entry.interpretation !== 'normal').length;
+  const lowCount = entries.filter((entry) => glucoseDirection(entry.readingMgdl, entry.context) === 'low' && entry.interpretation !== 'normal').length;
 
   const consultations = useMemo(() => appointments
     .filter((entry) => entry.patientId === id && isChatAvailable(entry.status))

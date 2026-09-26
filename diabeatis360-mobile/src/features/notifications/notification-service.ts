@@ -1,7 +1,8 @@
 import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
-import type { Interpretation } from '@/features/glucose/types';
+import { glucoseDirection, interpretGlucose } from '@/constants/glucose';
+import type { MealContext } from '@/constants/enums';
 
 export type NotificationType = 'glucose_alert' | 'booking_update' | 'message' | 'reminder';
 
@@ -48,28 +49,32 @@ export async function createNotification(
   await addDoc(collection(db, 'Notifications'), record);
 }
 
-// NOTE: these are safety prompts, not a diagnosis — they mirror the same
-// placeholder thresholds getInterpretation() uses, which still need the
-// adviser's sign-off before being treated as clinically authoritative.
-export function glucoseAlert(readingMgdl: number, interpretation: Interpretation): { message: string; severity: NotificationEntry['severity'] } | null {
+// NOTE: these are safety prompts, not a diagnosis. The cut-offs come from constants/glucose.ts (DECISIONS.md D4).
+// Critical readings always tell the person to contact their doctor or seek emergency care (root CLAUDE.md
+// health-safety rules); the app never suggests a medication change or an insulin dose.
+export function glucoseAlert(readingMgdl: number, context: MealContext): { message: string; severity: NotificationEntry['severity'] } | null {
+  const interpretation = interpretGlucose(readingMgdl, context);
+  if (interpretation === 'critical') {
+    return glucoseDirection(readingMgdl, context) === 'low'
+      ? {
+          message: `Your reading of ${readingMgdl} mg/dL is dangerously low. Take fast-acting sugar now and seek medical help immediately.`,
+          severity: 'critical',
+        }
+      : {
+          message: `Your reading of ${readingMgdl} mg/dL is very high. Please contact your doctor or go to the nearest hospital now.`,
+          severity: 'critical',
+        };
+  }
   if (interpretation === 'high') {
-    // Well above the post-meal target is the point where "see someone today"
-    // is the honest advice rather than "watch it".
-    const urgent = readingMgdl >= 250;
     return {
-      message: urgent
-        ? `Your reading of ${readingMgdl} mg/dL is very high. Please contact your doctor or go to the nearest hospital now.`
-        : `Your reading of ${readingMgdl} mg/dL is above your target range. Consider booking a consultation with your doctor.`,
-      severity: urgent ? 'critical' : 'warning',
+      message: `Your reading of ${readingMgdl} mg/dL is above your target range. Consider booking a consultation with your doctor.`,
+      severity: 'warning',
     };
   }
   if (interpretation === 'low') {
-    const urgent = readingMgdl < 54;
     return {
-      message: urgent
-        ? `Your reading of ${readingMgdl} mg/dL is dangerously low. Take fast-acting sugar now and seek medical help immediately.`
-        : `Your reading of ${readingMgdl} mg/dL is below your target range. Have a fast-acting snack and re-check in 15 minutes.`,
-      severity: urgent ? 'critical' : 'warning',
+      message: `Your reading of ${readingMgdl} mg/dL is below your target range. Have a fast-acting snack and re-check in 15 minutes.`,
+      severity: 'warning',
     };
   }
   return null;
