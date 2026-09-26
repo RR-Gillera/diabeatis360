@@ -43,7 +43,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [ ] Save to AI_Suggestions / Nutrition_Scans; daily free-plan limits
 
 ## Tier 5 — Admin management (A)
-- [ ] Verify doctor credentials; activate/deactivate doctors and users [item 7]
+- [x] Verify doctor credentials; activate/deactivate doctors and users [item 7]: admin `DoctorsPage` + `UsersPage` built and tested end to end against the emulators (18/18, 2026-09-26). UT-A006 "add doctor profile" is NOT built: doctors register in the mobile app and an admin verifies them (needs a manuscript wording change)
 - [ ] Food Database CRUD
 - [ ] Analytics dashboard (Recharts) + report export (CSV / printable) [item 12]
 - [ ] Send announcements [item 11]
