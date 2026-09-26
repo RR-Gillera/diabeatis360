@@ -445,3 +445,4 @@ Not agreed yet. `SCHEDULE.md` keeps the original dates until the adviser approve
 | 3 | done | 2026-09-26 | Blank-field messages, deactivated-account block, doctor pending-verification gate. |
 | 4 | done | 2026-09-26 | Slot-based booking id + transaction, verified-only directory, 15% commission. Rules tests: 111/111. |
 | 5 | done | 2026-09-26 | Critical class, `constants/glucose.ts` + 9 unit tests, result screen, exercise screen. **Correction:** Figma 23:526 is the Glucose Log screen, which already existed, so no separate "Trends" screen was needed. |
+| 6 | done | 2026-09-26 | Admin foundation: react-router-dom, Tailwind 4, Recharts (installed, first used in item 12), `AuthContext` + `AdminRoute` (Admins/{uid} check), `Layout`, login, account, reset. Tested with a headless-Edge end-to-end script against the local Auth + Firestore emulators (15/15). `VITE_USE_EMULATORS=true` switches the panel to the emulators; off by default. Rules tests now 116/116. |
