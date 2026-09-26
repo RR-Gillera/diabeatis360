@@ -112,7 +112,9 @@ service cloud.firestore {
       // An admin can read only their own record (the admin app uses this to confirm the login is an admin).
       allow read: if isUser(adminId);
       // Admin accounts are created only by the seed script with the Admin SDK, never from an app.
-      allow write: if false;
+      allow create, delete: if false;
+      // An admin may update only their own display name and last-login time (Update Account); never their role.
+      allow update: if isUser(adminId) && changedKeys().hasOnly(['full_name', 'last_login']);
     }
 
     match /Guardian_Verifications/{docId} {
