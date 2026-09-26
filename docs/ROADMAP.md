@@ -51,7 +51,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 ## Tier 6 — Engagement (P, A)
 - [~] Notifications list ✔ (`notifications.tsx`, `doctor/notifications.tsx`); local reminders (6 categories) ✘ (`expo-notifications` not installed); booking/message notifications partial [item 11]
 - [~] Streaks, points, badges (My Rewards screen ✔, `gamification-service.ts`); admin points view ✘ [item 9]
-- [~] Subscription: plans, mock subscribe, status, cancel ✔ (`subscription.tsx`); only one plan seeded ("Premium Monthly" ₱99), no Free / 6-Month / Annual, no daily-limit helper; admin plan CRUD + premium subscriber list ✘ [items 2, 10]
+- [~] Subscription: plans, mock subscribe, status, cancel ✔ (`subscription.tsx`); Free vs Premium comparison + hero (Figma 3:630) and `canUseFeature` daily-limit helper built 2026-09-26 [item 2]; **run `node seed-demo.cjs` to create the 4 plans (D5)**; admin plan CRUD + premium subscriber list ✘ [item 10]
 
 ## Added scope (adviser-requested, not in Table 24): after all 23 points
 - [ ] Product memory: shared barcode-keyed `Products` collection, reuse nutrients, admin review (DECISIONS D12, closed) [item 15]
