@@ -17,6 +17,7 @@ export default function LoginScreen() {
   const [resetting, setResetting] = useState(false);
 
   const submit = async () => {
+    if (!email.trim() || !password) { setError('Please fill in all required fields.'); return; }
     setError(''); setMessage(''); setLoading(true);
     try {
       const role = await signIn(email, password);
@@ -56,6 +57,7 @@ function getLoginError(value: unknown) {
     const code = String(value.code);
     if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') return 'The email or password is incorrect.';
     if (code === 'auth/invalid-email') return 'Enter a valid email address.';
+    if (code === 'app/account-deactivated') return 'This account has been deactivated. Please contact support.';
     if (code === 'auth/too-many-requests') return 'Too many attempts. Please wait a moment and try again.';
   }
   return 'We could not sign you in. Please try again.';
