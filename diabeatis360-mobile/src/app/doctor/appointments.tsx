@@ -86,13 +86,13 @@ export default function DoctorAppointmentsScreen() {
     <View style={doctorStyles.screen}>
       <DoctorHeader title="Appointments" subtitle="Accept, decline, and review bookings" badgeCount={pendingCount + unread} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
-        <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterScroll}>
           {filters.map((item) => (
             <Pressable key={item.key} onPress={() => setFilter(item.key)} style={[styles.filter, filter === item.key && styles.filterActive]}>
               <Text style={[styles.filterText, filter === item.key && styles.filterTextActive]}>{item.label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
 
@@ -161,8 +161,9 @@ export default function DoctorAppointmentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  filter: { backgroundColor: '#FFF', borderColor: '#E2E8F0', borderRadius: 22, borderWidth: 1, flex: 1, paddingVertical: 10 },
+  filterScroll: { flexGrow: 0, marginBottom: 8 },
+  filterRow: { flexDirection: 'row', gap: 8 },
+  filter: { backgroundColor: '#FFF', borderColor: '#E2E8F0', borderRadius: 22, borderWidth: 1, paddingHorizontal: 18, paddingVertical: 10 },
   filterActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
   filterText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   filterTextActive: { color: '#FFF' },
