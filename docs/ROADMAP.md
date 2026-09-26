@@ -29,7 +29,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 
 ## Tier 3 — Appointments & consultation (P, D, A)
 - [~] Doctor: Manage Schedule (availability + fee) ✔ (`doctor/schedule.tsx`, `updateDoctorAvailability`)
-- [~] Patient: directory → slots → mock payment → booking ✔; directory does **not** filter verified+active (`subscribeToProviders` reads all Providers); no double-booking guard (UI greys out taken slots only, no transaction) [item 4]
+- [~] Patient: directory (verified + active doctors only, `subscribeToBookableProviders`) → slots → mock payment → booking ✔; double-booking guard built 2026-09-26: booking id `<providerId>_<slot UTC>` written in a transaction and enforced by the rules; 15% `platform_commission` stored per booking (D3) [item 4]; not device-tested
 - [~] Doctor: queue → accept / decline ✔; both see appointment history ✔ (`booking/appointment.tsx`, `doctor/appointments.tsx`)
 - [~] Chat (realtime, top-level `Messages` collection, not the D8 subcollection) ✔; doctor sees patient profile + glucose history ✔
 - [~] End consultation + summary: either side can end (booking becomes `completed`); doctor writes the summary or adds it afterwards; other party is notified. Built 2026-09-26 [item 1], not device-tested

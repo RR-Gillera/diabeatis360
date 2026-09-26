@@ -15,7 +15,7 @@ intent. Names below are lowercase for readability. If this file and seed.cjs dis
 | ai_suggestions | auto | user_id, suggestion_type (`chat`/`meal`/`exercise`/`risk`), prompt, response, generated_at |
 | ai_suggestions_foods | auto | suggestion_id, food_id |
 | nutrition_scans | auto | user_id, image_url (optional, `null` per D2), product_name, product_id (barcode, D12 proposed), health_rating (`suitable`/`caution`/`unsuitable`), scanned_at |
-| bookings | auto or `${provider_id}_${slot}` | patient_id, provider_id, status (`pending`/`confirmed`/`completed`/`declined`/`cancelled`), payment_status (`unpaid`/`paid`/`onsite`), scheduled_at, fee, created_at |
+| bookings | `<provider_id>_<slot as UTC yyyymmddHHmm>` (D3/plan item 4: two patients booking the same slot collide on one doc) | patient_id, provider_id, status (`pending`/`confirmed`/`completed`/`declined`/`cancelled`), payment_status (`unpaid`/`paid`/`onsite`), scheduled_at, fee, platform_commission (15% of fee, D3), created_at |
 | gamification | user uid recommended | user_id, streak_count, total_points, updated_at |
 | badges | auto | badge_name, badge_description, criteria |
 | user_badges | auto | user_id, badge_id, earned_at |
@@ -98,5 +98,5 @@ Keep rules simple enough to explain in the defense; test them with the Firebase 
 - **Doctors read patient data only when `Providers/{uid}.is_verified == true`.** Rules cannot search Bookings to prove "this patient booked me", so any verified doctor can read any patient's profile/glucose logs. Until the admin panel can verify doctors, set `is_verified: true` by hand in the Firebase console for test doctors.
 - **Chat** is the top-level `Messages` collection (D8): read by the booking's two parties, created only while the booking is `confirmed`, never edited or deleted.
 - Notifications can be created for yourself, for the other party of a booking you are in (tagged with `related_id` = booking id), or by an admin for anyone.
-- Bookings: the doctor changes status/queue/consultation fields, the patient can only pay (after confirmation) or cancel, and `fee` must equal the doctor's `consultation_fee`.
+- Bookings: the doctor changes status/queue/consultation fields; the patient can only pay (after confirmation), end their own confirmed consultation, or cancel. `fee` must equal the doctor's `consultation_fee` and `platform_commission` must be 15% of it. A slot whose booking was declined/cancelled can be re-booked; an active booking can never be overwritten.
 - Nothing is ever deleted except a patient's own glucose logs.
