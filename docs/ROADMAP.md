@@ -33,7 +33,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Doctor: queue → accept / decline ✔; both see appointment history ✔ (`booking/appointment.tsx`, `doctor/appointments.tsx`)
 - [~] Chat (realtime, top-level `Messages` collection, not the D8 subcollection) ✔; doctor sees patient profile + glucose history ✔
 - [~] End consultation + summary: either side can end (booking becomes `completed`); doctor writes the summary or adds it afterwards; other party is notified. Built 2026-09-26 [item 1], not device-tested
-- [ ] Admin: all appointments table + revenue/commission [item 8]
+- [x] Admin: all appointments table + revenue/commission [item 8]: `AppointmentsPage` (status tabs, date range, names, 15% commission with a fallback for older bookings) tested end to end against the emulators (2026-09-26)
 
 ## Tier 4 — AI (P)  ← D1 closed 2026-09-26: Gemini via Firebase Cloud Functions (needs Blaze plan) [items 13a, 13, 14]
 - [ ] Cloud Functions (`functions/`: generateMeals, generateExercises, analyzeLabel; key as a Functions secret; server-side daily limits) + `ai.ts` wrapper calling them + disclaimer component (no Gemini code exists) [items 13a, 13]
@@ -45,12 +45,12 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 ## Tier 5 — Admin management (A)
 - [x] Verify doctor credentials; activate/deactivate doctors and users [item 7]: admin `DoctorsPage` + `UsersPage` built and tested end to end against the emulators (18/18, 2026-09-26). UT-A006 "add doctor profile" is NOT built: doctors register in the mobile app and an admin verifies them (needs a manuscript wording change)
 - [ ] Food Database CRUD
-- [ ] Analytics dashboard (Recharts) + report export (CSV / printable) [item 12]
-- [ ] Send announcements [item 11]
+- [x] Analytics dashboard (Recharts: 4 charts + stat cards) and Reports page (users / appointments and revenue / blood sugar trends, date range, CSV download, print to PDF) [item 12]: tested end to end, numbers checked by hand
+- [x] Send announcements [item 11, admin side]: `AnnouncementsPage` fans out one Notifications doc per active user (all / patients / doctors); mobile shows them in the notification list. Tested end to end
 
 ## Tier 6 — Engagement (P, A)
-- [~] Notifications list ✔ (`notifications.tsx`, `doctor/notifications.tsx`); local reminders (6 categories) ✘ (`expo-notifications` not installed); booking/message notifications partial [item 11]
-- [~] Streaks, points, badges (My Rewards screen ✔, `gamification-service.ts`); admin points view ✘ [item 9]
+- [~] Notifications list ✔ (`notifications.tsx`, `doctor/notifications.tsx`); local reminders (6 categories) ✘ (`expo-notifications` not installed); booking/message notifications ✔; the 6 reminder categories are still to do [item 11, mobile side] [item 11]
+- [~] Streaks, points, badges (My Rewards screen ✔, `gamification-service.ts`); admin points view ✔ (`PointsPage`, tested end to end) [item 9]
 - [~] Subscription: plans, mock subscribe, status, cancel ✔ (`subscription.tsx`); Free vs Premium comparison + hero (Figma 3:630) and `canUseFeature` daily-limit helper built 2026-09-26 [item 2]; **run `node seed-demo.cjs` to create the 4 plans (D5)**; admin plan CRUD + premium subscriber list ✘ [item 10]
 
 ## Added scope (adviser-requested, not in Table 24): after all 23 points

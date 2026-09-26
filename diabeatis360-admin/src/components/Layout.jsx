@@ -9,7 +9,7 @@ export default function Layout() {
   const { admin, logout } = useAuth()
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-gray-100 bg-white p-5">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-gray-100 bg-white p-5 print:hidden">
         <div className="mb-8">
           <p className="text-lg font-extrabold text-brand">Diabeatis360</p>
           <p className="text-xs font-medium text-muted">Admin panel</p>
