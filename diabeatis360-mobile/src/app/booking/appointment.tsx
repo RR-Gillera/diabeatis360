@@ -6,11 +6,14 @@ import { BookingHeader, bookingColors, formatDate, formatFee, styles as ui } fro
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, BookingStatus, PaymentStatus } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { enumLabel, isChatAvailable } from '@/constants/enums';
 
 const statusCopy: Record<BookingStatus, { label: string; color: string; background: string }> = {
-  scheduled: { label: 'SCHEDULED', color: '#475569', background: '#F1F5F9' },
-  accepted: { label: 'ACCEPTED', color: bookingColors.green, background: '#E9F6ED' },
-  declined: { label: 'DECLINED', color: '#D9364F', background: '#FBE6E9' },
+  pending: { label: enumLabel('bookingStatus', 'pending').toUpperCase(), color: '#B45309', background: '#FEF3C7' },
+  confirmed: { label: enumLabel('bookingStatus', 'confirmed').toUpperCase(), color: bookingColors.green, background: '#E9F6ED' },
+  completed: { label: enumLabel('bookingStatus', 'completed').toUpperCase(), color: '#475569', background: '#F1F5F9' },
+  declined: { label: enumLabel('bookingStatus', 'declined').toUpperCase(), color: '#D9364F', background: '#FBE6E9' },
+  cancelled: { label: enumLabel('bookingStatus', 'cancelled').toUpperCase(), color: '#D9364F', background: '#FBE6E9' },
 };
 
 const paymentCopy: Record<PaymentStatus, { label: string; color: string }> = {
@@ -54,7 +57,7 @@ export default function AppointmentScreen() {
                 the number can shift if the doctor later accepts someone holding
                 an earlier slot, and this screen should show where the patient
                 actually stands rather than what they were first told. */}
-            {entry.status === 'accepted' && entry.queueNumber ? (
+            {entry.status === 'confirmed' && entry.queueNumber ? (
               <View style={styles.queue}>
                 <Text style={styles.queueLabel}>YOUR QUEUE NUMBER</Text>
                 <Text style={styles.queueValue}>{entry.queueNumber}</Text>
@@ -71,19 +74,19 @@ export default function AppointmentScreen() {
               </Text>
             </View>
 
-            {entry.status === 'accepted' && entry.paymentStatus === 'unpaid' ? (
+            {entry.status === 'confirmed' && entry.paymentStatus === 'unpaid' ? (
               <Pressable style={styles.payButton} onPress={() => router.push({ pathname: '/booking/consultation-fee', params: { id: entry.id } })}>
                 <Text style={styles.payButtonText}>Pay Now</Text>
               </Pressable>
             ) : null}
 
-            {entry.status === 'accepted' && entry.paymentStatus !== 'unpaid' ? (
+            {isChatAvailable(entry.status) && entry.paymentStatus !== 'unpaid' ? (
               <Pressable style={styles.chatButton} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
                 <Text style={styles.chatButtonText}>Open Chat</Text>
               </Pressable>
             ) : null}
 
-            {entry.status === 'scheduled' ? (
+            {entry.status === 'pending' ? (
               <Text style={styles.waitingNote}>Waiting for the doctor to accept. You will be able to pay once they do.</Text>
             ) : null}
 

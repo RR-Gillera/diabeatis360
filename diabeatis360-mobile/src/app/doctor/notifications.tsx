@@ -35,7 +35,7 @@ type Notice = {
 function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
   return appointments.map((entry) => {
     const when = entry.scheduledAt;
-    if (entry.status === 'scheduled') {
+    if (entry.status === 'pending') {
       return {
         id: entry.id, patientId: entry.patientId,
         title: 'New booking request',
@@ -43,12 +43,28 @@ function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
         when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: '#B45309', background: '#FEF3C7',
       };
     }
-    if (entry.status === 'accepted') {
+    if (entry.status === 'confirmed') {
       return {
         id: entry.id, patientId: entry.patientId,
         title: 'Appointment confirmed',
         detail: `You accepted ${entry.patientName}'s consultation${when ? ` on ${when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}.`,
         when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint,
+      };
+    }
+    if (entry.status === 'completed') {
+      return {
+        id: entry.id, patientId: entry.patientId,
+        title: 'Consultation completed',
+        detail: `Your consultation with ${entry.patientName} has ended.`,
+        when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: '#475569', background: '#F1F5F9',
+      };
+    }
+    if (entry.status === 'cancelled') {
+      return {
+        id: entry.id, patientId: entry.patientId,
+        title: 'Appointment cancelled',
+        detail: `${entry.patientName} cancelled their consultation request.`,
+        when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
       };
     }
     return {

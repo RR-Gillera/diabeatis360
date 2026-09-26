@@ -7,11 +7,12 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
 import { addGlucoseLog, deleteGlucoseLog, getInterpretation, updateGlucoseLog } from './glucose-service';
+import { enumLabel } from '@/constants/enums';
 import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
 
 const contexts: { value: MealContext; label: string }[] = [
-  { value: 'before_meal', label: 'Before Meal' },
-  { value: 'after_meal', label: 'After Meal' },
+  { value: 'before_meal', label: enumLabel('mealContext', 'before_meal') },
+  { value: 'after_meal', label: enumLabel('mealContext', 'after_meal') },
 ];
 
 const livePreviewCopy: Record<Interpretation, { label: string; color: string; background: string }> = {

@@ -55,7 +55,7 @@ export default function ConsultationFeeScreen() {
     if (!booking) return <Text style={styles.notice}>This appointment no longer exists.</Text>;
     // Payment is gated on the doctor's acceptance — this is the whole point of
     // the accept-then-pay flow, so the screen refuses rather than half-working.
-    if (booking.status !== 'accepted') {
+    if (booking.status !== 'confirmed') {
       return (
         <View style={[ui.card, styles.gateCard]}>
           <SymbolView name={{ ios: 'clock.fill', android: 'schedule', web: 'schedule' }} size={24} tintColor="#B45309" />

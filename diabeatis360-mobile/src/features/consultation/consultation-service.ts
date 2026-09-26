@@ -1,7 +1,10 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import type { ConsultationStatus } from '@/constants/enums';
 import { createNotification } from '@/features/notifications/notification-service';
+
+export type { ConsultationStatus };
 
 export type SenderRole = 'patient' | 'doctor';
 
@@ -13,8 +16,6 @@ export type ChatMessage = {
   text: string;
   sentAt: Date | null;
 };
-
-export type ConsultationStatus = 'not_started' | 'active' | 'ended';
 
 export type ConsultationState = {
   status: ConsultationStatus;
@@ -122,6 +123,7 @@ export function subscribeToConsultation(
 /** Ends the consultation and records the doctor's written summary. */
 export async function endConsultation(bookingId: string, summary: string) {
   await setDoc(doc(db, 'Bookings', bookingId), {
+    status: 'completed',
     consultation_status: 'ended',
     consultation_summary: summary.trim(),
     consultation_ended_at: serverTimestamp(),

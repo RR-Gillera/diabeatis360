@@ -1,6 +1,9 @@
 import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import type { SubscriptionStatus } from '@/constants/enums';
+
+export type { SubscriptionStatus };
 
 export type MembershipPlan = {
   id: string;
@@ -8,8 +11,6 @@ export type MembershipPlan = {
   price: number;
   durationDays: number;
 };
-
-export type SubscriptionStatus = 'active' | 'cancelled' | 'expired';
 
 export type Subscription = {
   id: string;

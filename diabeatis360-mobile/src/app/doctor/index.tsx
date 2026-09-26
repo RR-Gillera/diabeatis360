@@ -44,17 +44,17 @@ export default function DoctorHomeScreen() {
 
   const stats = useMemo(() => {
     const today = new Date();
-    const pending = appointments.filter((entry) => entry.status === 'scheduled');
-    const todays = appointments.filter((entry) => isSameDay(entry.scheduledAt, today) && entry.status !== 'declined');
+    const pending = appointments.filter((entry) => entry.status === 'pending');
+    const todays = appointments.filter((entry) => isSameDay(entry.scheduledAt, today) && entry.status !== 'declined' && entry.status !== 'cancelled');
     const patients = new Set(appointments.map((entry) => entry.patientId));
     return { pending, todays, patientCount: patients.size };
   }, [appointments]);
 
   const upcoming = useMemo(() => appointments
-    .filter((entry) => entry.status === 'accepted' && entry.scheduledAt && entry.scheduledAt >= new Date())
+    .filter((entry) => entry.status === 'confirmed' && entry.scheduledAt && entry.scheduledAt >= new Date())
     .slice(0, 3), [appointments]);
 
-  const decide = async (bookingId: string, status: 'accepted' | 'declined') => {
+  const decide = async (bookingId: string, status: 'confirmed' | 'declined') => {
     setActingOn(bookingId);
     try { await updateBookingStatus(bookingId, status); } finally { setActingOn(null); }
   };
@@ -137,7 +137,7 @@ export default function DoctorHomeScreen() {
               <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'declined')} style={[styles.actionButton, styles.declineButton]}>
                 <Text style={styles.declineText}>Decline</Text>
               </Pressable>
-              <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'accepted')} style={[styles.actionButton, styles.acceptButton]}>
+              <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'confirmed')} style={[styles.actionButton, styles.acceptButton]}>
                 <Text style={styles.acceptText}>{actingOn === entry.id ? 'Saving...' : 'Accept'}</Text>
               </Pressable>
             </View>
