@@ -11,6 +11,7 @@ export type GlucoseLogRecord = {
   context: MealContext;
   notes: string;
   logged_at: Timestamp;
+  interpretation: Interpretation;
   created_at: ReturnType<typeof import('firebase/firestore').serverTimestamp>;
 };
 

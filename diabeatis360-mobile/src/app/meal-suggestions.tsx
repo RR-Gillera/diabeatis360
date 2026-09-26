@@ -6,6 +6,8 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
+import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
+import { CriticalNotice } from '@/features/glucose/critical-notice';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
@@ -29,6 +31,8 @@ const mealsByInterpretation: Record<Interpretation, { title: string; description
     { title: '🧃 Fruit Juice & Crackers', description: 'Quick-acting carbohydrates to bring your level back up.' },
     { title: '🥣 Oatmeal with Berries', description: 'A steady, balanced follow-up once your level has stabilized.' },
   ],
+  // No food suggestions for a critical reading: the screen shows the urgent guidance instead (see CriticalNotice).
+  critical: [],
 };
 
 export default function MealSuggestionsScreen() {
@@ -54,6 +58,7 @@ export default function MealSuggestionsScreen() {
         </View>
         <Text style={styles.subtitle}>Personalized meal options based on your health information.</Text>
 
+        {latest?.interpretation === 'critical' ? <CriticalNotice readingMgdl={latest.readingMgdl} /> : null}
         {meals.map((meal) => (
           <View key={meal.title} style={styles.card}>
             <View style={styles.cardTop}>
@@ -68,6 +73,7 @@ export default function MealSuggestionsScreen() {
             </Pressable>
           </View>
         ))}
+        <AiDisclaimer />
       </ScrollView>
       <BottomNav active="home" />
     </View>

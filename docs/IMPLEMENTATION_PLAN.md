@@ -432,3 +432,16 @@ Not agreed yet. `SCHEDULE.md` keeps the original dates until the adviser approve
 - **Gantt (Table 5):** only if the adviser approves the phased testing.
 - **Storyboard / system flow:** admin screens and the booking lifecycle
   (pending → confirmed → completed / declined / cancelled).
+
+## 7. Execution log (updated as items land; all built by reading and typechecking only, none device-tested)
+
+| Item | Status | Date | Notes |
+|---|---|---|---|
+| 0a | done | 2026-09-26 | Local commits on branch `russell` (not pushed). Stray audit file and `docs/reports/download` removed. |
+| 0b | partly done | 2026-09-26 | `seed-demo.cjs` written (4 plans, 7 badges, idempotent, never deletes); **not run**. Deploying rules, editing old bookings, verifying doctors and creating the `Admins/{uid}` doc are console steps for a person. Food_Database left for item 13 (needs a real DOST-FNRI source). |
+| 0c | done | 2026-09-26 | `Brand` tokens, Inter loaded in `app/_layout.tsx`, `components/ui/*`. Older screens still use the system font until they are touched. |
+| 1 | done | 2026-09-26 | Either side can end a consultation; doctor can add the summary afterwards. |
+| 2 | done | 2026-09-26 | Free vs Premium comparison, paid plans only purchasable, `canUseFeature`. Figma's "24/7 Doc Chat" / "Expert Reports" rows left out (conflict with the manuscript and not built). |
+| 3 | done | 2026-09-26 | Blank-field messages, deactivated-account block, doctor pending-verification gate. |
+| 4 | done | 2026-09-26 | Slot-based booking id + transaction, verified-only directory, 15% commission. Rules tests: 111/111. |
+| 5 | done | 2026-09-26 | Critical class, `constants/glucose.ts` + 9 unit tests, result screen, exercise screen. **Correction:** Figma 23:526 is the Glucose Log screen, which already existed, so no separate "Trends" screen was needed. |

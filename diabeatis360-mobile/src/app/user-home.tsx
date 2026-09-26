@@ -42,10 +42,12 @@ const badgeStyle: Record<Interpretation, { label: string; color: string; backgro
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
   low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
   high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
 };
 
 function bannerCopy(latest: GlucoseLogEntry | undefined) {
   if (!latest) return { icon: 'info.circle.fill', iconAndroid: 'info', color: homeColors.textMuted, background: homeColors.borderSoft, text: 'Log your first blood sugar reading to get started.' } as const;
+  if (latest.interpretation === 'critical') return { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', color: homeColors.red, background: 'rgba(239, 68, 68, 0.08)', text: 'Your last reading was in a dangerous range. Contact your doctor or seek emergency care.' } as const;
   if (latest.interpretation === 'high') return { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', color: homeColors.red, background: 'rgba(239, 68, 68, 0.08)', text: 'Your last reading was high — keep an eye on it.' } as const;
   if (latest.interpretation === 'low') return { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.08)', text: 'Your last reading was low — consider a snack soon.' } as const;
   return { icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint, text: 'Blood sugar is looking stable today' } as const;

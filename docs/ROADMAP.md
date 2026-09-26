@@ -11,7 +11,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Firestore rules (2026-09-25): new `firestore.rules` + `firebase.json` + `.firebaserc` at the repo root, one-line reason on every rule, default-deny. **Not deployed yet**, and tested with 101 allow/deny cases in the Firestore emulator on 2026-09-26 (all pass); after deploying, still try one flow per role in the Rules Playground (see FIRESTORE_SCHEMA.md "As implemented" for the deliberate relaxations). Before deploying, set `is_verified: true` on test doctors in the Firebase console, or their patient screens will show permission errors.
 - [~] Mobile: single `src/firebase.js` with RN auth persistence ✔; bottom nav shell ✔; theme tokens + Inter font ✘ (`constants/theme.ts` is still the Expo template; Inter not installed)
 - [ ] Admin: auth guard (`AdminRoute`) + layout shell (admin `src/` is still the Vite starter page)
-- [ ] Glucose thresholds constants + `interpretGlucose()` with tests (DECISIONS D4): thresholds are hardcoded in `features/glucose/glucose-service.ts`, no `critical`, no tests
+- [x] Glucose thresholds constants + `interpretGlucose()` with tests (DECISIONS D4): `constants/glucose.ts` + 9 unit tests (`npm test`, all pass), critical class added (2026-09-26)
 - [~] Docs hygiene: `LIST_OF_MODULES.md` restored to the official Table 24 (2026-09-26, check it against the signed copy); `docs/` is still untracked in git; the earlier PROGRESS log was lost [item 0a]
 
 ## Tier 1 — Accounts & profile (Account Mgmt P/D/A, Health Profile P/D)
@@ -23,8 +23,8 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [x] Remove `test-patient-001` placeholder everywhere (grep: zero matches in `src/`)
 
 ## Tier 2 — Blood sugar (P, D view)
-- [~] Add / edit / delete log ✔ → auto interpretation (low/normal/high only, **no critical**; computed on read, not stored on the doc) → Interpretation screen with feedback (`glucose-result.tsx`) [item 5]
-- [~] History list + weekly chart + average ✔ (`glucose-log.tsx`, `bucketCurrentWeek`); doctor sees the same in `doctor/patient/[id].tsx` Figma "View Blood Trends" (23:526) screen not built [item 5]
+- [~] Add / edit / delete log ✔ → interpretation from `constants/glucose.ts` (low/normal/high/critical, stored on the log and recomputed on read) → result screen matching Figma 194:264 with disclaimer, critical guidance and a working Exercise Tips screen (`exercise-tips.tsx`, curated until item 13). Built 2026-09-26 [item 5], not device-tested
+- [~] History list + weekly chart + average ✔ (`glucose-log.tsx`, `bucketCurrentWeek`); doctor sees the same in `doctor/patient/[id].tsx` Figma 23:526 is the Glucose Log screen (Weekly Overview + History), already built; its calendar and "more" header buttons are still Coming Soon alerts [polish]
 - [~] Out-of-range → in-app notification ✔ (`glucoseAlert`)
 
 ## Tier 3 — Appointments & consultation (P, D, A)
