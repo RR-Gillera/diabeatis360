@@ -1,7 +1,8 @@
-import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 import type { SubscriptionStatus } from '@/constants/enums';
+import { FREE_LIMITS, type LimitedFeature } from '@/constants/plans';
 
 export type { SubscriptionStatus };
 
@@ -106,4 +107,38 @@ export async function subscribeToPlan(userId: string, plan: MembershipPlan) {
  */
 export async function cancelSubscription(subscriptionId: string) {
   await updateDoc(doc(db, 'Subscriptions', subscriptionId), { status: 'cancelled' as SubscriptionStatus });
+}
+
+const usageSource: Record<LimitedFeature, { collection: string; dateField: string }> = {
+  ai: { collection: 'AI_Suggestions', dateField: 'generated_at' },
+  scan: { collection: 'Nutrition_Scans', dateField: 'scanned_at' },
+};
+
+/**
+ * How much of today's allowance is left for an AI generation or a label scan.
+ *
+ * Premium is unlimited; Free gets FREE_LIMITS per calendar day. This is for the UI only ("1 of 2 left"):
+ * the Cloud Functions repeat the same count on the server (plan item 13a) because a client-side check can be
+ * bypassed. One equality filter, counted client-side, so no composite index is needed.
+ */
+export async function canUseFeature(userId: string, feature: LimitedFeature) {
+  const subscriptions = await getDocs(query(collection(db, 'Subscriptions'), where('user_id', '==', userId)));
+  const now = Date.now();
+  const premium = subscriptions.docs.some((document) => {
+    const data = document.data();
+    const expires = (data.expires_at as Timestamp | undefined)?.toDate?.();
+    return data.status === 'active' && (!expires || expires.getTime() > now);
+  });
+  if (premium) return { allowed: true, used: 0, limit: null as number | null, premium: true };
+
+  const { collection: name, dateField } = usageSource[feature];
+  const usage = await getDocs(query(collection(db, name), where('user_id', '==', userId)));
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const used = usage.docs.filter((document) => {
+    const at = (document.data()[dateField] as Timestamp | undefined)?.toDate?.();
+    return at ? at >= startOfDay : false;
+  }).length;
+  const limit = FREE_LIMITS[feature];
+  return { allowed: used < limit, used, limit: limit as number | null, premium: false };
 }
