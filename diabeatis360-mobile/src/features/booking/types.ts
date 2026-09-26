@@ -14,6 +14,7 @@ export type Provider = {
   city: string;
   consultationFee: number;
   isVerified: boolean;
+  isActive: boolean;
 };
 
 export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';
@@ -36,6 +37,8 @@ export type BookingRecord = {
   status: BookingStatus;
   scheduled_at: Timestamp;
   fee: number;
+  /** 15% of the fee (DECISIONS.md D3), stored so admin revenue never depends on the current rate. */
+  platform_commission: number;
   payment_status: PaymentStatus;
   payment_method: PaymentMethod | null;
   /** Assigned when the doctor accepts — null while the request is pending. */

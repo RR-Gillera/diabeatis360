@@ -1,7 +1,8 @@
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { platformCommission } from '@/constants/commission';
 import { createNotification } from '@/features/notifications/notification-service';
 
 import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, PaymentMethod, PaymentStatus, Provider, ProviderBookingEntry } from './types';
@@ -19,6 +20,7 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
     city: String(data.city ?? 'Philippines'),
     consultationFee: Number(data.consultation_fee ?? 0),
     isVerified: Boolean(data.is_verified),
+    isActive: data.is_active !== false,
   };
 }
 
@@ -33,21 +35,52 @@ export function subscribeToProviders(
   );
 }
 
+// The doctor directory: only doctors an admin verified and who are still active can be booked (module 10).
+// subscribeToProviders stays unfiltered because booking history still needs the names of doctors who were
+// later deactivated.
+export function subscribeToBookableProviders(
+  onChange: (providers: Provider[]) => void,
+  onError: (error: Error) => void,
+) {
+  return subscribeToProviders(
+    (providers) => onChange(providers.filter((provider) => provider.isVerified && provider.isActive)),
+    onError,
+  );
+}
+
+// The booking's document id is the doctor plus the slot (UTC, so every device agrees), e.g.
+// "<providerId>_202609281400". Two patients picking the same slot therefore write the SAME document, which is
+// what makes double-booking impossible rather than merely unlikely.
+export function bookingIdFor(providerId: string, slot: Date) {
+  return `${providerId}_${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`;
+}
+
 // Creates the booking as a REQUEST: the doctor has to accept before the patient
 // is asked to pay, so no payment method is chosen here and nothing is marked paid.
+// A slot is free if nobody booked it, or the earlier booking was declined/cancelled; anything else means
+// someone got there first. firestore.rules enforces the same thing, so this is the friendly error, not the guard.
 export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number) {
+  const reference = doc(db, 'Bookings', bookingIdFor(providerId, selectedDate));
   const record: BookingRecord = {
     patient_id: patientId,
     provider_id: providerId,
     status: 'pending',
     scheduled_at: Timestamp.fromDate(selectedDate),
     fee,
+    platform_commission: platformCommission(fee),
     payment_status: 'unpaid',
     payment_method: null,
     queue_number: null,
     created_at: serverTimestamp(),
   };
-  const reference = await addDoc(collection(db, 'Bookings'), record);
+  await runTransaction(db, async (transaction) => {
+    const existing = await transaction.get(reference);
+    const status = existing.data()?.status;
+    if (existing.exists() && status !== 'declined' && status !== 'cancelled') {
+      throw new Error('That time slot was just booked by someone else. Please pick another time.');
+    }
+    transaction.set(reference, record);
+  });
   return reference.id;
 }
 
