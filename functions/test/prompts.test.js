@@ -76,6 +76,12 @@ test('cleanExercises keeps light or moderate and bounds the duration', () => {
   assert.equal(list[1].intensity, 'moderate')
 })
 
+test('cleanExercises keeps a tagline and at most 3 benefits', () => {
+  const [item] = cleanExercises([{ name: 'Walk', tagline: 'Low-impact', description: 'x', duration_minutes: 20, intensity: 'light', benefits: ['a', 'b', 'c', 'd'], caution: 'c' }])
+  assert.equal(item.tagline, 'Low-impact')
+  assert.deepEqual(item.benefits, ['a', 'b', 'c'])
+})
+
 test('cleanLabel: unreadable input stays unreadable', () => {
   assert.deepEqual(cleanLabel({ readable: false }, []), { readable: false })
   assert.deepEqual(cleanLabel(null, []), { readable: false })

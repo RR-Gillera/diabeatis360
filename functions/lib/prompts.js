@@ -67,7 +67,7 @@ function buildRecommendationPrompt({ kind, profile, reading, foods }) {
   const language = LANGUAGE_NAMES[profile.language_preference] ?? 'English'
   const task = kind === 'meal'
     ? 'Suggest exactly 3 different meal options for the person\'s NEXT meal. For each give the nutrition per serving and 4 to 7 simple ingredients.'
-    : 'Suggest exactly 3 gentle physical activities suitable right now. For each give a realistic duration in minutes and a short caution. Never suggest strenuous exercise if the latest reading is low.'
+    : 'Suggest exactly 3 gentle physical activities suitable right now. For each give a short tagline, a one-sentence description, a realistic duration in minutes, exactly 3 short benefits, and a short caution. Never suggest strenuous exercise if the latest reading is low.'
   return {
     system: SYSTEM_RULES,
     user: [
@@ -125,8 +125,8 @@ const exerciseSchema = {
       type: 'ARRAY',
       items: {
         type: 'OBJECT',
-        properties: { name: STRING, description: STRING, duration_minutes: NUMBER, intensity: STRING, caution: STRING },
-        required: ['name', 'description', 'duration_minutes', 'intensity', 'caution'],
+        properties: { name: STRING, tagline: STRING, description: STRING, duration_minutes: NUMBER, intensity: STRING, benefits: { type: 'ARRAY', items: STRING }, caution: STRING },
+        required: ['name', 'tagline', 'description', 'duration_minutes', 'intensity', 'benefits', 'caution'],
       },
     },
   },
@@ -175,7 +175,9 @@ function cleanExercises(items) {
   return (Array.isArray(items) ? items : [])
     .map((item) => ({
       name: text(item?.name, 80),
+      tagline: text(item?.tagline, 80),
       description: text(item?.description, 240),
+      benefits: (Array.isArray(item?.benefits) ? item.benefits : []).map((entry) => text(entry, 100)).filter(Boolean).slice(0, 3),
       duration_minutes: Math.max(5, Math.min(120, Math.round(number(item?.duration_minutes, 120)))),
       intensity: ['light', 'moderate'].includes(String(item?.intensity).toLowerCase()) ? String(item.intensity).toLowerCase() : 'light',
       caution: text(item?.caution, 200),
