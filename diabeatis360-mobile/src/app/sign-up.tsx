@@ -9,7 +9,7 @@ export default function SignUpScreen() {
   const router = useRouter();
   const { signUp } = useAuth();
   const [fullName, setFullName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [terms, setTerms] = useState(false); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
-  const submit = async () => { if (!fullName.trim() || !email.trim() || !password || password !== confirm || !terms) { setError('Complete the form, match your passwords, and accept the terms.'); return; } setError(''); setLoading(true); try { await signUp(fullName, email, password); router.replace('/verify-email' as never); } catch (value) { setError(getRegistrationError(value)); } finally { setLoading(false); } };
+  const submit = async () => { if (!fullName.trim() || !email.trim() || !password || !confirm) { setError('Please fill in all required fields.'); return; } if (password !== confirm) { setError('Your passwords do not match.'); return; } if (!terms) { setError('Please accept the Terms of Service and Privacy Policy to continue.'); return; } setError(''); setLoading(true); try { await signUp(fullName, email, password); router.replace('/verify-email' as never); } catch (value) { setError(getRegistrationError(value)); } finally { setLoading(false); } };
   // Google/Apple sign-up isn't wired up yet — surface that instead of attempting a native call that would fail.
   const socialSignUp = (provider: 'google' | 'apple') => { setError(`${provider === 'google' ? 'Google' : 'Apple'} sign-up is coming soon.`); };
   return <ScrollView style={authStyles.screen} contentContainerStyle={styles.scroll}>

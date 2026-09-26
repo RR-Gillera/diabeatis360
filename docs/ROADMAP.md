@@ -16,8 +16,8 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 
 ## Tier 1 — Accounts & profile (Account Mgmt P/D/A, Health Profile P/D)
 - [~] Patient: sign up → role gate → onboarding steps → Users doc → dashboard (email verification is mocked)
-- [~] Doctor: sign up → professional verification form → Providers doc (`is_verified:false`) ✔; **pending-verification screen missing**, doctor goes straight to the dashboard [item 3]
-- [~] Login with role routing ✔; blank-field validation message "Please fill in all required fields." ✘; deactivated-account block ✘ (`is_active` never checked at login) [item 3]
+- [~] Doctor: sign up → professional verification form → Providers doc (`is_verified:false`) ✔ → **pending-verification screen** (`app/doctor/_layout.tsx` gates every doctor screen until an admin verifies; switches automatically) built 2026-09-26 [item 3]; needs an admin (or console) to set `is_verified`
+- [~] Login with role routing ✔; exact "Please fill in all required fields." on login and sign-up ✔; deactivated accounts (`is_active == false` on Users or Providers) are blocked at login with a message and signed out on session restore ✔ (built 2026-09-26, not device-tested) [item 3]
 - [~] Reset password (P/D ✔ on login screen), update account (P/D name edit ✔), update/view health profile (`profile.tsx`, doctor `patient/[id].tsx`) ✔; admin equivalents ✘
 - [ ] Admin login + admin account update/reset [item 6]
 - [x] Remove `test-patient-001` placeholder everywhere (grep: zero matches in `src/`)

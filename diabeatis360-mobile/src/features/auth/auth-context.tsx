@@ -31,6 +31,19 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * True when an admin deactivated this account (DECISIONS.md D9). The flag lives on the Users doc for everyone
+ * and on the Providers doc for doctors; a missing flag means active. Deactivated accounts are signed out
+ * rather than deleted so their bookings and logs stay intact.
+ */
+async function isDeactivated(uid: string) {
+  const [user, provider] = await Promise.all([
+    getDoc(doc(db, 'Users', uid)),
+    getDoc(doc(db, 'Providers', uid)),
+  ]);
+  return user.data()?.is_active === false || provider.data()?.is_active === false;
+}
+
 async function roleFromFirestore(uid: string): Promise<DemoRole> {
   const snapshot = await getDoc(doc(db, 'Users', uid));
   return snapshot.data()?.role === 'doctor' ? 'doctor' : 'user';
@@ -52,6 +65,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) { setRole('guest'); setUid(null); setEmail(null); setDisplayName(null); return; }
+      // A restored session for an account an admin has since deactivated is ended quietly.
+      if (await isDeactivated(user.uid)) { await firebaseSignOut(auth); return; }
       const snapshot = await getDoc(doc(db, 'Users', user.uid));
       if (!snapshot.exists()) return; // signed up but hasn't finished verification yet
       setRole(snapshot.data()?.role === 'doctor' ? 'doctor' : 'user');
@@ -64,6 +79,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signIn = async (email: string, password: string) => {
     const credentials = await signInWithEmailAndPassword(auth, email.trim(), password);
+    if (await isDeactivated(credentials.user.uid)) {
+      await firebaseSignOut(auth);
+      // The login screen turns this code into a message (UT-019 "deactivated -> blocked with message").
+      throw Object.assign(new Error('Account deactivated'), { code: 'app/account-deactivated' });
+    }
     const nextRole = await roleFromFirestore(credentials.user.uid);
     setRole(nextRole);
     setUid(credentials.user.uid);
@@ -92,6 +112,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       full_name: user.displayName ?? 'Diabeatis360 User',
       email: user.email,
       role: 'patient',
+      is_active: true,
       created_at: serverTimestamp(),
     });
     setRole('user');
