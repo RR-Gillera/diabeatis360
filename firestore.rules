@@ -1,95 +1,288 @@
 rules_version = '2';
 
-// Diabeatis360 Firestore security rules.
+// Diabeatis360 Firestore security rules (audited/written 2026-09-25, follows docs/FIRESTORE_SCHEMA.md
+// "Security rules plan" and the decisions D8 and D9 in docs/DECISIONS.md).
 //
-// These replace the default "test mode" rules, which allowed anyone in the world
-// to read and write the whole database and expired on 2026-09-22 (after which
-// every client request was denied — the "Missing or insufficient permissions"
-// error). These rules do not expire.
+// How to read this file: every `allow` line has a one-line "why" comment above it, so each rule can be
+// defended in front of the panel. Anything not matched below is DENIED by default (no catch-all).
 //
-// SCOPE / KNOWN LIMITATION, to be honest about what this does and does not do:
-// reads are allowed to any *signed-in* user, while writes are restricted to the
-// record's owner. Tighter per-record read rules are not practical here because
-// Firestore evaluates rules per document but cannot run a query inside a rule —
-// e.g. proving "this doctor may read this patient" would require looking up the
-// Bookings collection, which rules cannot query. The app relies on several such
-// cross-user reads:
-//   * a patient reads other patients' bookings for a doctor, to grey out slots
-//     that are already taken (subscribeToBookedTimes)
-//   * a doctor reads the Users and Glucose_Logs docs of patients who booked them
-// Locking reads down further needs either denormalised membership fields on each
-// document or Cloud Functions, which is the right follow-up before this handles
-// real patient data.
+// Role model (D9): the app screens are chosen from Users.role, but these rules NEVER trust Users.role
+// (a user can edit their own doc). Authority comes from documents only an admin can create or change:
+//   Admins/{uid}                 -> admin
+//   Providers/{uid}.is_verified  -> a doctor whose PRC credentials an admin verified
+//
+// KNOWN LIMITATIONS (be upfront about these in the defense):
+//   1. Bookings are readable by any signed-in user, because patients query a doctor's bookings to grey
+//      out taken time slots. Fix later: a separate Booked_Slots collection holding only times.
+//   2. A verified doctor can read ANY patient's profile and glucose logs, not only their own patients':
+//      rules cannot search the Bookings collection (Firestore rules cannot run queries). Fix later:
+//      deterministic booking IDs or a per-doctor patient list.
+//   3. Doctors must be verified (Providers/{uid}.is_verified == true) to read patient data. Until the admin
+//      panel exists, set is_verified to true by hand in the Firebase console for test doctors.
+//   4. Not tested against the Firebase emulator's unit-test harness; try each flow in the Rules Playground.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ------------------------------------------------------------------ helpers
+
+    // True when the caller is signed in (every collection below needs this).
     function signedIn() {
       return request.auth != null;
     }
 
+    // True when the caller is the person whose Auth UID equals `uid`.
     function isUser(uid) {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // Account + health profile. Document ID is the Firebase Auth UID.
+    // An admin is anyone with a document in Admins/ (only created by the seed script, never from a client).
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/Admins/$(request.auth.uid));
+    }
+
+    // A doctor whose credentials an admin verified and who is still active.
+    function isVerifiedDoctor() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/Providers/$(request.auth.uid))
+        && get(/databases/$(database)/documents/Providers/$(request.auth.uid)).data.get('is_verified', false) == true
+        && get(/databases/$(database)/documents/Providers/$(request.auth.uid)).data.get('is_active', true) == true;
+    }
+
+    // The fields a write actually changes (used to allow "only these fields" updates).
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // The booking with this id (used by chat and notification rules to check "are you in this booking?").
+    function bookingData(bookingId) {
+      return get(/databases/$(database)/documents/Bookings/$(bookingId)).data;
+    }
+
+    // True when the caller is the patient or the doctor of the given booking.
+    function inBooking(bookingId) {
+      return signedIn()
+        && (bookingData(bookingId).patient_id == request.auth.uid
+            || bookingData(bookingId).provider_id == request.auth.uid);
+    }
+
+    // ------------------------------------------------------------------ accounts
+
     match /Users/{userId} {
-      allow read: if signedIn();
-      allow create, update: if isUser(userId);
+      // A person reads their own profile; admins manage users; verified doctors read patient health profiles (limitation 2).
+      allow read: if isUser(userId) || isAdmin() || isVerifiedDoctor();
+      // You can only create your own profile, and cannot create it already deactivated.
+      allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true;
+      // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
+      allow update: if (isUser(userId) && !changedKeys().hasAny(['is_active']))
+                    || (isAdmin() && changedKeys().hasOnly(['is_active']));
+      // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
       allow delete: if false;
     }
 
-    // A doctor's bookable profile. Document ID is also their Auth UID, so only
-    // they can edit it, while any signed-in patient can browse it.
     match /Providers/{providerId} {
+      // Any signed-in user can browse the doctor directory (patients need it to book).
       allow read: if signedIn();
-      allow create, update: if isUser(providerId);
+      // A doctor creates their own profile, but can never create it pre-verified or pre-approved.
+      allow create: if isUser(providerId)
+                    && request.resource.data.get('is_verified', false) == false
+                    && request.resource.data.get('is_active', true) == true
+                    && !('verified_by' in request.resource.data);
+      // Doctors edit their profile/schedule but cannot verify or activate themselves; only admins can (module 10).
+      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active']))
+                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active']));
+      // Doctors are deactivated, not deleted.
       allow delete: if false;
     }
 
-    // Only the patient can raise a booking request; either side can update it
-    // afterwards (the doctor accepts/declines, the patient pays, and both can
-    // open the consultation).
-    match /Bookings/{bookingId} {
-      allow read: if signedIn();
-      allow create: if isUser(request.resource.data.patient_id);
-      allow update: if isUser(resource.data.patient_id) || isUser(resource.data.provider_id);
+    match /Admins/{adminId} {
+      // An admin can read only their own record (the admin app uses this to confirm the login is an admin).
+      allow read: if isUser(adminId);
+      // Admin accounts are created only by the seed script with the Admin SDK, never from an app.
+      allow write: if false;
+    }
+
+    match /Guardian_Verifications/{docId} {
+      // A minor's guardian record is visible only to the person who submitted it and to admins.
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // You can submit a guardian verification only for yourself, and it always starts as pending.
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.verification_status == 'pending';
+      // Only an admin reviews it.
+      allow update: if isAdmin();
       allow delete: if false;
     }
 
-    // Readings belong to the patient who logged them. Doctors read them for the
-    // blood-sugar history and charts.
+    // ------------------------------------------------------------------ blood sugar
+
     match /Glucose_Logs/{logId} {
-      allow read: if signedIn();
-      allow create: if isUser(request.resource.data.patient_id);
-      allow update, delete: if isUser(resource.data.patient_id);
+      // Readings are private health data: the patient, admins, and verified doctors (limitation 2) only.
+      allow read: if signedIn() && (resource.data.patient_id == request.auth.uid || isAdmin() || isVerifiedDoctor());
+      // You can only log readings for yourself, and the value must be a number.
+      allow create: if signedIn() && request.resource.data.patient_id == request.auth.uid
+                    && request.resource.data.reading_mgdl is number;
+      // You can edit only your own readings, and cannot reassign one to another patient.
+      allow update: if signedIn() && resource.data.patient_id == request.auth.uid
+                    && request.resource.data.patient_id == request.auth.uid;
+      // You can delete only your own readings (the app offers delete-with-confirmation).
+      allow delete: if signedIn() && resource.data.patient_id == request.auth.uid;
     }
 
-    // Consultation chat. Messages are immutable once sent, so the transcript
-    // cannot be quietly rewritten after the fact.
-    match /Messages/{messageId} {
+    // ------------------------------------------------------------------ appointments and chat
+
+    match /Bookings/{bookingId} {
+      // Any signed-in user may read bookings so the booking screen can grey out taken slots (limitation 1).
       allow read: if signedIn();
-      allow create: if isUser(request.resource.data.sender_id);
+
+      // A patient creates a booking only for themselves, starting as pending and unpaid,
+      // and the fee must equal the doctor's listed fee (the patient cannot name their own price).
+      allow create: if signedIn()
+                    && request.resource.data.patient_id == request.auth.uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.payment_status == 'unpaid'
+                    && request.resource.data.fee == get(/databases/$(database)/documents/Providers/$(request.resource.data.provider_id)).data.get('consultation_fee', 0);
+
+      allow update: if signedIn() && (
+        // The booked doctor decides the request, orders the queue, and records the consultation outcome, nothing else.
+        (resource.data.provider_id == request.auth.uid
+          && changedKeys().hasOnly(['status', 'queue_number', 'consultation_status', 'consultation_summary', 'consultation_ended_at']))
+        // The patient may only pay, and only after the doctor confirmed and while still unpaid.
+        || (resource.data.patient_id == request.auth.uid
+          && resource.data.status == 'confirmed'
+          && resource.data.payment_status == 'unpaid'
+          && changedKeys().hasOnly(['payment_status', 'payment_method'])
+          && request.resource.data.payment_status in ['paid', 'onsite'])
+        // Either side of the booking may mark the consultation as started (first chat message opens it).
+        || (inBooking(bookingId)
+          && changedKeys().hasOnly(['consultation_status'])
+          && request.resource.data.consultation_status == 'active')
+        // The patient may cancel their own booking while it is still pending or confirmed.
+        || (resource.data.patient_id == request.auth.uid
+          && resource.data.status in ['pending', 'confirmed']
+          && changedKeys().hasOnly(['status', 'queue_number'])
+          && request.resource.data.status == 'cancelled')
+      );
+
+      // Bookings are history (and revenue), so they are never deleted; cancel/decline instead.
+      allow delete: if false;
+    }
+
+    match /Messages/{messageId} {
+      // Chat is private: only the patient and doctor of the booking the message belongs to can read it (D8).
+      allow read: if signedIn() && inBooking(resource.data.booking_id);
+      // You can send a message only as yourself, into your own booking, while it is confirmed (read-only once completed).
+      allow create: if signedIn()
+                    && request.resource.data.sender_id == request.auth.uid
+                    && inBooking(request.resource.data.booking_id)
+                    && bookingData(request.resource.data.booking_id).status == 'confirmed'
+                    && request.resource.data.message is string
+                    && request.resource.data.message.size() <= 2000;
+      // Sent messages are a medical-consultation record, so they can be neither edited nor deleted.
       allow update, delete: if false;
     }
 
-    // Notifications are written FOR another user (the recipient of a message,
-    // for instance), so creation only requires being signed in — but only the
-    // recipient can mark their own as read.
+    // ------------------------------------------------------------------ notifications
+
     match /Notifications/{notificationId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if isUser(resource.data.user_id);
+      // You read only your own notifications; admins may read all (to review announcements).
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // You may notify yourself (glucose alerts), the other party of a booking you are in (booking updates,
+      // chat messages, always tagged with that booking's id), or, as an admin, anyone (announcements).
+      allow create: if signedIn() && request.resource.data.user_id is string && (
+        request.resource.data.user_id == request.auth.uid
+        || isAdmin()
+        || (request.resource.data.get('related_id', '') != ''
+            && inBooking(request.resource.data.related_id)
+            && request.resource.data.user_id in [
+                 bookingData(request.resource.data.related_id).patient_id,
+                 bookingData(request.resource.data.related_id).provider_id ])
+      );
+      // The owner may only mark a notification as read; its text cannot be rewritten.
+      allow update: if signedIn() && resource.data.user_id == request.auth.uid
+                    && changedKeys().hasOnly(['is_read']);
       allow delete: if false;
     }
 
-    // Collections seeded for the ERD that no app code writes yet
-    // (Food_Database, Badges, Subscription_Plans, and the rest). Readable so
-    // features can be built against them, but not client-writable until those
-    // features exist and can be given real rules.
-    match /{collection}/{docId} {
+    // ------------------------------------------------------------------ gamification
+
+    match /Gamification/{userId} {
+      // Streak/points are readable by the owner and by admins (admin "View Award Points").
+      allow read: if isUser(userId) || isAdmin();
+      // The doc ID is the patient's UID, and you can only write your own stats.
+      allow create, update: if isUser(userId) && request.resource.data.user_id == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /Badges/{badgeId} {
+      // The badge catalogue is public to signed-in users (the rewards screen lists it).
       allow read: if signedIn();
-      allow write: if false;
+      // Only admins define badges.
+      allow write: if isAdmin();
+    }
+
+    match /User_Badges/{docId} {
+      // You see your own earned badges; admins see all.
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // A badge can only be granted to yourself, and never edited or removed afterwards.
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------ subscriptions
+
+    match /Subscription_Plans/{planId} {
+      // Plans and prices are public to signed-in users so they can compare them.
+      allow read: if signedIn();
+      // Only admins manage plans (module 12, admin side).
+      allow write: if isAdmin();
+    }
+
+    match /Subscriptions/{subscriptionId} {
+      // You see your own subscription; admins see all (premium subscribers list).
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // You subscribe only for yourself (payment is mocked in the prototype, so it starts active).
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid
+                    && request.resource.data.status == 'active';
+      // The only change an owner can make is cancelling.
+      allow update: if signedIn() && resource.data.user_id == request.auth.uid
+                    && changedKeys().hasOnly(['status'])
+                    && request.resource.data.status == 'cancelled';
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------ AI data (not written by the app yet)
+
+    match /Food_Database/{foodId} {
+      // The Filipino food/GI list grounds the AI prompts and is readable by signed-in users.
+      allow read: if signedIn();
+      // Only admins add or hide foods (Food Database CRUD).
+      allow write: if isAdmin();
+    }
+
+    match /AI_Suggestions/{suggestionId} {
+      // A person's generated suggestions are private to them (and admins for reports).
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // You can only save suggestions generated for yourself; they are never edited.
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /AI_Suggestions_Foods/{docId} {
+      // A link row is visible/creatable only by the owner of the suggestion it points to.
+      allow read: if signedIn() && (
+        get(/databases/$(database)/documents/AI_Suggestions/$(resource.data.suggestion_id)).data.user_id == request.auth.uid
+        || isAdmin());
+      allow create: if signedIn()
+                    && get(/databases/$(database)/documents/AI_Suggestions/$(request.resource.data.suggestion_id)).data.user_id == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /Nutrition_Scans/{scanId} {
+      // Scan results are private to the person who scanned (and admins for reports).
+      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
+      // You can only save scans for yourself; they are never edited.
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }
