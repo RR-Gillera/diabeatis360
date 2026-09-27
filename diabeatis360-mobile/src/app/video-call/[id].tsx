@@ -101,7 +101,7 @@ export default function VideoCallScreen() {
   if (call.status === 'ringing') {
     return (
       <View style={[styles.screen, styles.center]}>
-        <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{name.replace(/^dr\.?\s+/i, '').charAt(0).toUpperCase()}</AppText></View>
+        <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{otherName ? otherName.replace(/^dr\.?\s+/i, '').charAt(0).toUpperCase() : ''}</AppText></View>
         <AppText weight="extraBold" style={styles.title}>{isCaller ? `Calling ${name}…` : `${name} is calling`}</AppText>
         <AppText style={styles.text}>{isCaller ? 'Waiting for them to answer.' : 'Accept to start the video call.'}</AppText>
         {error ? <AppText style={styles.error}>{error}</AppText> : null}
