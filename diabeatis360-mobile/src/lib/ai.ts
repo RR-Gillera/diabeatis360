@@ -2,7 +2,7 @@ import { httpsCallable } from 'firebase/functions';
 
 import { functions } from '@/firebase';
 import type {
-  ExerciseSuggestion, LabelAnalysis, MealSuggestion, RecommendationResult, SuggestionKind,
+  ExerciseSuggestion, LabelAnalysis, MealSuggestion, ProductLookup, RecommendationResult, SuggestionKind,
 } from '@/features/ai/types';
 
 // The ONLY place the app asks for AI output (DECISIONS.md D1, option A). It calls Firebase Cloud Functions; the
@@ -49,7 +49,12 @@ export function requestExerciseSuggestions() {
   return call<{ kind: SuggestionKind }, RecommendationResult<ExerciseSuggestion>>('generateRecommendations', { kind: 'exercise' });
 }
 
-/** The photo is sent to the function and never stored (DECISIONS.md D2). */
-export function requestLabelAnalysis(imageBase64: string, mimeType: 'image/jpeg' | 'image/png' | 'image/webp') {
-  return call<{ imageBase64: string; mimeType: string }, LabelAnalysis>('analyzeLabel', { imageBase64, mimeType });
+/** The photo is sent to the function and never stored (DECISIONS.md D2). The barcode, if one was seen, links the scan to the product. */
+export function requestLabelAnalysis(imageBase64: string, mimeType: 'image/jpeg' | 'image/png' | 'image/webp', barcode?: string) {
+  return call<{ imageBase64: string; mimeType: string; barcode?: string }, LabelAnalysis>('analyzeLabel', { imageBase64, mimeType, barcode });
+}
+
+/** Looks a barcode up in the shared product memory. No AI call is made and no Free scan is used (DECISIONS.md D12). */
+export function requestProductLookup(barcode: string) {
+  return call<{ barcode: string }, ProductLookup>('lookupProduct', { barcode });
 }

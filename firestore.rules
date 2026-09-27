@@ -344,6 +344,26 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // Shared product memory for the scanner (DECISIONS.md D12), keyed by barcode.
+    match /Products/{barcode} {
+      // Any signed-in person can read it; the app labels products that are not verified yet.
+      allow read: if signedIn();
+      // Any signed-in person can add a product that is not in the collection yet (create, never overwrite). It must
+      // start unverified and carry their own id, and the document id must look like a real barcode.
+      allow create: if signedIn()
+        && barcode.matches('^[0-9]{6,14}$')
+        && request.resource.data.barcode == barcode
+        && request.resource.data.created_by == request.auth.uid
+        && request.resource.data.verified == false
+        && request.resource.data.verified_by == null
+        && request.resource.data.product_name is string && request.resource.data.product_name.size() > 0
+        && request.resource.data.nutrients is map;
+      // Only admins review: they may change nothing except the verification fields.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verified', 'verified_by', 'verified_at']);
+      allow delete: if false;
+    }
+
     match /Nutrition_Scans/{scanId} {
       // Scan results are private to the person who scanned (and admins for reports).
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());

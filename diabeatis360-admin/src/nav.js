@@ -8,6 +8,7 @@ export const navItems = [
   { to: '/plans', label: 'Membership Plans' },
   { to: '/subscribers', label: 'Subscribers' },
   { to: '/announcements', label: 'Announcements' },
+  { to: '/products', label: 'Scanned Products' },
   { to: '/reports', label: 'Reports' },
   { to: '/account', label: 'My Account' },
 ]

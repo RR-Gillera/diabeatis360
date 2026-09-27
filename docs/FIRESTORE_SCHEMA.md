@@ -58,19 +58,20 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 
 
 ## Added scope (adviser-requested, 2026-09-26) — NOT in the signed Table 24
-Collections for DECISIONS.md D11 (closed; `Calls` is built) and D12 (`Products`, not built yet).
+Collections for DECISIONS.md D11 (closed; `Calls` is built) and D12 (`Products`, built).
 
 | Collection | Doc ID | Fields |
 |---|---|---|
 | Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), room (random token, 16+ chars, names the Jitsi room), created_at, ended_at |
-| Products | barcode | barcode, product_name, brand, nutrients (map, per serving), source (`gemini_label`), created_by, verified (bool), verified_by, created_at |
+| Products | barcode | barcode, product_name, brand, serving_size, nutrients (map: calories, carbs_g, sugar_g, fiber_g, protein_g, sodium_mg), ingredients_text, alternatives (list of instead_of/try), source (`gemini_label`), created_by, verified (bool), verified_by, verified_at, created_at |
 
 Rules intent:
 - **Calls:** read/update only when `request.auth.uid` is the caller or callee AND they are that booking's
   `patient_id` / `provider_id`; create only as the caller, with `status == 'ringing'`, on a `confirmed` booking;
   no delete. A missed call is set by the caller's app after ~30 s. The `room` token is random per call, so the video room cannot be guessed from the booking id; only the two participants can read it. Calling again after a finished call reuses the same doc (a new token).
 - **Products:** signed-in read; signed-in create with `verified == false` and `created_by == request.auth.uid`;
-  only admins update `verified` / `verified_by`; no delete. Health ratings are never stored here (computed per user).
+  only admins update, and only `verified` / `verified_by` / `verified_at`; no delete. The document id must be 6 to 14 digits and equal the `barcode` field. Health ratings are never stored here (computed per user by the `lookupProduct` function from the nutrients and that user's allergies).
+- **Nutrition_Scans** gained `product_id` (the barcode, or null) and `source` (`gemini_label` or `product_memory`). A scan answered from Products makes no Gemini call and does not count toward the Free plan's 3 scans a day.
 ## Indexes you'll likely need
 - glucose_logs: `user_id ==` + `logged_at desc`
 - bookings: `provider_id ==` + `status ==` + `scheduled_at`; `patient_id ==` + `scheduled_at desc`

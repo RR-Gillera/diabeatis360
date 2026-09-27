@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { SymbolView } from 'expo-symbols';
 
@@ -53,8 +54,42 @@ function DailyRing({ percent }: { percent: number }) {
   );
 }
 
-/** The analysis of one scanned label (Figma 195:2908). */
-export function ScanResult({ analysis, onAlternatives, onScanAgain }: { analysis: Readable; onAlternatives: () => void; onScanAgain: () => void }) {
+/**
+ * After a label scan of a product with a barcode, asks the person to confirm the name and brand, then shares the
+ * product with all patients (DECISIONS.md D12). Not part of the Figma frame; it is the adviser-requested addition.
+ */
+function ShareProduct({ analysis, onSave }: { analysis: Readable; onSave: (name: string, brand: string) => Promise<void> }) {
+  const [name, setName] = useState(analysis.product_name);
+  const [brand, setBrand] = useState(analysis.brand);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  if (state === 'saved') {
+    return <AppText style={styles.shareDone}>Thank you! This product is now shared with other patients (not yet verified).</AppText>;
+  }
+  const save = async () => {
+    setState('saving');
+    try {
+      await onSave(name, brand);
+      setState('saved');
+    } catch {
+      setState('failed');
+    }
+  };
+  return (
+    <Card style={styles.share}>
+      <AppText weight="bold" style={styles.insightTitle}>Share this product?</AppText>
+      <AppText style={styles.insightText}>Check the name and brand below. Other patients who scan this barcode will see these values without needing a photo.</AppText>
+      <TextInput accessibilityLabel="Product name" style={styles.input} value={name} onChangeText={setName} placeholder="Product name" placeholderTextColor={Brand.colors.textFaint} maxLength={100} />
+      <TextInput accessibilityLabel="Brand" style={styles.input} value={brand} onChangeText={setBrand} placeholder="Brand" placeholderTextColor={Brand.colors.textFaint} maxLength={80} />
+      {state === 'failed' ? <AppText style={styles.shareError}>We could not share it. Someone may have shared it already.</AppText> : null}
+      <PrimaryButton title="Share with other patients" loading={state === 'saving'} disabled={!name.trim()} onPress={save} />
+    </Card>
+  );
+}
+
+/** The analysis of one scanned label (Figma 195:2908). onShare is set only for a new product that has a barcode. */
+export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare }: {
+  analysis: Readable; onAlternatives: () => void; onScanAgain: () => void; onShare?: (name: string, brand: string) => Promise<void>;
+}) {
   const percent = (analysis.calories / DAILY_CALORIE_REFERENCE) * 100;
   return (
     <View>
@@ -63,6 +98,9 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain }: { analysis
           <AppText weight="bold" style={styles.small}>SCANNED PRODUCT</AppText>
           <StatusPill label={enumLabel('healthRating', analysis.health_rating).toUpperCase()} tone={tones[analysis.health_rating]} />
         </View>
+        {analysis.from_memory ? (
+          <AppText style={styles.memory}>{analysis.verified ? 'Shared product, verified by an admin' : 'Shared product, not yet verified'}</AppText>
+        ) : null}
         <AppText weight="extraBold" style={styles.name}>{analysis.product_name}</AppText>
         {analysis.brand ? <AppText style={styles.brand}>{analysis.brand}</AppText> : null}
         <View style={styles.kcalRow}>
@@ -97,11 +135,13 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain }: { analysis
             <View style={styles.insightIcon}>
               <SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} size={16} tintColor={Brand.colors.primary} />
             </View>
-            <AppText weight="bold" style={styles.insightTitle}>AI Personalized Insight</AppText>
+            <AppText weight="bold" style={styles.insightTitle}>{analysis.from_memory ? 'Personalized Insight' : 'AI Personalized Insight'}</AppText>
           </View>
           <AppText style={styles.insightText}>{analysis.insight}</AppText>
         </Card>
       ) : null}
+
+      {onShare ? <ShareProduct analysis={analysis} onSave={onShare} /> : null}
 
       {analysis.alternatives.length ? <PrimaryButton title="View Healthier Alternatives" onPress={onAlternatives} style={styles.button} /> : null}
       <PrimaryButton title="Scan Another Product" variant="outline" onPress={onScanAgain} style={styles.button} />
@@ -139,4 +179,9 @@ const styles = StyleSheet.create({
   insightTitle: { fontSize: 15 },
   insightText: { color: Brand.colors.textMuted, fontSize: 15, lineHeight: 23 },
   button: { marginTop: 16 },
+  memory: { color: Brand.colors.primary, fontSize: 12, marginTop: 6 },
+  share: { gap: 10, marginTop: 16 },
+  input: { backgroundColor: Brand.colors.background, borderColor: Brand.colors.neutralTint, borderRadius: 14, borderWidth: 1, color: Brand.colors.text, fontSize: 16, paddingHorizontal: 14, paddingVertical: 12 },
+  shareError: { color: Brand.colors.danger, fontSize: 13 },
+  shareDone: { color: Brand.colors.primary, fontSize: 14, lineHeight: 20, marginTop: 16, textAlign: 'center' },
 });

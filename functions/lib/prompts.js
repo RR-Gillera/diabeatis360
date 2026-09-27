@@ -196,6 +196,7 @@ function cleanLabel(raw, allergens) {
   return {
     readable: true,
     product_name: text(raw.product_name, 100) || 'Unknown product',
+    ingredients_text: ingredientsText,
     brand: text(raw.brand, 80),
     serving_size: text(raw.serving_size, 60),
     calories: number(raw.calories, 3000),

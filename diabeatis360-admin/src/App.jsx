@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import PlansPage from './pages/PlansPage'
 import PointsPage from './pages/PointsPage'
+import ProductsPage from './pages/ProductsPage'
 import ReportsPage from './pages/ReportsPage'
 import SubscribersPage from './pages/SubscribersPage'
 import UsersPage from './pages/UsersPage'
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="/plans" element={<PlansPage />} />
               <Route path="/subscribers" element={<SubscribersPage />} />
               <Route path="/announcements" element={<AnnouncementsPage />} />
+              <Route path="/products" element={<ProductsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               <Route path="/account" element={<AccountPage />} />
             </Route>

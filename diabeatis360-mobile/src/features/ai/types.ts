@@ -57,8 +57,16 @@ export type LabelAnalysis =
       insight: string;
       allergen_warnings: string[];
       alternatives: LabelAlternative[];
+      ingredients_text: string;
       remaining: number | null;
+      // Set only when the answer came from the shared Products collection (DECISIONS.md D12).
+      from_memory?: boolean;
+      verified?: boolean;
+      barcode?: string;
     };
+
+/** Answer of a barcode lookup: not saved yet, or the same analysis a label scan gives. */
+export type ProductLookup = { found: false } | (Extract<LabelAnalysis, { readable: true }> & { found: true });
 
 /** A suggestion set saved by the function in AI_Suggestions, read back so details screens need no new AI call. */
 export type SavedSuggestion<T> = { id: string; kind: SuggestionKind; items: T[]; generatedAt: Date | null };
