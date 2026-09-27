@@ -275,7 +275,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ------------------------------------------------------------------ AI data (not written by the app yet)
+    // ------------------------------------------------------------------ AI data (written ONLY by the Cloud Functions)
+    // The functions use the Admin SDK, which bypasses these rules. Clients can read their own results but can never
+    // write them, so nobody can forge suggestions or scans to get around the Free plan's daily limits (D1).
 
     match /Food_Database/{foodId} {
       // The Filipino food/GI list grounds the AI prompts and is readable by signed-in users.
@@ -287,27 +289,23 @@ service cloud.firestore {
     match /AI_Suggestions/{suggestionId} {
       // A person's generated suggestions are private to them (and admins for reports).
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      // You can only save suggestions generated for yourself; they are never edited.
-      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update, delete: if false;
+      // Created only by the generateRecommendations Cloud Function (Admin SDK), never by an app.
+      allow create, update, delete: if false;
     }
 
     match /AI_Suggestions_Foods/{docId} {
-      // A link row is visible/creatable only by the owner of the suggestion it points to.
+      // A link row is visible only to the owner of the suggestion it points to; the function creates it.
       allow read: if signedIn() && (
         get(/databases/$(database)/documents/AI_Suggestions/$(resource.data.suggestion_id)).data.user_id == request.auth.uid
         || isAdmin());
-      allow create: if signedIn()
-                    && get(/databases/$(database)/documents/AI_Suggestions/$(request.resource.data.suggestion_id)).data.user_id == request.auth.uid;
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
     match /Nutrition_Scans/{scanId} {
       // Scan results are private to the person who scanned (and admins for reports).
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      // You can only save scans for yourself; they are never edited.
-      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update, delete: if false;
+      // Created only by the analyzeLabel Cloud Function (Admin SDK), never by an app.
+      allow create, update, delete: if false;
     }
   }
 }
