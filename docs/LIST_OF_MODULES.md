@@ -55,6 +55,10 @@ Columns: Patient · Providers (Doctor) · Admin — 1 point per module group per
 | 12 | Subscription | Manage Membership Plans | | | ✓ |
 | 12 | Subscription | View Premium Subscribers | | | ✓ |
 
+> **Note (2026-09-27):** pediatric account setup under guardian supervision (manuscript UT-005) is part of the
+> "Create Account" and "Setup Health Profile" rows above (Patient) — it is not a separate module-point and does
+> not change the table or the totals below. See DECISIONS.md D16.
+
 ## Points (official)
 | Module group | Patient | Providers | Admin |
 |---|---|---|---|

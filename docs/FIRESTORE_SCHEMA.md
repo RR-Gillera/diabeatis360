@@ -6,8 +6,8 @@ intent. Names below are lowercase for readability. If this file and seed.cjs dis
 ## Existing collections (16, from the manuscript data dictionary, already seeded)
 | Collection | Doc ID | Key fields |
 |---|---|---|
-| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, diabetes_type, location, language_preference, created_at, is_active |
-| guardian_verifications | auto | user_id, guardian_full_name, guardian_id_photo_url, relationship_to_minor, verification_status (`pending`/`approved`/`rejected`), reviewed_by, submitted_at |
+| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), created_at, is_active |
+| guardian_verifications | **the child's own Auth UID** (D16: one per pediatric account, not auto — matches the manuscript's "Minor's Own User ID") | user_id, guardian_full_name, guardian_id_photo_url (Firebase Storage download URL), relationship_to_minor (`parent`/`legal_guardian`/`other`), verification_status (`pending`/`approved`/`rejected`), reviewed_by, reviewed_at, rejection_reason, submitted_at |
 | providers | Auth UID | email, full_name, specialty, prc_license_number, city, consultation_fee (number), is_verified, verified_by, created_at, is_active |
 | admins | Auth UID | email, full_name, role (`super_admin`/`admin`), last_login, created_at |
 | glucose_logs | auto | patient_id, reading_mgdl (int mg/dL), context (`before_meal`/`after_meal`), notes, logged_at, created_at, interpretation (D13: the app's names are final) |
@@ -72,6 +72,15 @@ Rules intent:
 - **Products:** signed-in read; signed-in create with `verified == false` and `created_by == request.auth.uid`;
   only admins update, and only `verified` / `verified_by` / `verified_at`; no delete. The document id must be 6 to 14 digits and equal the `barcode` field. Health ratings are never stored here (computed per user by the `lookupProduct` function from the nutrients and that user's allergies).
 - **Nutrition_Scans** gained `product_id` (the barcode, or null) and `source` (`gemini_label` or `product_memory`). A scan answered from Products makes no Gemini call and does not count toward the Free plan's 3 scans a day.
+
+## Firebase Storage (DECISIONS.md D16)
+The ONLY thing ever stored here is a guardian's ID photo for a pediatric account. Nutrition-label photos are
+still never stored anywhere (D2) — this is a deliberate exception, because an ID photo is sensitive personal
+data under the Data Privacy Act and needs real, lasting access control, unlike a food photo nobody needs back.
+| Path | Rules intent |
+|---|---|
+| `guardian_ids/{uid}/id.jpg` | Only the account at `{uid}` may read or write it directly (owner-only path match); a JPEG under 5 MB. There is no separate admin rule here: `getDownloadURL()` returns a URL carrying its own access token, and that URL is exposed ONLY through the `Guardian_Verifications` Firestore field, which Firestore's own rules already restrict to the owner and admins — one security boundary, not two. |
+
 ## Indexes you'll likely need
 - glucose_logs: `user_id ==` + `logged_at desc`
 - bookings: `provider_id ==` + `status ==` + `scheduled_at`; `patient_id ==` + `scheduled_at desc`
@@ -101,3 +110,10 @@ Keep rules simple enough to explain in the defense; test them with the Firebase 
 - Notifications can be created for yourself, for the other party of a booking you are in (tagged with `related_id` = booking id), or by an admin for anyone.
 - Bookings: the doctor changes status/queue/consultation fields; the patient can only pay (after confirmation), end their own confirmed consultation, or cancel. `fee` must equal the doctor's `consultation_fee` and `platform_commission` must be 15% of it. A slot whose booking was declined/cancelled can be re-booked; an active booking can never be overwritten.
 - Nothing is ever deleted except a patient's own glucose logs.
+- **D16 (pediatric accounts):** `Users.account_type` may be set once (create, or one later update if it was
+  missing) and never changed after that — a minor account can't relabel itself `self` to skip guardian review.
+  `Bookings` create/re-book is refused for a `minor` account unless its `Guardian_Verifications` doc says
+  `approved`. `Guardian_Verifications` is created by the child's own account (doc id == their uid); they may
+  resubmit only while it is `rejected`, and only an admin may change `verification_status`/`reviewed_by`/
+  `reviewed_at`/`rejection_reason`. 21 new rules-emulator cases (182 total, 0 failed) plus 11 Storage-emulator
+  cases for `storage.rules` (0 failed).

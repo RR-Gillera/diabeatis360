@@ -60,6 +60,16 @@ export function bookingIdFor(providerId: string, slot: Date) {
 // A slot is free if nobody booked it, or the earlier booking was declined/cancelled; anything else means
 // someone got there first. firestore.rules enforces the same thing, so this is the friendly error, not the guard.
 export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number) {
+  // A pediatric account (DECISIONS.md D16) may not book a consultation until an admin approves the guardian
+  // verification. firestore.rules enforces the same rule; this is only the friendly message before that.
+  const patientSnapshot = await getDoc(doc(db, 'Users', patientId));
+  if (patientSnapshot.data()?.account_type === 'minor') {
+    const guardianSnapshot = await getDoc(doc(db, 'Guardian_Verifications', patientId));
+    if (guardianSnapshot.data()?.verification_status !== 'approved') {
+      throw new Error('This account needs guardian verification to be approved before booking a consultation. An admin is reviewing it, or you can resubmit it from Profile if it was rejected.');
+    }
+  }
+
   const reference = doc(db, 'Bookings', bookingIdFor(providerId, selectedDate));
   const record: BookingRecord = {
     patient_id: patientId,

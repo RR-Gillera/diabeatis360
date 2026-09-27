@@ -4,7 +4,7 @@ import { db } from '@/firebase';
 import { glucoseDirection, interpretGlucose } from '@/constants/glucose';
 import type { MealContext } from '@/constants/enums';
 
-export type NotificationType = 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement';
+export type NotificationType = 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification';
 
 export type NotificationEntry = {
   id: string;

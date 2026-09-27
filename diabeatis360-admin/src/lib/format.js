@@ -22,3 +22,15 @@ export function formatDateTime(value) {
 export function formatPeso(amount) {
   return `₱${Number(amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+
+/** Age in whole years from a birthdate, or null if there isn't one — used on GuardiansPage to show the child's age. */
+export function ageFrom(birthdateValue) {
+  const birthdate = toDate(birthdateValue)
+  if (!birthdate) return null
+  const now = new Date()
+  let age = now.getFullYear() - birthdate.getFullYear()
+  const hadBirthdayThisYear = now.getMonth() > birthdate.getMonth()
+    || (now.getMonth() === birthdate.getMonth() && now.getDate() >= birthdate.getDate())
+  if (!hadBirthdayThisYear) age -= 1
+  return age
+}

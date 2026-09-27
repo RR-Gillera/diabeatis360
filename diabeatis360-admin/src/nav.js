@@ -2,6 +2,7 @@
 export const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/doctors', label: 'Doctors' },
+  { to: '/guardians', label: 'Guardian Verification' },
   { to: '/users', label: 'Users' },
   { to: '/appointments', label: 'Appointments' },
   { to: '/points', label: 'Award Points' },

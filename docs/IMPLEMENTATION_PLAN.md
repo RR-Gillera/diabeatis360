@@ -131,6 +131,7 @@ appointments, admin acceptance; Gulay: interpretation, feedback, notifications, 
 | 14 | Nutrition scanner | Scanner P | L | Gulay | 13a, 13 | 23 |
 | 15 | Added: Product memory | added | M–L | Gulay | 14, 6 | — |
 | 16 | Added: Video call signaling | added | M–L | Gillera | 1 | — |
+| 17 | Pediatric account under guardian supervision | Account P (UT-005) | M | Catubay | 0b, 3 | no change |
 
 ### 0a — Docs and git housekeeping (S, Gillera)
 - **Goal:** stop losing docs; make the repo the single source of truth.
@@ -362,6 +363,29 @@ appointments, admin acceptance; Gulay: interpretation, feedback, notifications, 
 - **Rules:** add the Calls rules (FIRESTORE_SCHEMA.md "Added scope").
 - **Tests:** new (add to the manuscript test plan).
 
+### 17 — Pediatric account under guardian supervision (M, Catubay; D16 closed, finishes manuscript UT-005)
+- **This is not new scope** — it amends D10, which wrongly listed it as out of scope; the manuscript's Scope &
+  Limitations and `Guardian_Verifications` data dictionary already describe it.
+- **Checkmark:** Create Account (P) and Setup Health Profile (P) — not a separate Table 24 row.
+- **Work:**
+  - `app/onboarding/account-for.tsx` ("For me" / "For my child", patient path only, right after Role Selection
+    Gate) and `app/onboarding/guardian.tsx` (guardian's name, relationship, ID photo via `expo-camera`); no
+    Figma frame for either (FIGMA_MAP.md).
+  - `constants/guardian.ts` (age-18 rule) checked on the birthdate step; a mismatch offers to switch.
+  - `features/auth/guardian-service.ts`: uploads the ID photo to Firebase Storage, writes
+    `Guardian_Verifications/{childUid}`.
+  - Home banner + Profile "Managed by" line and Resubmit action (reachable from a rejection).
+  - `booking-service.ts` pre-check: a friendly message before the rules would refuse the booking anyway.
+  - Admin: `pages/GuardiansPage.jsx` (Doctor Management pattern) — Pending/Approved/Rejected, view ID,
+    Approve/Reject with a reason, notifies the child's account.
+- **Firestore:** `Users.account_type`, `Guardian_Verifications` (doc id == child uid; gains `reviewed_at`,
+  `rejection_reason`).
+- **Storage:** new — `storage.rules`, `guardian_ids/{uid}/id.jpg`, only the owner reads/writes it directly.
+- **Rules:** `Users` create/update gates `account_type` to settable-once; `Guardian_Verifications` rewritten for
+  the new doc-id and resubmit flow; `Bookings.validNewBooking()` refuses an unapproved minor. 21 new Firestore
+  cases (182 total) + 11 new Storage cases, all passing in the emulator.
+- **Tests:** UT-005 (manuscript); add the Actual Result to Table 25.
+
 ## 4. Decisions (all closed 2026-09-26)
 
 Every decision this plan depends on is now CLOSED in `docs/DECISIONS.md`. Nothing blocks an item except
@@ -466,3 +490,4 @@ This is not the same as testing on a physical phone (native gestures, Expo Go, k
 | 14 | built, not run with a real camera or Gemini | 2026-09-27 | `expo-camera` (approved D14; plugin added to app.json), `app/scanner.tsx`, `features/scanner/scan-result.tsx`, `app/healthier-alternatives.tsx`, `constants/nutrition.ts` (display cues: 2,000 kcal reference, 10 g sugar highlight, to be confirmed by the adviser). The photo is sent to `analyzeLabel` and never stored. Free plan: shutter is replaced by an upgrade button after 3 scans; an unreadable photo does not count. Verified in the browser build with a fake camera feed, the Functions emulator and a fake Gemini: 18/18. Barcode scanning (D12, item 15) needs a physical phone to test. Rules: AI_Suggestions, AI_Suggestions_Foods and Nutrition_Scans are now server-write-only (124 rules tests). |
 | 16 | built, not device-tested | 2026-09-27 | `Calls` rules (149/149 rules tests), `features/calls/*` (service, incoming-call host in the root layout, WebView/iframe call frame), `app/video-call/[id].tsx`; the chat video button now rings instead of opening a link. Jitsi room name is a random per-call token stored in the call doc. Needs two real phones for camera, microphone and ringing. |
 | 15 | built, not device-tested | 2026-09-27 | Function `lookupProduct` (+ `analyzeLabel` takes the barcode), `lib/rating.js` (per-person rule rating, cut-offs to be confirmed by the adviser or a dietitian), `Products` rules (161/161 rules tests), scanner reads EAN/UPC barcodes, share form on the result, admin page Scanned Products. |
+| 17 | built, not device-tested | 2026-09-27 | Mobile: `app/onboarding/{account-for,guardian}.tsx`, `constants/guardian.ts`, `features/auth/guardian-service.ts`, Home banner + Profile "Managed by" line, `booking-service.ts` friendly pre-check. Admin: `pages/GuardiansPage.jsx`. Firestore: `Users.account_type` (settable once), `Guardian_Verifications` rewritten (doc id == child uid, resubmit flow). New `storage.rules` for the guardian ID photo. Verified: 21 new Firestore rules cases + 11 new Storage rules cases (all passing), 4 new unit tests for the age rule, full mobile typecheck/lint clean. **Not run on a device or with a real Storage upload.** |
