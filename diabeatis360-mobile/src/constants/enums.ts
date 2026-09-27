@@ -44,6 +44,14 @@ export const FOOD_STATUSES = ['active', 'hidden'] as const;
 export const ADMIN_ROLES = ['super_admin', 'admin'] as const;
 export const VERIFICATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
 
+/** `Users.account_type` (D16): a pediatric account is set up and operated by a guardian, per UT-005. */
+export const ACCOUNT_TYPES = ['self', 'minor'] as const;
+export type AccountType = (typeof ACCOUNT_TYPES)[number];
+
+/** `Guardian_Verifications.relationship_to_minor`. */
+export const GUARDIAN_RELATIONSHIPS = ['parent', 'legal_guardian', 'other'] as const;
+export type GuardianRelationship = (typeof GUARDIAN_RELATIONSHIPS)[number];
+
 // Onboarding profile fields: the stored value IS the display string (matches Figma).
 export const ACTIVITY_LEVELS = ['Sedentary', 'Light', 'Active', 'Very Active'] as const;
 export const DIETARY_PREFERENCES = ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet'] as const;
@@ -112,6 +120,15 @@ export const ENUM_LABELS = {
     approved: { en: 'Approved', fil: 'Aprubado' },
     rejected: { en: 'Rejected', fil: 'Tinanggihan' },
   } satisfies Labels<(typeof VERIFICATION_STATUSES)[number]>,
+  accountType: {
+    self: { en: 'Adult account', fil: 'Sariling account' },
+    minor: { en: "Child's account", fil: 'Account ng bata' },
+  } satisfies Labels<(typeof ACCOUNT_TYPES)[number]>,
+  guardianRelationship: {
+    parent: { en: 'Parent', fil: 'Magulang' },
+    legal_guardian: { en: 'Legal Guardian', fil: 'Legal na Tagapag-alaga' },
+    other: { en: 'Other', fil: 'Iba pa' },
+  } satisfies Labels<(typeof GUARDIAN_RELATIONSHIPS)[number]>,
 } as const;
 
 /** Display label for a stored code. Falls back to the raw code so an unexpected value is visible, not blank. */

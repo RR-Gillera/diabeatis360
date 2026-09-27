@@ -16,6 +16,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 
 ## Tier 1 — Accounts & profile (Account Mgmt P/D/A, Health Profile P/D)
 - [~] Patient: sign up → role gate → onboarding steps → Users doc → dashboard (email verification is mocked)
+- [~] Pediatric account under guardian supervision (manuscript UT-005, DECISIONS D16, closed; amends D10, not new scope) [item 17]: "For me" / "For my child" after Role Selection Gate, guardian's name/relationship/ID photo (Storage), booking blocked until an admin approves. Built, 21 new + 11 Storage rules cases all passing; needs a real phone and a real Storage upload.
 - [~] Doctor: sign up → professional verification form → Providers doc (`is_verified:false`) ✔ → **pending-verification screen** (`app/doctor/_layout.tsx` gates every doctor screen until an admin verifies; switches automatically) built 2026-09-26 [item 3]; needs an admin (or console) to set `is_verified`
 - [~] Login with role routing ✔; exact "Please fill in all required fields." on login and sign-up ✔; deactivated accounts (`is_active == false` on Users or Providers) are blocked at login with a message and signed out on session restore ✔ (built 2026-09-26, verified in the browser build against the emulators (not yet on a phone)) [item 3]
 - [~] Reset password (P/D ✔ on login screen), update account (P/D name edit ✔), update/view health profile (`profile.tsx`, doctor `patient/[id].tsx`) ✔; admin equivalents ✘
@@ -44,6 +45,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 
 ## Tier 5 — Admin management (A)
 - [x] Verify doctor credentials; activate/deactivate doctors and users [item 7]: admin `DoctorsPage` + `UsersPage` built and tested end to end against the emulators (18/18, 2026-09-26). UT-A006 "add doctor profile" is NOT built: doctors register in the mobile app and an admin verifies them (needs a manuscript wording change)
+- [~] Guardian Verification (manuscript UT-005, DECISIONS D16) [item 17]: admin `GuardiansPage` (Pending/Approved/Rejected, view ID photo, Approve/Reject with a reason). Built, not device-tested.
 - [ ] Food Database CRUD
 - [x] Analytics dashboard (Recharts: 4 charts + stat cards) and Reports page (users / appointments and revenue / blood sugar trends, date range, CSV download, print to PDF) [item 12]: tested end to end, numbers checked by hand
 - [x] Send announcements [item 11, admin side]: `AnnouncementsPage` fans out one Notifications doc per active user (all / patients / doctors); mobile shows them in the notification list. Tested end to end

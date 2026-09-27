@@ -26,6 +26,12 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 - Doctor signup continues to Professional Verification (PRC license number, specialty, city, fee).
 - Google Sign-In: optional, deferred (needs dev build) — see DECISIONS.md.
 - Figma: Login Screen, Sign Up Screen, Role Selection Gate, Doctor Account Verification, Profile screens.
+- **Pediatric account setup (manuscript UT-005, DECISIONS.md D16):** on the patient path, Role Selection Gate
+  is followed by "For me" / "For my child". "For my child" collects the guardian's name, relationship and an
+  ID photo, creates `Guardian_Verifications/{childUid}` as `pending`, then continues into the same health
+  profile steps below (describing the CHILD). The account can do everything except book a consultation until
+  an admin approves it (Doctor Management-style admin page, "Guardian Verification"). No Figma frame exists
+  for either new screen; not a separate Table 24 row (see LIST_OF_MODULES.md).
 
 ## 2. Health Profile — P, D (view)
 | Function | P | D |

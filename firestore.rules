@@ -60,11 +60,22 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/Bookings/$(bookingId)).data;
     }
 
+    // A pediatric account (D16): the account's own Users doc says so, and its Guardian_Verifications doc
+    // (same id as the account) must have been approved by an admin. exists() first because a brand-new
+    // 'self' account never gets a Guardian_Verifications document at all.
+    function isUnapprovedMinor() {
+      return get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.get('account_type', 'self') == 'minor'
+        && !(exists(/databases/$(database)/documents/Guardian_Verifications/$(request.auth.uid))
+             && get(/databases/$(database)/documents/Guardian_Verifications/$(request.auth.uid)).data.get('verification_status', 'pending') == 'approved');
+    }
+
     // A well-formed new booking (also used to re-book a slot freed by a decline/cancel): by the caller for
     // themselves, pending and unpaid, fee copied from the doctor's profile, commission = fee x 0.15 (D3).
+    // A pediatric account (D16) may not book until its guardian verification is approved.
     function validNewBooking() {
       return signedIn()
         && request.resource.data.patient_id == request.auth.uid
+        && !isUnapprovedMinor()
         && request.resource.data.status == 'pending'
         && request.resource.data.payment_status == 'unpaid'
         && request.resource.data.fee == get(/databases/$(database)/documents/Providers/$(request.resource.data.provider_id)).data.get('consultation_fee', 0)
@@ -97,11 +108,19 @@ service cloud.firestore {
     match /Users/{userId} {
       // A person reads their own profile; admins manage users; verified doctors read patient health profiles (limitation 2).
       allow read: if isUser(userId) || isAdmin() || isVerifiedDoctor();
-      // You can only create your own profile, and cannot create it already deactivated.
-      allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true;
+      // You can only create your own profile, and cannot create it already deactivated. account_type (D16),
+      // if present, must be 'self' or 'minor' — anything else is rejected outright, not silently ignored.
+      allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
+                    && request.resource.data.get('account_type', 'self') in ['self', 'minor'];
       // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
-      allow update: if (isUser(userId) && !changedKeys().hasAny(['is_active']))
-                    || (isAdmin() && changedKeys().hasOnly(['is_active']));
+      // account_type (D16) is set once — the Users doc already exists by the time onboarding chooses "For me" /
+      // "For my child" (it is created earlier, at email verification), so this has to be an update, not a
+      // create. It may only go from "never set" to a valid value; once set, it is fixed, so a minor account
+      // cannot relabel itself 'self' later to dodge guardian approval.
+      allow update: if isAdmin() && changedKeys().hasOnly(['is_active'])
+                    || (isUser(userId) && !changedKeys().hasAny(['is_active'])
+                        && (!changedKeys().hasAny(['account_type'])
+                            || (!('account_type' in resource.data) && request.resource.data.account_type in ['self', 'minor'])));
       // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
       allow delete: if false;
     }
@@ -130,14 +149,31 @@ service cloud.firestore {
       allow update: if isUser(adminId) && changedKeys().hasOnly(['full_name', 'last_login']);
     }
 
-    match /Guardian_Verifications/{docId} {
-      // A minor's guardian record is visible only to the person who submitted it and to admins.
-      allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      // You can submit a guardian verification only for yourself, and it always starts as pending.
-      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid
-                    && request.resource.data.verification_status == 'pending';
-      // Only an admin reviews it.
-      allow update: if isAdmin();
+    // Pediatric account under guardian supervision (DECISIONS.md D16, manuscript UT-005). The document id IS
+    // the child's own Auth UID (the manuscript's "Minor's Own User ID"), so there is exactly one per account.
+    match /Guardian_Verifications/{childUid} {
+      // Visible only to the child's own account (the guardian has no separate login) and to admins who review it.
+      allow read: if isUser(childUid) || isAdmin();
+      // First submission: the child's own account creates it, always starting pending, with the guardian's
+      // name, relationship and ID photo filled in.
+      allow create: if isUser(childUid)
+        && request.resource.data.user_id == childUid
+        && request.resource.data.verification_status == 'pending'
+        && request.resource.data.guardian_full_name is string && request.resource.data.guardian_full_name.size() > 0
+        && request.resource.data.relationship_to_minor in ['parent', 'legal_guardian', 'other']
+        && request.resource.data.guardian_id_photo_url is string && request.resource.data.guardian_id_photo_url.size() > 0;
+      allow update: if
+        // Resubmitting after a rejection: a fresh guardian name/relationship/photo, back to pending, nothing else.
+        (isUser(childUid)
+          && resource.data.verification_status == 'rejected'
+          && request.resource.data.user_id == childUid
+          && request.resource.data.verification_status == 'pending'
+          && request.resource.data.relationship_to_minor in ['parent', 'legal_guardian', 'other']
+          && request.resource.data.guardian_full_name is string && request.resource.data.guardian_full_name.size() > 0
+          && request.resource.data.guardian_id_photo_url is string && request.resource.data.guardian_id_photo_url.size() > 0
+          && changedKeys().hasOnly(['guardian_full_name', 'relationship_to_minor', 'guardian_id_photo_url', 'verification_status', 'submitted_at', 'rejection_reason']))
+        // Only an admin approves or rejects, and only by changing the review fields.
+        || (isAdmin() && changedKeys().hasOnly(['verification_status', 'reviewed_by', 'reviewed_at', 'rejection_reason']));
       allow delete: if false;
     }
 

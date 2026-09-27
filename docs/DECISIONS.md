@@ -154,12 +154,14 @@ Original proposal: role = which collection holds a doc with the user's uid (User
 → doctor, Admins → admin), with rules using `exists()`.
 
 ### D10 — Features in the manuscript but NOT in Table 24 — CLOSED 2026-09-26: out of scope
-**Decision:** risk prediction, guardian verification, community, AI chatbot and calorie/activity tracking are
-**not built**. The dashboard shows a small labelled placeholder card where Figma has one, instead of empty space.
+**Decision:** risk prediction, community, AI chatbot and calorie/activity tracking are **not built**. The
+dashboard shows a small labelled placeholder card where Figma has one, instead of empty space.
 **Manuscript:** list them under Scope & Limitations / Recommendations (future work). Original proposal:
-AI Diabetes Risk Prediction (Figma screen exists), pediatric/guardian verification (UT-005),
-community module (explicitly out of scope), AI chatbot, calorie/activity tracking on the dashboard.
-Show static/placeholder cards for these on the dashboard rather than leaving empty space.
+AI Diabetes Risk Prediction (Figma screen exists), community module (explicitly out of scope), AI chatbot,
+calorie/activity tracking on the dashboard. Show static/placeholder cards for these on the dashboard rather
+than leaving empty space.
+> **Amended 2026-09-27:** pediatric/guardian verification (UT-005) is REMOVED from this out-of-scope list — the
+> adviser flagged it as a planned feature the manuscript already describes, not new scope. It is built; see D16.
 
 ### D11 — Video call (call signaling) — CLOSED 2026-09-26: approved as designed (adviser-requested scope)
 **The problem is signaling, not the video provider.** Today "Video Call" just opens
@@ -218,3 +220,35 @@ it, and that item's notes say why.
 **Decision:** not in Table 24, so no Cancel button until all 23 points are done. The `cancelled` status code
 (D6) and the security rule allowing a patient to cancel their own pending/confirmed booking already exist,
 so adding the button later is a small change.
+
+### D16 — Pediatric accounts under guardian supervision — CLOSED 2026-09-27: built (amends D10, finishes UT-005)
+**This is not new scope.** The manuscript's Scope & Limitations already says "pediatric users may access the
+application only under parental or guardian supervision", and the data dictionary already has a
+`Guardian_Verifications` table and test case UT-005 ("Pediatric Account Setup"). D10 (2026-09-26) wrongly
+grouped this with features that really are out of scope; the adviser flagged the mistake. This decision
+finishes the feature the manuscript always described.
+1. **One account, no separate guardian login.** The child's own account is what the guardian operates —
+   matching the data dictionary, where `Guardian_Verifications.user_id` is described as the "Minor's Own User
+   ID". `Users.account_type` is `self` or `minor`; once set it cannot be changed (firestore.rules), so a
+   minor account can't relabel itself to dodge review.
+2. **Where it happens:** a new "For me" / "For my child" screen (`app/onboarding/account-for.tsx`) right after
+   Role Selection Gate, patient path only. "For my child" continues to a guardian details screen
+   (`app/onboarding/guardian.tsx`: guardian's name, relationship, and an ID photo captured with the
+   already-installed `expo-camera`) before the normal health-profile steps, which describe the CHILD. Neither
+   screen has a Figma frame (docs/FIGMA_MAP.md); built to match the screens around them. The birthdate step
+   checks the choice against age 18 (`constants/guardian.ts`) and offers to switch if they don't match.
+3. **While pending or rejected:** the account can do everything except book a consultation (blocked in
+   firestore.rules and, for a friendly message first, in `booking-service.ts`). Home shows a banner; Profile
+   shows "Managed by: <guardian> (<relationship>) · <status>" with a Resubmit action after a rejection.
+4. **Admin:** a new "Guardian Verification" page (Doctor Management pattern) lists Pending / Approved /
+   Rejected, links to the ID photo, and lets an admin Approve or Reject (with a reason); the child's account is
+   notified either way.
+5. **The guardian's ID photo goes to Firebase Storage** (`guardian_ids/{uid}/id.jpg`, storage.rules), not
+   Firestore or unstored — it is sensitive personal data under the Data Privacy Act, so it needs real access
+   control, unlike the nutrition-scanner photos which are simply never kept (D2). Only the child's own account
+   can read/write that Storage path directly; an admin sees the photo through the download-URL field on the
+   `Guardian_Verifications` Firestore document, which firestore.rules already restricts to the owner and
+   admins — one security boundary instead of two. Tested with 11 Storage-emulator rules cases (0 failed) plus
+   21 new Firestore rules cases (182 total, 0 failed).
+**Manuscript needs editing:** none of the data dictionary changes (see FIRESTORE_SCHEMA.md), plus the new
+`Users.account_type` field and the Storage bucket path in the Network Model / data flow diagram.

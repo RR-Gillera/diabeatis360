@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
+import { connectStorageEmulator, getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
@@ -20,6 +21,10 @@ export const db = getFirestore(app);
 // The Cloud Functions that call Gemini (DECISIONS.md D1). Same region as Firestore.
 export const functions = getFunctions(app, 'asia-southeast1');
 
+// The ONLY thing stored here is a guardian's ID photo for a pediatric account (DECISIONS.md D16); nutrition
+// label photos are still never stored (D2). storage.rules keeps each photo private to its owner and admins.
+export const storage = getStorage(app);
+
 // On native, plain getAuth(app) only persists the session in memory — closing the
 // app signs the user out every time, silently, with just a console warning. Web
 // gets persistence for free via the browser, so only native needs the explicit
@@ -36,4 +41,5 @@ if (process.env.EXPO_PUBLIC_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
   connectFirestoreEmulator(db, host, 8080);
   connectFunctionsEmulator(functions, host, 5001);
+  connectStorageEmulator(storage, host, 9199);
 }

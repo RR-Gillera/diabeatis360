@@ -21,18 +21,32 @@ async function seed() {
     diabetes_type: 'Type 2',
     location: 'Cebu City',
     language_preference: 'English',
+    account_type: 'self', // D16: 'self' or 'minor'; a real Users doc has this only after the account-for screen ran
     created_at: now,
     is_active: true,
   });
 
-  await db.collection('Guardian_Verifications').add({
-    user_id: 'test123',
+  // D16 (pediatric accounts, UT-005): the doc id IS the child's own Auth UID, one per account — never .add().
+  await db.collection('Users').doc('test-minor-child').set({
+    email: 'child.test@example.com',
+    full_name: 'Test Child',
+    birthdate: now,
+    diabetes_type: 'Type 1',
+    location: 'Cebu City',
+    language_preference: 'English',
+    account_type: 'minor',
+    created_at: now,
+    is_active: true,
+  });
+  await db.collection('Guardian_Verifications').doc('test-minor-child').set({
+    user_id: 'test-minor-child',
     guardian_full_name: 'Maria Dela Cruz',
-    guardian_id_photo_url: 'test.jpg',
-    relationship_to_minor: 'Parent',
-    verification_status: 'pending',
-    reviewed_by: 'test123',
-    reviewed_at: now,
+    guardian_id_photo_url: 'https://example.com/test-id.jpg', // Firebase Storage download URL, see storage.rules
+    relationship_to_minor: 'parent', // 'parent' | 'legal_guardian' | 'other' (D6 lowercase codes)
+    verification_status: 'pending', // 'pending' | 'approved' | 'rejected'
+    reviewed_by: null,
+    reviewed_at: null,
+    rejection_reason: null,
     submitted_at: now,
   });
 

@@ -8,6 +8,7 @@ import AnnouncementsPage from './pages/AnnouncementsPage'
 import AppointmentsPage from './pages/AppointmentsPage'
 import DoctorsPage from './pages/DoctorsPage'
 import DashboardPage from './pages/DashboardPage'
+import GuardiansPage from './pages/GuardiansPage'
 import LoginPage from './pages/LoginPage'
 import PlansPage from './pages/PlansPage'
 import PointsPage from './pages/PointsPage'
@@ -27,6 +28,7 @@ export default function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/doctors" element={<DoctorsPage />} />
+              <Route path="/guardians" element={<GuardiansPage />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/appointments" element={<AppointmentsPage />} />
               <Route path="/points" element={<PointsPage />} />

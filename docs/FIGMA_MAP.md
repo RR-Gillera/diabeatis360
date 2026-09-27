@@ -25,6 +25,8 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Sign Up Screen | 25:99 | Account |
 | Doctor Account Verification (code entry) | 230:3825 | Account |
 | Role Selection Gate | 25:191 | Account |
+| *(no frame)* "For me" / "For my child" (D16, UT-005) | — | Account |
+| *(no frame)* Guardian's details (D16, UT-005) | — | Health Profile |
 | Profile Setup Step 3 — Language | 25:393 | Health Profile |
 | Profile Setup Step 5 — Birthdate | 25:312 | Health Profile |
 | Profile Setup Step 6 / 7 — Dietary/Allergies (WIP) | 67:8 / 68:90 | Health Profile |
