@@ -24,7 +24,6 @@ export default function GuardianScreen() {
 
   const [name, setName] = useState('');
   const [relationship, setRelationship] = useState<GuardianRelationship>('parent');
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -52,24 +51,21 @@ export default function GuardianScreen() {
   };
 
   const capture = async () => {
-    const photo = await cameraRef.current?.takePictureAsync({ quality: 0.6, base64: true });
-    if (!photo?.base64) return;
-    // The web camera's base64 carries a "data:image/...;base64," prefix; native does not.
-    const match = /^data:image\/[a-z]+;base64,(.*)$/i.exec(photo.base64);
-    setPhotoBase64(match ? match[1] : photo.base64);
+    const photo = await cameraRef.current?.takePictureAsync({ quality: 0.6 });
+    if (!photo?.uri) return;
     setPhotoPreview(photo.uri);
     setShowCamera(false);
   };
 
   const submit = async () => {
-    if (!uid || !name.trim() || !photoBase64 || submitting) return;
+    if (!uid || !name.trim() || !photoPreview || submitting) return;
     setSubmitting(true);
     setError('');
     try {
       // Reachable directly from the birthdate age check as well as from "For my child", so this is where
       // account_type is guaranteed to end up 'minor' (DECISIONS.md D16) no matter which path led here.
       if (email) await saveOnboardingValue(email, 'accountType', 'minor', uid);
-      await submitGuardianVerification(uid, name, relationship, photoBase64);
+      await submitGuardianVerification(uid, name, relationship, photoPreview);
       if (isResubmit) {
         goBack();
       } else {
@@ -141,7 +137,7 @@ export default function GuardianScreen() {
 
       <View style={styles.bottom}>
         {submitting ? <ActivityIndicator color={authColors.green} /> : (
-          <AuthButton title={isResubmit ? 'Resubmit for Review' : 'Continue'} onPress={submit} disabled={!name.trim() || !photoBase64} />
+          <AuthButton title={isResubmit ? 'Resubmit for Review' : 'Continue'} onPress={submit} disabled={!name.trim() || !photoPreview} />
         )}
       </View>
     </View>
