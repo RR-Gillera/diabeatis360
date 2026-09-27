@@ -265,7 +265,11 @@ export default function ConsultationScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    // 'undefined' on Android disables keyboard avoidance entirely: the composer at the bottom of this screen
+    // was left completely covered by the on-screen keyboard (confirmed on a Pixel 7 AVD — the message field's
+    // on-screen position never moved when the keyboard opened, so it could not be tapped or read while typing).
+    // No other screen in the app hit this because none of them pin an input to the very bottom of the screen.
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={goBack} hitSlop={10}>
           <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
