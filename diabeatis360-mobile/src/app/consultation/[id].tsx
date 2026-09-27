@@ -275,7 +275,7 @@ export default function ConsultationScreen() {
           <Text style={styles.headerSubtitle} numberOfLines={1}>{appointmentLabel}</Text>
         </View>
         {canConsult && !ended && !(unpaid && !isDoctor) ? (
-          <Pressable style={styles.callButton} onPress={startVideoCall} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Video call" style={styles.callButton} onPress={startVideoCall} hitSlop={8}>
             <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={17} tintColor="#FFF" />
           </Pressable>
         ) : null}
