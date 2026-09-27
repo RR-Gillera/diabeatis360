@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   pillText: { color: '#FFF', fontSize: 14 },
   frameWrap: { alignItems: 'center', bottom: 0, gap: 16, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
   frame: { borderColor: 'rgba(255,255,255,0.9)', borderRadius: 24, borderStyle: 'dashed', borderWidth: 2, height: 280, width: '78%' },
-  hint: { color: '#FFF', fontSize: 14, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
+  hint: { color: '#FFF', fontSize: 14, paddingHorizontal: 32, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 4 },
   bottomBar: { alignItems: 'center', bottom: 0, gap: 12, left: 0, paddingBottom: 40, position: 'absolute', right: 0 },
   usageDark: { color: '#E5E7EB', fontSize: 13 },
   shutter: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 40, height: 80, justifyContent: 'center', width: 80 },
