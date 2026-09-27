@@ -4,7 +4,7 @@ import { db } from '@/firebase';
 import { interpretGlucose } from '@/constants/glucose';
 import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
 
-import type { GlucoseLogEntry, GlucoseLogRecord, Interpretation, MealContext } from './types';
+import type { GlucoseLogEntry, GlucoseLogRecord, MealContext } from './types';
 
 export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date) {
   const record: GlucoseLogRecord = {

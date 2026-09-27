@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
@@ -50,16 +50,6 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
   const [notice, setNotice] = useState('');
   const [usage, setUsage] = useState('');
 
-  const refreshUsage = useCallback(async () => {
-    if (!uid) return;
-    try {
-      const value = await canUseFeature(uid, 'ai');
-      setUsage(value.premium ? 'Premium: unlimited suggestions' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} left today`);
-    } catch {
-      setUsage('');
-    }
-  }, [uid]);
-
   useEffect(() => {
     if (!uid) return;
     return subscribeToLatestSuggestion<T>(uid, kind, (value) => { setSaved(value); setLoaded(true); }, () => setLoaded(true));
@@ -70,7 +60,20 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
     return subscribeToGlucoseHistory(uid, (entries) => setLatest(entries[0] ?? null), () => {});
   }, [uid]);
 
-  useEffect(() => { void refreshUsage(); }, [refreshUsage]);
+  // Free-plan usage line. Re-read whenever `usageTick` changes (after a generation), never synchronously in the effect.
+  const [usageTick, setUsageTick] = useState(0);
+  const refreshUsage = () => setUsageTick((count) => count + 1);
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    canUseFeature(uid, 'ai')
+      .then((value) => {
+        if (cancelled) return;
+        setUsage(value.premium ? 'Premium: unlimited suggestions' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} left today`);
+      })
+      .catch(() => { if (!cancelled) setUsage(''); });
+    return () => { cancelled = true; };
+  }, [uid, usageTick]);
 
   const generate = async () => {
     if (busy) return;
@@ -84,7 +87,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
       setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
     } finally {
       setBusy(false);
-      void refreshUsage();
+      refreshUsage();
     }
   };
 

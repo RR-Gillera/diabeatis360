@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
@@ -42,25 +42,28 @@ export default function ScannerScreen() {
   const [usage, setUsage] = useState('');
   const [allowed, setAllowed] = useState(true);
 
-  const refreshUsage = useCallback(async () => {
+  // Free-plan usage line. Re-read whenever `usageTick` changes (after a scan), never synchronously in the effect.
+  const [usageTick, setUsageTick] = useState(0);
+  const refreshUsage = () => setUsageTick((count) => count + 1);
+  useEffect(() => {
     if (!uid) return;
-    try {
-      const value = await canUseFeature(uid, 'scan');
-      setAllowed(value.allowed);
-      setUsage(value.premium ? 'Premium: unlimited scans' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} scans left today`);
-    } catch {
-      setUsage('');
-    }
-  }, [uid]);
-
-  useEffect(() => { void refreshUsage(); }, [refreshUsage]);
+    let cancelled = false;
+    canUseFeature(uid, 'scan')
+      .then((value) => {
+        if (cancelled) return;
+        setAllowed(value.allowed);
+        setUsage(value.premium ? 'Premium: unlimited scans' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} scans left today`);
+      })
+      .catch(() => { if (!cancelled) setUsage(''); });
+    return () => { cancelled = true; };
+  }, [uid, usageTick]);
 
   const scanAgain = () => {
     setPhase('camera');
     setAnalysis(null);
     setMessage('');
     setError(null);
-    void refreshUsage();
+    refreshUsage();
   };
 
   const capture = async () => {
@@ -83,7 +86,7 @@ export default function ScannerScreen() {
       setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
       setPhase('retry');
     } finally {
-      void refreshUsage();
+      refreshUsage();
     }
   };
 
