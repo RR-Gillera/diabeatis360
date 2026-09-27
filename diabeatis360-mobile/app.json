@@ -32,6 +32,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels.",
+          "recordAudioAndroid": false
+        }
       ]
     ],
     "experiments": {

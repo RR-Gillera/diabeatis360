@@ -1,5 +1,5 @@
 import { useRouter, type Href } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
@@ -36,7 +36,7 @@ const navItems = [
 ] as const satisfies { key: NavTarget; label: string; href: Href; icon: string; iconAndroid: string }[];
 
 // Shared bottom tab bar for the dashboard/log/doctors/profile screens, with a
-// raised center action for the (not yet built) AI nutrition-scan camera flow.
+// raised center action that opens the nutrition-label scanner.
 export function BottomNav({ active }: { active: NavTarget }) {
   const router = useRouter();
   const [before, after] = [navItems.slice(0, 2), navItems.slice(2)];
@@ -63,7 +63,7 @@ export function BottomNav({ active }: { active: NavTarget }) {
   return (
     <View style={styles.nav}>
       {before.map(renderItem)}
-      <Pressable onPress={() => Alert.alert('Coming Soon', 'AI nutrition-label scanning is on the way.')} style={styles.fab}>
+      <Pressable onPress={() => router.push('/scanner' as Href)} style={styles.fab}>
         <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={24} tintColor="#FFF" />
       </Pressable>
       {after.map(renderItem)}
