@@ -7,6 +7,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { BookingProvider } from '@/features/booking/booking-context';
 import { AuthProvider } from '@/features/auth/auth-context';
 import { IncomingCallHost } from '@/features/calls/incoming-call-host';
+import { ReminderHost } from '@/features/reminders/reminder-host';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,8 @@ export default function TabLayout() {
           />
           {/* Rings on top of any screen while the app is open (video call signaling, D11). */}
           <IncomingCallHost />
+          {/* Keeps the phone's local health reminders in step with the patient's notification switches. */}
+          <ReminderHost />
         </BookingProvider>
       </AuthProvider>
     </ThemeProvider>

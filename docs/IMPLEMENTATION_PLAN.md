@@ -450,7 +450,7 @@ Not agreed yet. `SCHEDULE.md` keeps the original dates until the adviser approve
 | 8 | done | 2026-09-26 | `AppointmentsPage`: every booking, status tabs, date range, patient and doctor names, fees and 15% commission (older bookings without the stored field fall back to 15% of the fee). |
 | 9 | done | 2026-09-26 | `PointsPage`: patients ranked by points, streak and badges earned. |
 | 10 | done | 2026-09-26 | `PlansPage` (add / edit / delete) and `SubscribersPage` (active vs all, expiry-aware). |
-| 11 | admin half done | 2026-09-26 | `AnnouncementsPage` (fan-out to Notifications; new type `announcement` on mobile). **Still to do: the 6 local reminder categories on mobile (`expo-notifications`).** |
+| 11 | built, not device-tested | 2026-09-27 | Admin `AnnouncementsPage` (fan-out to Notifications). Mobile: `features/reminders` schedules local reminders with `expo-notifications` for glucose, meal, medication, exercise, hydration (daily times, in `reminder-plan.ts`) and appointment (1 hour before each confirmed booking). The five onboarding switches drive them: Blood Sugar Reminders = glucose + meal + medication, Activity Goals = exercise + hydration, Telehealth Messages = appointment, so no new screen was needed. Plan logic has 4 unit tests (`npm test`). Not on the web build; needs a phone. |
 | 12 | done | 2026-09-26 | Dashboard (stat cards + 4 Recharts charts) and Reports (3 report types, date range, CSV, print/PDF). |
 Items 6 to 12 were verified with a headless-Edge script driving the real admin UI against the local Auth + Firestore emulators (15 + 18 + 32 = 65 checks, all passing) plus 116 security-rules tests and 9 unit tests. That harness lives outside the repo for now.
 

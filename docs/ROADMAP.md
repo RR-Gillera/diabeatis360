@@ -49,7 +49,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [x] Send announcements [item 11, admin side]: `AnnouncementsPage` fans out one Notifications doc per active user (all / patients / doctors); mobile shows them in the notification list. Tested end to end
 
 ## Tier 6 — Engagement (P, A)
-- [~] Notifications list ✔ (`notifications.tsx`, `doctor/notifications.tsx`); local reminders (6 categories) ✘ (`expo-notifications` not installed); booking/message notifications ✔; the 6 reminder categories are still to do [item 11, mobile side] [item 11]
+- [~] Notifications: in-app list ✔ (`notifications.tsx`, `doctor/notifications.tsx`), booking/message/announcement notifications ✔; local reminders for the 6 categories ✔ in code (`features/reminders`, `expo-notifications`, driven by the onboarding switches, unit-tested); still needs a real phone to confirm they ring [item 11]
 - [~] Streaks, points, badges (My Rewards screen ✔, `gamification-service.ts`); admin points view ✔ (`PointsPage`, tested end to end) [item 9]
 - [~] Subscription: plans, mock subscribe, status, cancel ✔ (`subscription.tsx`); Free vs Premium comparison + hero (Figma 3:630) and `canUseFeature` daily-limit helper built 2026-09-26 [item 2]; **run `node seed-demo.cjs` to create the 4 plans (D5)**; admin plan CRUD + premium subscriber list ✘ [item 10]
 
