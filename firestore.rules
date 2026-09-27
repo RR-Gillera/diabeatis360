@@ -79,6 +79,19 @@ service cloud.firestore {
             || bookingData(bookingId).provider_id == request.auth.uid);
     }
 
+    // A well-formed new video call (D11): started by a person in a CONFIRMED booking, ringing the OTHER person on it.
+    function validNewCall(bookingId) {
+      return inBooking(bookingId)
+        && request.resource.data.booking_id == bookingId
+        && request.resource.data.caller_id == request.auth.uid
+        && request.resource.data.callee_id != request.auth.uid
+        && request.resource.data.callee_id in [bookingData(bookingId).patient_id, bookingData(bookingId).provider_id]
+        && request.resource.data.status == 'ringing'
+        && request.resource.data.room is string
+        && request.resource.data.room.size() >= 16
+        && bookingData(bookingId).status == 'confirmed';
+    }
+
     // ------------------------------------------------------------------ accounts
 
     match /Users/{userId} {
@@ -204,6 +217,36 @@ service cloud.firestore {
                     && request.resource.data.message.size() <= 2000;
       // Sent messages are a medical-consultation record, so they can be neither edited nor deleted.
       allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------ video calls (DECISIONS.md D11)
+    // One document per booking, keyed by the booking id, describing the CURRENT call. Only the two people on the booking
+    // can see or change it.
+    match /Calls/{bookingId} {
+      // Reading one call (the caller watching for an answer): allowed for anyone on that booking, even before a call exists.
+      allow get: if inBooking(bookingId);
+      // Watching for incoming calls is a query on callee_id, which must be the caller's own id.
+      allow list: if signedIn() && (resource.data.callee_id == request.auth.uid || resource.data.caller_id == request.auth.uid);
+
+      // Start a call: a fresh document.
+      allow create: if validNewCall(bookingId);
+
+      allow update: if signedIn() && (
+        // Ring again after the previous call finished (declined, missed or ended); an active ringing/accepted call cannot be overwritten.
+        (resource.data.status in ['declined', 'missed', 'ended'] && validNewCall(bookingId))
+        // The person being called answers: accept or decline, nothing else.
+        || (resource.data.callee_id == request.auth.uid && resource.data.status == 'ringing'
+            && changedKeys().hasOnly(['status']) && request.resource.data.status in ['accepted', 'declined'])
+        // The caller gives up (cancel) or the ring timed out (missed) while it is still ringing.
+        || (resource.data.caller_id == request.auth.uid && resource.data.status == 'ringing'
+            && changedKeys().hasOnly(['status', 'ended_at']) && request.resource.data.status in ['missed', 'ended'])
+        // Either person hangs up an accepted call.
+        || (resource.data.status == 'accepted' && (resource.data.caller_id == request.auth.uid || resource.data.callee_id == request.auth.uid)
+            && changedKeys().hasOnly(['status', 'ended_at']) && request.resource.data.status == 'ended')
+      );
+
+      // Call records are never deleted.
+      allow delete: if false;
     }
 
     // ------------------------------------------------------------------ notifications

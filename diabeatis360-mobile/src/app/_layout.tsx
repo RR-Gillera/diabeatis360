@@ -6,6 +6,7 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { BookingProvider } from '@/features/booking/booking-context';
 import { AuthProvider } from '@/features/auth/auth-context';
+import { IncomingCallHost } from '@/features/calls/incoming-call-host';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,6 +33,8 @@ export default function TabLayout() {
               animation: 'slide_from_right',
             }}
           />
+          {/* Rings on top of any screen while the app is open (video call signaling, D11). */}
+          <IncomingCallHost />
         </BookingProvider>
       </AuthProvider>
     </ThemeProvider>

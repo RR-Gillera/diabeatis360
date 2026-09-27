@@ -23,15 +23,6 @@ export type ConsultationState = {
   endedAt: Date | null;
 };
 
-/**
- * Deterministic video room for a booking. Both sides derive the same name from
- * the booking ID, so nobody has to send a link — and because Firestore IDs are
- * 20 random characters, the room is effectively unguessable by outsiders.
- */
-export function videoRoomUrl(bookingId: string) {
-  return `https://meet.jit.si/diabeatis360-${bookingId}`;
-}
-
 // Messages live in their own flat collection keyed by booking_id, matching the
 // ERD's convention of plain-string foreign keys rather than subcollections.
 // Consultation state (active/ended + summary) lives on the Bookings doc itself,

@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { endConsultation, saveConsultationSummary, sendMessage, subscribeToConsultation, subscribeToMessages, videoRoomUrl, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
+import { endConsultation, saveConsultationSummary, sendMessage, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
 import { isChatAvailable } from '@/constants/enums';
+import { startCall } from '@/features/calls/call-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 function dayLabel(date: Date | null) {
@@ -109,7 +110,17 @@ export default function ConsultationScreen() {
     }
   };
 
-  const joinCall = () => { if (id) void Linking.openURL(videoRoomUrl(id)); };
+  // Rings the other person in the app, then opens the call screen (DECISIONS.md D11). It never opens a raw link.
+  const startVideoCall = async () => {
+    if (!id || !uid) return;
+    setError('');
+    try {
+      await startCall(id, uid);
+      router.push({ pathname: '/video-call/[id]', params: { id } } as never);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'We could not start the call.');
+    }
+  };
 
   // Falls back to a role label only when the joined name is genuinely missing.
   const counterpartName = isDoctor
@@ -264,7 +275,7 @@ export default function ConsultationScreen() {
           <Text style={styles.headerSubtitle} numberOfLines={1}>{appointmentLabel}</Text>
         </View>
         {canConsult && !ended && !(unpaid && !isDoctor) ? (
-          <Pressable style={styles.callButton} onPress={joinCall} hitSlop={8}>
+          <Pressable style={styles.callButton} onPress={startVideoCall} hitSlop={8}>
             <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={17} tintColor="#FFF" />
           </Pressable>
         ) : null}
