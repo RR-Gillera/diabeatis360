@@ -9,10 +9,11 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Brand } from '@/constants/theme';
 import type { LabelAnalysis } from '@/features/ai/types';
 import { useAuth } from '@/features/auth/auth-context';
+import { saveProduct } from '@/features/scanner/product-service';
 import { ScanResult } from '@/features/scanner/scan-result';
 import { canUseFeature } from '@/features/subscription/subscription-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
-import { AiError, requestLabelAnalysis } from '@/lib/ai';
+import { AiError, requestLabelAnalysis, requestProductLookup } from '@/lib/ai';
 
 type Phase = 'camera' | 'analyzing' | 'result' | 'retry';
 
@@ -24,9 +25,10 @@ function splitDataUrl(value: string): { base64: string; mimeType: 'image/jpeg' |
   return { base64: match ? value.slice(match[0].length) : value, mimeType };
 }
 
-// Nutrition Scanner (Figma 25:1092 camera, 195:2908 result). The photo goes to the analyzeLabel Cloud Function, which
-// asks Gemini and returns the analysis; the photo is never stored (DECISIONS.md D2). Free plan: 3 scans a day,
-// enforced on the server.
+// Nutrition Scanner (Figma 25:1092 camera, 195:2908 result). Product memory (DECISIONS.md D12): the barcode is read
+// first and looked up in the shared Products collection, which needs no AI call and no Free scan. Only a barcode that
+// is not saved yet (or a product without one) needs a label photo: it goes to the analyzeLabel Cloud Function, which
+// asks Gemini; the photo is never stored (D2). Free plan: 3 photo scans a day, enforced on the server.
 export default function ScannerScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/user-home');
@@ -41,6 +43,10 @@ export default function ScannerScreen() {
   const [error, setError] = useState<AiError | null>(null);
   const [usage, setUsage] = useState('');
   const [allowed, setAllowed] = useState(true);
+  // The barcode seen by the camera. `lastCode` stops the camera (which reports the same code many times a second)
+  // from starting a second lookup.
+  const [barcode, setBarcode] = useState<string | null>(null);
+  const lastCode = useRef<string | null>(null);
 
   // Free-plan usage line. Re-read whenever `usageTick` changes (after a scan), never synchronously in the effect.
   const [usageTick, setUsageTick] = useState(0);
@@ -61,6 +67,8 @@ export default function ScannerScreen() {
   const scanAgain = () => {
     setPhase('camera');
     setAnalysis(null);
+    setBarcode(null);
+    lastCode.current = null;
     setMessage('');
     setError(null);
     refreshUsage();
@@ -74,13 +82,35 @@ export default function ScannerScreen() {
       if (!photo?.base64) throw new AiError('unknown', 'We could not take the photo. Please try again.');
       setPhase('analyzing');
       const { base64, mimeType } = splitDataUrl(photo.base64);
-      const result = await requestLabelAnalysis(base64, mimeType);
+      const result = await requestLabelAnalysis(base64, mimeType, barcode ?? undefined);
       if (result.readable) {
         setAnalysis(result);
         setPhase('result');
       } else {
         setMessage(result.message);
         setPhase('retry');
+      }
+    } catch (value) {
+      setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
+      setPhase('retry');
+    } finally {
+      refreshUsage();
+    }
+  };
+
+  // A barcode appeared in the frame. Only real product barcodes (EAN/UPC: 6 to 14 digits) are looked up.
+  const handleBarcode = async ({ data }: { data: string }) => {
+    if (phase !== 'camera' || data === lastCode.current || !/^[0-9]{6,14}$/.test(data)) return;
+    lastCode.current = data;
+    setPhase('analyzing');
+    try {
+      const found = await requestProductLookup(data);
+      setBarcode(data);
+      if (found.found) {
+        setAnalysis(found);
+        setPhase('result');
+      } else {
+        setPhase('camera'); // a new product: the person now photographs its label
       }
     } catch (value) {
       setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
@@ -119,6 +149,7 @@ export default function ScannerScreen() {
             analysis={analysis}
             onAlternatives={() => router.push({ pathname: '/healthier-alternatives', params: { id: analysis.scan_id } } as never)}
             onScanAgain={scanAgain}
+            onShare={barcode && uid && !analysis.from_memory ? (name, brand) => saveProduct(uid, barcode, analysis, name, brand) : undefined}
           />
           <AppText style={styles.usageLight}>{usage}</AppText>
         </ScrollView>
@@ -145,7 +176,10 @@ export default function ScannerScreen() {
   // ---- camera
   return (
     <View style={styles.dark}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} onCameraReady={() => setReady(true)} />
+      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} onCameraReady={() => setReady(true)}
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+        onBarcodeScanned={phase === 'camera' ? handleBarcode : undefined}
+      />
 
       <View style={styles.topBar}>
         <Pressable style={styles.round} onPress={() => goBack()} hitSlop={8}>
@@ -159,7 +193,7 @@ export default function ScannerScreen() {
 
       <View style={styles.frameWrap} pointerEvents="none">
         <View style={styles.frame} />
-        <AppText style={styles.hint}>Fit the nutrition facts label inside the frame</AppText>
+        <AppText style={styles.hint}>{barcode ? 'New product. Now fit its nutrition facts label inside the frame' : 'Point at the barcode, or fit the nutrition facts label inside the frame'}</AppText>
       </View>
 
       <View style={styles.bottomBar}>

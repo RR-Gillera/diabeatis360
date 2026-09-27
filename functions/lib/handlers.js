@@ -8,6 +8,7 @@ const { FieldValue } = require('firebase-admin/firestore')
 const { HttpsError } = require('firebase-functions/v2/https')
 
 const { interpretGlucose } = require('./glucose')
+const { rateNutrients } = require('./rating')
 const { checkLimit, countToday, hasPremium } = require('./limits')
 const {
   buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals,
@@ -36,10 +37,15 @@ async function loadContext(db, uid) {
   }
 }
 
-async function usedToday(db, collection, dateField, uid, now) {
+async function usedToday(db, collection, dateField, uid, now, keep = () => true) {
   const snapshot = await db.collection(collection).where('user_id', '==', uid).get()
-  return countToday(snapshot.docs.map((doc) => doc.data()[dateField]), now)
+  return countToday(snapshot.docs.filter((doc) => keep(doc.data())).map((doc) => doc.data()[dateField]), now)
 }
+
+// A scan answered from the shared Products collection makes no Gemini call, so it does not use up a Free scan (D12).
+const countsAsScan = (scan) => scan.source !== 'product_memory'
+
+const validBarcode = (value) => typeof value === 'string' && /^[0-9]{6,14}$/.test(value)
 
 function limitError(feature, limit) {
   const what = feature === 'scan' ? 'label scans' : 'AI suggestions'
@@ -110,14 +116,14 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BASE64_LENGTH = 7 * 1024 * 1024 // about 5 MB of image
 
 /** Reads a nutrition label photo for the signed-in user. The image is sent to Gemini and never stored (D2). */
-async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
+async function analyzeLabel({ db, uid, image, barcode, callAi, now = new Date() }) {
   if (!image || typeof image.base64 !== 'string' || !IMAGE_TYPES.includes(image.mimeType)) {
     throw new HttpsError('invalid-argument', 'Send a JPEG, PNG or WebP photo of the label.')
   }
   if (image.base64.length > MAX_BASE64_LENGTH) throw new HttpsError('invalid-argument', 'That photo is too large. Try a smaller one.')
 
   const { profile, premium } = await loadContext(db, uid)
-  const used = await usedToday(db, 'Nutrition_Scans', 'scanned_at', uid, now)
+  const used = await usedToday(db, 'Nutrition_Scans', 'scanned_at', uid, now, countsAsScan)
   const limit = checkLimit({ feature: 'scan', premium, usedToday: used })
   if (!limit.allowed) throw limitError('scan', limit.limit)
 
@@ -142,7 +148,10 @@ async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
     product_name: result.product_name,
     health_rating: result.health_rating,
     scanned_at: FieldValue.serverTimestamp(),
+    product_id: validBarcode(barcode) ? barcode : null,
+    source: 'gemini_label',
     analysis: {
+      ingredients_text: result.ingredients_text,
       brand: result.brand, serving_size: result.serving_size, calories: result.calories, carbs_g: result.carbs_g,
       sugar_g: result.sugar_g, fiber_g: result.fiber_g, protein_g: result.protein_g, sodium_mg: result.sodium_mg,
       insight: result.insight, allergen_warnings: result.allergen_warnings, alternatives: result.alternatives,
@@ -152,4 +161,65 @@ async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
   return { ...result, scan_id: saved.id, remaining: limit.limit === null ? null : Math.max(0, limit.limit - used - 1) }
 }
 
-module.exports = { generateRecommendations, analyzeLabel, CRITICAL_MESSAGE, containsAllergen }
+/**
+ * Looks a barcode up in the shared Products collection (D12). Found: the saved nutrients are rated again for THIS
+ * person (their allergies decide the warnings) and no Gemini call is made. Not found: the app then asks for a label photo.
+ */
+async function lookupProduct({ db, uid, barcode, now = new Date() }) {
+  if (!validBarcode(barcode)) throw new HttpsError('invalid-argument', 'That barcode is not valid.')
+  const snapshot = await db.doc(`Products/${barcode}`).get()
+  if (!snapshot.exists) return { found: false }
+  const product = snapshot.data()
+  const { profile, premium } = await loadContext(db, uid)
+
+  const nutrients = product.nutrients ?? {}
+  const allergens = parseAllergens(profile.allergies)
+  const matched = containsAllergen(`${product.product_name ?? ''} ${product.ingredients_text ?? ''}`, allergens)
+  const rated = rateNutrients(nutrients)
+  const rating = matched.length ? 'unsuitable' : rated.rating
+  const alternatives = (Array.isArray(product.alternatives) ? product.alternatives : [])
+    .filter((entry) => entry && entry.instead_of && entry.try && !containsAllergen(entry.try, allergens).length)
+    .slice(0, 4)
+  const analysis = {
+    brand: product.brand ?? '',
+    serving_size: product.serving_size ?? '',
+    calories: nutrients.calories ?? 0,
+    carbs_g: nutrients.carbs_g ?? 0,
+    sugar_g: nutrients.sugar_g ?? 0,
+    fiber_g: nutrients.fiber_g ?? 0,
+    protein_g: nutrients.protein_g ?? 0,
+    sodium_mg: nutrients.sodium_mg ?? 0,
+    insight: rated.insight,
+    allergen_warnings: matched.map((allergen) => `Contains ${allergen}`),
+    alternatives,
+    ingredients_text: product.ingredients_text ?? '',
+  }
+
+  const saved = await db.collection('Nutrition_Scans').add({
+    user_id: uid,
+    image_url: null,
+    product_name: product.product_name,
+    health_rating: rating,
+    scanned_at: FieldValue.serverTimestamp(),
+    product_id: barcode,
+    source: 'product_memory',
+    analysis,
+  })
+  const used = await usedToday(db, 'Nutrition_Scans', 'scanned_at', uid, now, countsAsScan)
+  const limit = checkLimit({ feature: 'scan', premium, usedToday: used })
+
+  return {
+    found: true,
+    readable: true,
+    scan_id: saved.id,
+    product_name: product.product_name,
+    health_rating: rating,
+    ...analysis,
+    from_memory: true,
+    verified: product.verified === true,
+    barcode,
+    remaining: limit.limit === null ? null : Math.max(0, limit.limit - used),
+  }
+}
+
+module.exports = { generateRecommendations, analyzeLabel, lookupProduct, CRITICAL_MESSAGE, containsAllergen }

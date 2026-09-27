@@ -6,7 +6,8 @@ Gemini API key lives here as a Firebase secret and is never in either app.
 | Function | Input | What it does |
 |---|---|---|
 | `generateRecommendations` | `{ kind: 'meal' \| 'exercise' }` | Reads the signed-in user's profile and latest glucose reading **on the server**, asks Gemini for 3 suggestions, removes anything that mentions the user's allergens, saves it to `AI_Suggestions`. |
-| `analyzeLabel` | `{ imageBase64, mimeType }` | Sends a nutrition-label photo to Gemini, returns the nutrients, a personalised rating and healthier Filipino swaps, saves it to `Nutrition_Scans`. **The photo is never stored** (D2). |
+| `analyzeLabel` | `{ imageBase64, mimeType, barcode? }` | Sends a nutrition-label photo to Gemini, returns the nutrients, a personalised rating and healthier Filipino swaps, saves it to `Nutrition_Scans`. **The photo is never stored** (D2). |
+| `lookupProduct` | `{ barcode }` | Looks the barcode up in the shared `Products` collection (D12). Found: rates the saved nutrients for this person and returns the analysis with **no Gemini call** and no Free scan used. Not found: `{ found: false }`. |
 
 Rules enforced here (the app cannot be trusted with them):
 - the caller must be signed in;

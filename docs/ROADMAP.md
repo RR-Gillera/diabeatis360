@@ -54,7 +54,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Subscription: plans, mock subscribe, status, cancel ✔ (`subscription.tsx`); Free vs Premium comparison + hero (Figma 3:630) and `canUseFeature` daily-limit helper built 2026-09-26 [item 2]; **run `node seed-demo.cjs` to create the 4 plans (D5)**; admin plan CRUD + premium subscriber list ✘ [item 10]
 
 ## Added scope (adviser-requested, not in Table 24): after all 23 points
-- [ ] Product memory: shared barcode-keyed `Products` collection, reuse nutrients, admin review (DECISIONS D12, closed) [item 15]
+- [~] Product memory (DECISIONS D12, closed) [item 15]: barcode lookup first (no Gemini, no Free scan used), label photo only for a new product, patient confirms name/brand and shares it as unverified, admin verifies in Scanned Products. Built, rules- and emulator-tested; needs a real phone camera for barcode reading.
 - [~] Video call signaling (DECISIONS D11, closed) [item 16]: ringing, Accept/Decline, cancel, 30 s missed call with notification, in-app Jitsi (WebView / iframe) with a random room token. Built and rules-tested (149/149); needs a two-phone test for camera, microphone and real-device ringing. Rings only while the app is open (no FCM).
 
 ## Tier 7 — If time allows
