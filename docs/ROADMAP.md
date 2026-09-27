@@ -9,7 +9,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [x] Audit both repos; fill in real status below (`/audit`, 2026-09-25)
 - [~] Secrets hygiene (2026-09-25): root `.gitignore` added and both app `.gitignore`s widened (`.env*`, `serviceAccountKey*.json`, `*-firebase-adminsdk-*.json`); `.env.example` added to both apps; the stray `For Firebase JS SDK v7.20.0 and la.txt` is untracked (staged deletion, still on disk); no service-account key was ever committed, and no other secret was found in the repo. **Still to do by a person:** restrict the Firebase web API key in Google Cloud console (Credentials > API key > application/API restrictions), because `diabeatis360-mobile/.env` (web config only) and that txt file remain in git history on origin. History was NOT rewritten (a force-push would break teammates' clones); web config is not a secret, so restricting the key is the real fix.
 - [~] Firestore rules (2026-09-25): new `firestore.rules` + `firebase.json` + `.firebaserc` at the repo root, one-line reason on every rule, default-deny. **Not deployed yet**, and tested with 124 allow/deny cases in the Firestore emulator (all pass); after deploying, still try one flow per role in the Rules Playground (see FIRESTORE_SCHEMA.md "As implemented" for the deliberate relaxations). Before deploying, set `is_verified: true` on test doctors in the Firebase console, or their patient screens will show permission errors.
-- [~] Mobile: single `src/firebase.js` with RN auth persistence ✔; bottom nav shell ✔; theme tokens + Inter font ✘ (`constants/theme.ts` is still the Expo template; Inter not installed)
+- [~] Mobile: single `src/firebase.js` with RN auth persistence ✔; bottom nav shell ✔; `Brand` theme tokens + Inter loaded ✔ (newer screens use them, older screens still use the system font); `npm run lint` works (3 pre-existing errors: profile.tsx x2, Expo template hook)
 - [x] Admin: auth guard (`AdminRoute`) + layout shell built and tested end to end against the Firebase emulators (2026-09-26): router, Tailwind 4, `Layout`, `AuthContext`; 15/15 headless-browser checks pass
 - [x] Glucose thresholds constants + `interpretGlucose()` with tests (DECISIONS D4): `constants/glucose.ts` + 9 unit tests (`npm test`, all pass), critical class added (2026-09-26)
 - [~] Docs hygiene: `LIST_OF_MODULES.md` restored to the official Table 24 (2026-09-26, check it against the signed copy); `docs/` is still untracked in git; the earlier PROGRESS log was lost [item 0a]
@@ -55,7 +55,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 
 ## Added scope (adviser-requested, not in Table 24): after all 23 points
 - [ ] Product memory: shared barcode-keyed `Products` collection, reuse nutrients, admin review (DECISIONS D12, closed) [item 15]
-- [~] Video call: Jitsi link opens in the browser ✔; **call signaling missing** (no ringing, Accept/Decline, missed calls), Jitsi not in-app (DECISIONS D11, closed) [item 16]
+- [~] Video call signaling (DECISIONS D11, closed) [item 16]: ringing, Accept/Decline, cancel, 30 s missed call with notification, in-app Jitsi (WebView / iframe) with a random room token. Built and rules-tested (149/149); needs a two-phone test for camera, microphone and real-device ringing. Rings only while the app is open (no FCM).
 
 ## Tier 7 — If time allows
 - [ ] AI Diabetes Risk Prediction screen · Google Sign-In (dev build) · real push (FCM)

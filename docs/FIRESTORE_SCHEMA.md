@@ -58,17 +58,17 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 
 
 ## Added scope (adviser-requested, 2026-09-26) — NOT in the signed Table 24
-Proposed collections for DECISIONS.md D11 (OPEN) and D12 (PROPOSED). Not built yet.
+Collections for DECISIONS.md D11 (closed; `Calls` is built) and D12 (`Products`, not built yet).
 
 | Collection | Doc ID | Fields |
 |---|---|---|
-| Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), created_at, ended_at |
+| Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), room (random token, 16+ chars, names the Jitsi room), created_at, ended_at |
 | Products | barcode | barcode, product_name, brand, nutrients (map, per serving), source (`gemini_label`), created_by, verified (bool), verified_by, created_at |
 
 Rules intent:
 - **Calls:** read/update only when `request.auth.uid` is the caller or callee AND they are that booking's
   `patient_id` / `provider_id`; create only as the caller, with `status == 'ringing'`, on a `confirmed` booking;
-  no delete. A missed call is set by the caller's app after ~30 s.
+  no delete. A missed call is set by the caller's app after ~30 s. The `room` token is random per call, so the video room cannot be guessed from the booking id; only the two participants can read it. Calling again after a finished call reuses the same doc (a new token).
 - **Products:** signed-in read; signed-in create with `verified == false` and `created_by == request.auth.uid`;
   only admins update `verified` / `verified_by`; no delete. Health ratings are never stored here (computed per user).
 ## Indexes you'll likely need
