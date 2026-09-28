@@ -70,12 +70,14 @@ export function subscribeToSubscriptions(
  *
  * Expiry is judged here rather than trusting the stored status: a subscription
  * that lapsed while the app was closed would otherwise still read as 'active'
- * until something happened to rewrite it.
+ * until something happened to rewrite it. A 'cancelled' subscription still
+ * counts until it expires — cancelling stops the renewal, not today's access
+ * (see cancelSubscription below).
  */
 export function activeSubscription(subscriptions: Subscription[]): Subscription | null {
   const now = Date.now();
   return subscriptions.find((item) =>
-    item.status === 'active' && (!item.expiresAt || item.expiresAt.getTime() > now)) ?? null;
+    (item.status === 'active' || item.status === 'cancelled') && (!item.expiresAt || item.expiresAt.getTime() > now)) ?? null;
 }
 
 export function isExpired(subscription: Subscription) {
@@ -127,7 +129,7 @@ export async function canUseFeature(userId: string, feature: LimitedFeature) {
   const premium = subscriptions.docs.some((document) => {
     const data = document.data();
     const expires = (data.expires_at as Timestamp | undefined)?.toDate?.();
-    return data.status === 'active' && (!expires || expires.getTime() > now);
+    return (data.status === 'active' || data.status === 'cancelled') && (!expires || expires.getTime() > now);
   });
   if (premium) return { allowed: true, used: 0, limit: null as number | null, premium: true };
 
