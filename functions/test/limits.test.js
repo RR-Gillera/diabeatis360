@@ -27,13 +27,15 @@ test('countToday only counts timestamps from the current Manila day', () => {
   assert.equal(countToday(stamps, now), 3)
 })
 
-test('hasPremium needs an active, unexpired subscription', () => {
+test('hasPremium needs an unexpired subscription that is active or cancelled-but-not-yet-lapsed', () => {
   const now = new Date('2026-09-26T00:00:00Z')
   const later = new Date('2026-10-26T00:00:00Z')
   const earlier = new Date('2026-08-26T00:00:00Z')
   assert.equal(hasPremium([{ status: 'active', expires_at: later }], now), true)
   assert.equal(hasPremium([{ status: 'active', expires_at: earlier }], now), false)
-  assert.equal(hasPremium([{ status: 'cancelled', expires_at: later }], now), false)
+  // Cancelling stops the renewal, not access already paid for: still premium until expiry.
+  assert.equal(hasPremium([{ status: 'cancelled', expires_at: later }], now), true)
+  assert.equal(hasPremium([{ status: 'cancelled', expires_at: earlier }], now), false)
   assert.equal(hasPremium([{ status: 'active', expires_at: { toDate: () => later } }], now), true)
   assert.equal(hasPremium([], now), false)
 })

@@ -12,11 +12,14 @@ function startOfManilaDay(now = new Date()) {
   return new Date(Date.UTC(manila.getUTCFullYear(), manila.getUTCMonth(), manila.getUTCDate()) - MANILA_OFFSET_MS)
 }
 
-/** True while a subscription entitles the user to premium: 'active' and not past its expiry. */
+/**
+ * True while a subscription entitles the user to premium: 'active' or 'cancelled' (cancelling stops
+ * the renewal, not the access already paid for) and not past its expiry.
+ */
 function hasPremium(subscriptions, now = new Date()) {
   return subscriptions.some((item) => {
     const expires = item.expires_at && typeof item.expires_at.toDate === 'function' ? item.expires_at.toDate() : item.expires_at
-    return item.status === 'active' && (!expires || expires.getTime() > now.getTime())
+    return (item.status === 'active' || item.status === 'cancelled') && (!expires || expires.getTime() > now.getTime())
   })
 }
 
