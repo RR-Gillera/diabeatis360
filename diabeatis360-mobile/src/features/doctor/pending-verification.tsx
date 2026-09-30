@@ -23,16 +23,31 @@ function Row({ label, value }: { label: string; value: string }) {
  * admin verifies the credentials; no refresh is needed.
  */
 export function PendingVerification({ profile, onSignOut }: { profile: DoctorProfile; onSignOut: () => void }) {
+  const rejected = Boolean(profile.rejectionReason);
   return (
     <ScrollView contentContainerStyle={styles.screen}>
-      <View style={styles.icon}>
-        <SymbolView name={{ ios: 'hourglass', android: 'hourglass_top', web: 'hourglass_top' }} size={30} tintColor={Brand.colors.warning} />
+      <View style={[styles.icon, rejected && styles.iconRejected]}>
+        <SymbolView
+          name={rejected
+            ? { ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' }
+            : { ios: 'hourglass', android: 'hourglass_top', web: 'hourglass_top' }}
+          size={30}
+          tintColor={rejected ? Brand.colors.danger : Brand.colors.warning}
+        />
       </View>
-      <AppText weight="extraBold" style={styles.title}>Verification in progress</AppText>
+      <AppText weight="extraBold" style={styles.title}>{rejected ? 'Changes needed' : 'Verification in progress'}</AppText>
       <AppText style={styles.body}>
-        An admin is reviewing your PRC credentials. You will get full access to your dashboard, schedule and patients as soon as
-        you are verified. This screen updates automatically.
+        {rejected
+          ? 'An admin reviewed your credentials and found an issue. Fix it in your profile, then an admin will review again.'
+          : 'An admin is reviewing your PRC credentials. You will get full access to your dashboard, schedule and patients as soon as you are verified. This screen updates automatically.'}
       </AppText>
+
+      {rejected ? (
+        <Card style={[styles.card, styles.reasonCard]}>
+          <AppText weight="bold" style={styles.cardTitle}>Admin&apos;s note</AppText>
+          <AppText style={styles.reasonText}>{profile.rejectionReason}</AppText>
+        </Card>
+      ) : null}
 
       <Card style={styles.card}>
         <AppText weight="bold" style={styles.cardTitle}>Credentials you submitted</AppText>
@@ -50,9 +65,12 @@ export function PendingVerification({ profile, onSignOut }: { profile: DoctorPro
 const styles = StyleSheet.create({
   screen: { alignItems: 'center', backgroundColor: Brand.colors.background, flexGrow: 1, justifyContent: 'center', padding: Brand.sizes.screenPadding },
   icon: { alignItems: 'center', backgroundColor: Brand.colors.warningTint, borderRadius: 24, height: 64, justifyContent: 'center', marginBottom: 16, width: 64 },
+  iconRejected: { backgroundColor: Brand.colors.dangerTint },
   title: { fontSize: 24, textAlign: 'center' },
   body: { color: Brand.colors.textMuted, fontSize: 14, lineHeight: 21, marginBottom: 24, marginTop: 8, textAlign: 'center' },
   card: { alignSelf: 'stretch', gap: 10 },
+  reasonCard: { backgroundColor: Brand.colors.dangerTint, marginBottom: 16 },
+  reasonText: { color: Brand.colors.danger, fontSize: 13, lineHeight: 19 },
   cardTitle: { fontSize: 14, marginBottom: 4 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   rowLabel: { color: Brand.colors.textMuted, fontSize: 13 },

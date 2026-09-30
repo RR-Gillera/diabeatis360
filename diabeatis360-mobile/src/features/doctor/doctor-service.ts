@@ -28,6 +28,7 @@ export function subscribeToDoctorProfile(
         consultationFee: Number(data.consultation_fee ?? 0),
         isVerified: Boolean(data.is_verified),
         isActive: data.is_active !== false,
+        rejectionReason: String(data.rejection_reason ?? ''),
         availableDays: Array.isArray(data.available_days) ? data.available_days.map(Number) : [],
         availableRanges: Array.isArray(data.available_ranges)
           ? (data.available_ranges as TimeRange[]).filter((range) => range?.start && range?.end).map((range) => ({ start: String(range.start), end: String(range.end) }))

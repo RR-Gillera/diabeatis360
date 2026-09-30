@@ -95,8 +95,8 @@ export default function DoctorNotificationsScreen() {
   }, [uid]);
 
   const notices = useMemo(() => {
-    // Chat notifications are real Notifications docs; booking activity is derived
-    // from the bookings themselves. Both belong in one list for the doctor.
+    // Chat and credential-review notifications are real Notifications docs; booking activity is derived
+    // from the bookings themselves. All three belong in one list for the doctor.
     const messageNotices: Notice[] = stored
       .filter((entry) => entry.type === 'message')
       .map((entry) => ({
@@ -113,7 +113,22 @@ export default function DoctorNotificationsScreen() {
         color: homeColors.green,
         background: homeColors.greenTint,
       }));
-    const list = [...messageNotices, ...toNotices(appointments)];
+    const verificationNotices: Notice[] = stored
+      .filter((entry) => entry.type === 'doctor_verification')
+      .map((entry) => ({
+        id: entry.id,
+        patientId: '',
+        notificationId: entry.id,
+        unread: !entry.isRead,
+        title: entry.severity === 'warning' ? 'Credential review: changes needed' : 'Credentials verified',
+        detail: entry.message,
+        when: entry.sentAt,
+        icon: entry.severity === 'warning' ? 'exclamationmark.triangle.fill' as const : 'checkmark.seal.fill' as const,
+        iconAndroid: entry.severity === 'warning' ? 'warning' as const : 'verified' as const,
+        color: entry.severity === 'warning' ? '#D9364F' : homeColors.green,
+        background: entry.severity === 'warning' ? '#FBE6E9' : homeColors.greenTint,
+      }));
+    const list = [...messageNotices, ...verificationNotices, ...toNotices(appointments)];
     // Pending requests first, then most recent — the doctor's action queue
     // matters more than strict chronology.
     return list.sort((a, b) => {

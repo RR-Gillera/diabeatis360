@@ -14,6 +14,9 @@ export type DoctorProfile = {
   consultationFee: number;
   isVerified: boolean;
   isActive: boolean;
+  /** Set by an admin's Reject action (admin panel); shown on the pending-verification screen so the doctor
+   * knows what to fix before resubmitting. Cleared back to '' once the admin verifies. */
+  rejectionReason: string;
   /** Weekday indexes the doctor works, Mon=0 … Sun=6. Empty means "not set yet". */
   availableDays: number[];
   /** Free-form availability windows, e.g. 7:00 PM - 9:00 PM. Empty means "not set yet". */
