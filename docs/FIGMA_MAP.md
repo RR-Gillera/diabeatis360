@@ -59,8 +59,32 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Clinical Dashboard (D_DASH) | 44:967 | Doctor home |
 | Telehealth Queue (D_QUEUE) | 44:1082 | Accept/Decline |
 | Consultation Room (D_ROOM) | 44:1185 | Chat (doctor) + summary |
-There are no admin-web frames in this file; admin screens follow the manuscript storyboard
-(Figures 45–52) using the same brand color.
+### Admin web (exports in `FIGMA/ADMIN/`, corrected 2026-09-29)
+Earlier versions of this file said there were no admin frames. There are: 12 PNG exports in
+`FIGMA/ADMIN/`. **Node IDs cannot be recorded from the connected file** (checked 2026-09-30 through the Figma
+connector): `zg94UJ7h9nxktg8Sf8mTJ3` has a single page, "User" (`0:1`), and no admin frames in it (the only
+"Settings" frames, `44:1077` and `44:1181`, are patient/doctor navigation items). The admin designs live in a
+different Figma file, or were exported from an unlinked copy. **To do (team):** share that file's link so the IDs
+can be added. Plan: IMPLEMENTATION_PLAN.md "Admin Figma pass".
+
+| Frame (file in FIGMA/ADMIN) | Admin page (built 2026-09-29) | Module | Deliberate differences from the frame |
+|---|---|---|---|
+| Admin Login Page | `/login` | Account (A) | Adds the wrong-password / not-an-admin messages the frame does not show |
+| Overview Dashboard | `/` Overview | Analytics (supporting) | Numbers are patients only (D9); the feed is built from stored timestamps; "View All Logs" expands the feed (no separate log page) |
+| User Management Page, -1 (details drawer) | `/users` → Patients | User management (UT-A003–A005, A011) | Drawer also lists the patient's blood sugar logs and wellness points |
+| Provider Management Page (list) | `/providers` | Doctor Management | Adds **+ Add Provider** (UT-A006) and sidebar badge for pending approvals |
+| Provider Management Page-1 (credential modal) | `/providers` → View Profile | Verify / Activate-Deactivate Doctor | Reject asks for a reason (shown to the doctor in the app) |
+| Analytics Page | `/analytics` | View Analytics | Revenue in ₱, "Active/Inactive/New" are patient counts for the chosen period |
+| Analytics Page-1 (report modal) | `/analytics` → Generate Report | Generate Reports, UT-A012 | Report types are the ones the system supports (Users, Appointments & revenue, Blood sugar trends); "data categories" checkboxes not built |
+| Revenue (list) | `/revenue` | Appointment History (A) | Extra tabs Premium Subscribers / Membership Plans; status chips are Paid / Unpaid / Pay on-site (no Failed/Refunded in our data) |
+| Revenue-1 (payment modal) | `/revenue` → View | Appointment History (A) | "Download Invoice" opens a printable receipt (Save as PDF); "Report a Problem" opens an email to the project mailbox |
+| Settings (Announcements tab) | `/settings` | Send Announcements | No scheduled publish date and no "New Template"; drafts and history are built; extra "My Account" tab |
+| Settings-1 (Reminders tab) | **not built** (decision 2026-09-29: phone reminders are local) | — | — |
+| Overlay+OverlayBlur | modal backdrop style | — | — |
+
+No frame (built in the same look): Content (Food Database, Scanned Products), Users → Guardian
+Verification and Award Points. Sidebar uses the 7-item version (Overview, Users, Providers, Content,
+Analytics, Revenue, Settings) with light-lime active pill (`#DDF0A9`) and the heart-and-drop logo.
 
 ## Known design ↔ spec mismatches (see DECISIONS.md)
 - Premium price in Figma ₱149/month vs manuscript ₱99 / ₱499 (6-mo) / ₱899 (annual).
