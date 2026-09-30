@@ -128,14 +128,25 @@ service cloud.firestore {
     match /Providers/{providerId} {
       // Any signed-in user can browse the doctor directory (patients need it to book).
       allow read: if signedIn();
-      // A doctor creates their own profile, but can never create it pre-verified or pre-approved.
+      // A doctor creates their own profile, but can never create it pre-verified or pre-approved, and can never
+      // create it carrying any admin/audit field (verified_by, reviewed_by, reviewed_at, created_by_admin) —
+      // otherwise a self-registered doctor could forge "an admin added me" in the audit trail.
       allow create: if isUser(providerId)
                     && request.resource.data.get('is_verified', false) == false
                     && request.resource.data.get('is_active', true) == true
-                    && !('verified_by' in request.resource.data);
-      // Doctors edit their profile/schedule but cannot verify or activate themselves; only admins can (module 10).
-      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active']))
-                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active']));
+                    && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin']);
+      // Doctors edit their profile/schedule but cannot verify/activate themselves or touch the admin review
+      // trail; they MAY still clear rejection_reason themselves when they resubmit (module 10, admin Figma pass).
+      // Admins may additionally reject with a reason and record who reviewed it; created_by_admin (UT-A006,
+      // "Add Provider") can be set once, the same one-shot pattern Users.account_type uses (D16). When an admin
+      // writes created_by_admin or reviewed_by the value must be THEIR OWN uid, so the field names which admin
+      // account did it instead of being any string an admin chooses. verified_by is pinned the same way.
+      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin']))
+                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
+                        && (!changedKeys().hasAny(['created_by_admin'])
+                            || (!('created_by_admin' in resource.data) && request.resource.data.created_by_admin == request.auth.uid))
+                        && (!changedKeys().hasAny(['reviewed_by']) || request.resource.data.reviewed_by == request.auth.uid)
+                        && (!changedKeys().hasAny(['verified_by']) || request.resource.data.verified_by == request.auth.uid));
       // Doctors are deactivated, not deleted.
       allow delete: if false;
     }
@@ -307,6 +318,26 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ------------------------------------------------------------------ announcements (admin Figma pass)
+
+    match /Announcements/{announcementId} {
+      // History + drafts on the admin Settings page (fanned out to Notifications on publish, module 8).
+      // Nobody outside the admin panel needs to read these, so — unlike most collections — this is admin-only.
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+                    && request.resource.data.title is string && request.resource.data.title.size() <= 200
+                    && request.resource.data.message is string && request.resource.data.message.size() <= 1000
+                    && request.resource.data.audience in ['all', 'patient', 'doctor']
+                    && request.resource.data.status in ['draft', 'published']
+                    && request.resource.data.created_by == request.auth.uid;
+      allow update: if isAdmin()
+                    && (!('title' in request.resource.data) || (request.resource.data.title is string && request.resource.data.title.size() <= 200))
+                    && (!('message' in request.resource.data) || (request.resource.data.message is string && request.resource.data.message.size() <= 1000))
+                    && (!('audience' in request.resource.data) || request.resource.data.audience in ['all', 'patient', 'doctor'])
+                    && (!('status' in request.resource.data) || request.resource.data.status in ['draft', 'published']);
+      allow delete: if isAdmin();
+    }
+
     // ------------------------------------------------------------------ gamification
 
     match /Gamification/{userId} {
@@ -361,8 +392,15 @@ service cloud.firestore {
     match /Food_Database/{foodId} {
       // The Filipino food/GI list grounds the AI prompts and is readable by signed-in users.
       allow read: if signedIn();
-      // Only admins add or hide foods (Food Database CRUD).
-      allow write: if isAdmin();
+      // Only admins add, edit or hide foods (admin Content page, UT-A008-UT-A010). Glycemic index is a
+      // percentile-style 0-100 scale; calories cannot be negative.
+      allow create, update: if isAdmin()
+                    && request.resource.data.food_name is string && request.resource.data.food_name.size() > 0
+                    && request.resource.data.glycemic_index is number
+                    && request.resource.data.glycemic_index >= 0 && request.resource.data.glycemic_index <= 100
+                    && request.resource.data.calories is number && request.resource.data.calories >= 0
+                    && request.resource.data.status in ['active', 'hidden'];
+      allow delete: if isAdmin();
     }
 
     match /AI_Suggestions/{suggestionId} {
