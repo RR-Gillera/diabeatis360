@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { type DimensionValue, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuthButton, authColors, authStyles } from './auth-ui';
 
 export function SetupShell({ section, progress, title, description, children, onBack, onNext, buttonTitle = 'Next  ›' }: { section: string; progress: string; title: string; description: string; children: React.ReactNode; onBack: () => void; onNext: () => void; buttonTitle?: string }) {
-  const width = progress === '100% Complete' ? '100%' : `${Number.parseInt(progress, 10)}%`;
+  // A template string is typed as plain `string`, but a style width needs a DimensionValue (e.g. '40%').
+  const width = (progress === '100% Complete' ? '100%' : `${Number.parseInt(progress, 10)}%`) as DimensionValue;
   return <View style={[authStyles.screen, styles.screen]}><View style={styles.progress}><Text style={styles.section}>{section}</Text><Text style={styles.progressText}>{progress}</Text></View><View style={styles.track}><View style={[styles.fill, { width }]} /></View><Pressable onPress={onBack}><Text style={styles.back}>‹  Back</Text></Pressable><Text style={styles.title}>{title}</Text><Text style={styles.description}>{description}</Text>{children}<View style={styles.bottom}><AuthButton title={buttonTitle} onPress={onNext} /></View></View>;
 }
 
