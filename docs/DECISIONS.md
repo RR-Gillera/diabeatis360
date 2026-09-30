@@ -252,3 +252,29 @@ finishes the feature the manuscript always described.
    21 new Firestore rules cases (182 total, 0 failed).
 **Manuscript needs editing:** none of the data dictionary changes (see FIRESTORE_SCHEMA.md), plus the new
 `Users.account_type` field and the Storage bucket path in the Network Model / data flow diagram.
+
+### D17 — Admin web panel rebuilt to the Figma exports — CLOSED 2026-09-29: built
+**Why:** the earlier panel had no Figma match (the "no admin frames" note was wrong — `FIGMA/ADMIN/` has 12 exports,
+see FIGMA_MAP.md) and the adviser credits a module only when it matches its frame. The panel now follows the
+Figma sidebar (Overview, Users, Providers, Content, Analytics, Revenue, Settings). The team's rule for extras:
+"if it benefits the admin or is crucial, add it — with the same look and feel."
+1. **Add Provider (manuscript UT-A006) runs in the browser** with a second, temporary Firebase app so the admin is
+   not signed out. The temporary password is random, never shown, never stored; the doctor sets a real one from the
+   password-reset email. The scratch app signs out and is deleted right after. The new `Providers` doc records
+   `created_by_admin: <admin uid>` (audit trail) and can be set only once, only by an admin, and only with that admin's own uid (`firestore.rules`); a self-registering doctor cannot create a Providers doc that already contains it (hardened 2026-09-30 after a rules test showed forging was possible). `reviewed_by` and `verified_by` are pinned the same way (an admin can only write their own uid). What it proves and does not prove: it names the admin **account** that wrote it through the app; it does not identify a person behind a shared login, does not show the licence was checked, and says nothing about writes made with the Admin SDK, a service account or the Firebase console, which bypass the rules.
+   **Roles and routing (checked 2026-09-30):** the mobile app decides patient vs doctor from `Users.role` only (`auth-context.tsx`), not from a `Providers` doc. `Users.role` is editable by its owner by design (the doctor onboarding writes the `Providers` doc first and then sets `role: 'doctor'`), so restricting `Providers` create to `role == 'doctor'` would break that onboarding and could be bypassed by setting the role first. The real boundary is `isVerifiedDoctor()` (needs an admin-set `is_verified`), and tests pin that a patient with an unverified `Providers` doc, or with `role: 'doctor'`, cannot read other patients' profiles.
+2. **New collection `Announcements`** (history + drafts for Settings): `title`, `message`, `audience`
+   (`all`/`patient`/`doctor`), `status` (`draft`/`published`), `recipient_count`, `created_by`, `created_at`,
+   `published_at`. Publishing also writes one `Notifications` doc per active recipient (as before). Scheduled
+   publishing and templates are **not** built.
+3. **Providers gets `rejection_reason`, `reviewed_by`, `reviewed_at`, `created_by_admin`.** A rejected doctor sees the
+   reason on the mobile pending-verification screen and gets a `doctor_verification` notification.
+4. **Food Database CRUD (UT-A008–A010), a user's blood sugar logs (UT-A011) and health trend reports (UT-A012)**
+   are now in the panel (Content, Users drawer, Analytics > Generate Report).
+5. **Left out:** the Figma Reminders tab, and the "Failed"/"Refunded" payment chips (the app only records
+   `unpaid`/`paid`/`onsite`; payment is mocked).
+6. **Reads:** charts and totals that group or count distinct patients read whole collections in the browser (fine at
+   capstone scale); sidebar badges use small filtered live queries.
+**Manuscript needs editing:** data dictionary — `Announcements` table; `Providers.rejection_reason`, `reviewed_by`,
+`reviewed_at`, `created_by_admin`; `Notifications.notification_type` gains `doctor_verification`,
+`guardian_verification`. Admin screenshots/test-case results (UT-A001–A012) should be refreshed from the new panel.

@@ -132,6 +132,8 @@ appointments, admin acceptance; Gulay: interpretation, feedback, notifications, 
 | 15 | Added: Product memory | added | M–L | Gulay | 14, 6 | — |
 | 16 | Added: Video call signaling | added | M–L | Gillera | 1 | — |
 | 17 | Pediatric account under guardian supervision | Account P (UT-005) | M | Catubay | 0b, 3 | no change |
+| 6–12 rev. | Admin Figma pass (A0–A8, see "Admin Figma pass" below) | Figma credit for all 7 admin points | ~13 days total | split | 6–12 | no change (credit) |
+| 18 | Admin content: Food Database CRUD (part of A6) | manuscript UT-A008–A010 | M | Gulay | A0 | no change |
 
 ### 0a — Docs and git housekeeping (S, Gillera)
 - **Goal:** stop losing docs; make the repo the single source of truth.
@@ -231,8 +233,12 @@ appointments, admin acceptance; Gulay: interpretation, feedback, notifications, 
 - **Tests:** UT-006, UT-007, IT-003, IT-004, IT-008.
 
 ### 6 — Admin foundation and admin account (M, Gillera)
+> **Revised 2026-09-29:** items 6–12 are built and work, but do not follow the admin designs in
+> `FIGMA/ADMIN/`. The restyle and the remaining manuscript gaps are planned in **"Admin Figma pass"**
+> below (A0–A8). The original item text is kept for history.
 - **Checkmarks:** Login, Update, Reset (A). Completes Account for A.
-- **Screens:** manuscript storyboard Figures 45–52 (there are no admin Figma frames), brand `#629C2C`.
+- **Screens:** ~~manuscript storyboard Figures 45–52 (there are no admin Figma frames)~~ — superseded:
+  admin frames exist in `FIGMA/ADMIN/` (see FIGMA_MAP.md). Brand `#629C2C`.
 - **Work:**
   - Add `react-router-dom`, Tailwind and Recharts (approved, D14).
   - `AdminRoute` waits for auth, then checks that `Admins/{uid}` exists; otherwise it signs out with
@@ -386,6 +392,159 @@ appointments, admin acceptance; Gulay: interpretation, feedback, notifications, 
   cases (182 total) + 11 new Storage cases, all passing in the emulator.
 - **Tests:** UT-005 (manuscript); add the Actual Result to Table 25.
 
+### Admin Figma pass — revises items 6–12, adds item 18 (PLAN, 2026-09-29, awaiting approval)
+
+**Why.** All 12 admin Table 24 checkmarks already *work* (items 6–12, tested against the emulators), but
+the adviser credits a function only when it matches its design, and the panel was built on the belief that
+there were no admin frames. `FIGMA/ADMIN/` has 12 exported frames (Login, Overview, Users + details
+drawer, Providers + credential modal, Analytics & Reports, Revenue + payment modal, Settings with
+Announcements and Reminders tabs). The manuscript's admin tests also still have gaps: UT-A006 (add
+doctor), UT-A008–A010 (food database CRUD) and UT-A011 (view a user's blood sugar logs).
+
+**Decisions taken 2026-09-29 (user):** match `FIGMA/ADMIN/`, and add anything crucial for admin in the
+same look · UT-A006 via a second in-browser Firebase app (safeguards below) · announcements get a
+history + drafts (no scheduled publish, no templates) · the Settings → Reminders frame is left out (not
+graded; the phone schedules reminders locally, so an admin setting it never reads would be undefendable).
+
+#### Current state (2026-09-29, read from the code)
+| Area | State | Notes |
+|---|---|---|
+| Router, `AdminRoute`, `AuthContext` (Admins/{uid} gate, "Not an admin account") | done | keep as is |
+| Services layer (`src/services/*`), client SDK only, no `firebase-admin` in `src/` | done | keep; `serviceAccountKey.json` + a stray `For Firebase JS SDK...txt` sit in the folder (gitignored/untracked) |
+| Brand tokens `#629C2C` + Inter in `index.css` | done | keep |
+| Layout | partial | flat 12-link text sidebar; Figma = 7 icon items, logo, Logout at the bottom |
+| Login / Account / reset | done, not Figma | Figma login: split layout, illustration, "Keep me logged in" |
+| Doctors | done, not Figma | no Reject (reason), no modal, no consult counts, no Add Provider (UT-A006) |
+| Users | done, not Figma | lists doctors too (`role !== 'doctor'`, D9 wants `role == 'patient'`); no drawer; no per-user glucose logs (UT-A011) |
+| Guardians, Points, Plans, Subscribers, Products, Appointments, Announcements, Reports, Dashboard | done, not Figma | each is its own menu entry today |
+| Food Database CRUD | **missing** | rules already allow admin writes; no page (UT-A008–A010) |
+| Confirmations | partial | `window.confirm` on 3 actions; guardian reject has a reason box |
+| Pagination | missing | tables render every row |
+| Aggregation queries | none | 31 full-collection live reads |
+| `diabeatis360-admin/CLAUDE.md` | stale | still says "untouched Vite boilerplate" |
+
+Mobile side already enforces what admin toggles: `is_active == false` on Users or Providers signs the
+person out (`features/auth/auth-context.tsx:44`), and the patient directory shows only
+`isVerified && isActive` doctors (`features/booking/booking-service.ts:46`).
+
+#### Target structure (sidebar = Figma, 7 items)
+| Menu | Figma frame | Page content | Graded function / tests |
+|---|---|---|---|
+| Overview | Overview Dashboard | 4 stat cards, activity line, consultations bar, revenue line, **Recent Activity Feed**, Export Data (CSV) | supports Analytics |
+| Users | User Management Page (+ -1) | Tabs: **Patients** (search, status filter, 10/page, Plan/Status/Joined, View → **details drawer** with contact, joined, status toggle + Save, **blood sugar logs**, points/streak) · **Guardian Verification** (existing page, restyled, ID photo in a modal) · **Award Points** (existing leaderboard) | UT-A003–A005, UT-A011; View Award Points |
+| Providers | Provider Management Page (+ -1) | Tabs **Verified** / **Pending Approval (n)**; search; Provider/Specialty/PRC/City/Consults/Status; **View Profile → Credential Verification modal** (Verify, Reject with reason, Active/Inactive); **+ Add Provider** | Verify Doctor Credentials, Activate/Deactivate Doctor; UT-A006 |
+| Content | no frame (menu item only) | Tabs **Food Database** (CRUD) · **Scanned Products** (existing D12 queue) | UT-A008–A010 |
+| Analytics | Analytics Page (+ -1) | period control (Today / Week / Month / Year / Custom), 5 stat cards, registrations line, activity donut, consultations by weekday, monthly revenue; **Generate Report** → existing report builder (users, appointments & revenue, blood sugar trends) with CSV + print/PDF | View System Analytics, Generate System Reports; UT-A012 |
+| Revenue | Revenue (+ -1) | Tabs **Consultations** (4 cards, growth chart Monthly/Quarterly, payments table = every booking with status/date filters, search, pages; **View → Payment Details modal**, "Download Invoice" = printable receipt) · **Subscribers** · **Membership Plans** (CRUD) | View Appointment History (A), Manage Membership Plans, View Premium Subscribers; UT-A007 |
+| Settings | Settings | Tabs **Announcements** (create, audience, Publish Now, Save Draft, **Previous Announcements** history with delete) · **My Account** (name, reset password; no frame) | Send Announcements; Update Account, Reset Password |
+
+Frame elements deliberately not built (data the system does not have): credential PDF previews and
+"Request Additional Information" (the app collects a PRC number, not files), "Add User" (patients
+self-register), Publish Date/New Template, Reminders tab, card brand/last-4 and "Report a Problem" on
+payments, "Flagged" user status. Currency shown as ₱, not $. Old URLs redirect to the new pages.
+
+**Admin additions (user asked for crucial extras, same look):** audit fields on every review
+(`reviewed_by`, `reviewed_at`, `created_by_admin`); doctor **Reject with reason** that the doctor sees on
+their pending screen; one shared confirmation modal (reason required for rejections); CSV export on every
+table; Recent Activity Feed; Pending-approval count badges in the sidebar (Providers, Users→Guardians,
+Content→Products).
+
+#### Work items (in order)
+| # | Work | Size | Owner | Tests covered |
+|---|---|---|---|---|
+| A0 | **Foundation restyle** (revises 6): new `Layout` (logo, 7 icon items, badges, Logout at bottom), inline SVG icon set (no new dependency), shared `Modal`, `Drawer`, `ConfirmDialog` (optional required reason), `StatCard`, `SearchInput`, `SegmentedTabs`, pagination + CSV button in `DataTable`; Login to Figma incl. "Keep me logged in" (`setPersistence` local vs session) and the illustration (exported from the Figma file into `public/`); route remap + redirects; fix `role == 'patient'` everywhere (D9) | M | Gillera | UT-A001, UT-A002 |
+| A1 | **Providers** (revises 7): tabs + table + consults count (from Bookings), credential modal, Verify / Reject (reason) / status; **Add Provider** (safeguards below); mobile `pending-verification.tsx` shows the rejection reason | L | Gillera | UT-A006; Verify, Activate/Deactivate |
+| A6 | **Content** (new item 18 + part of 15): Food Database table (name, category, GI, calories, status), add/edit modal with validation (GI 0–100, calories ≥ 0, category from a fixed list), delete with confirm, hide/show via `status`, `added_by_admin_id`; Scanned Products tab restyled | M | Gulay | UT-A008, UT-A009, UT-A010 |
+| A2 | **Users** (revises 7, 9, 17): patients table + drawer (status Save with confirm, blood sugar logs table + mini chart, points/streak/badges); Guardian Verification and Award Points as tabs | M | Catubay | UT-A003, UT-A004, UT-A005, UT-A011; View Award Points |
+| A7 | **Settings** (revises 11, 6): Announcements form + Save Draft + history + delete; My Account tab | M | Gulay | Send Announcements; Update Account, Reset Password |
+| A3 | **Revenue** (revises 8, 10): cards, growth chart, payments table (all bookings, filters, pages), payment modal + printable receipt; Subscribers and Plans tabs (delete with confirm; D5 prices) | M | Catubay | UT-A007; Manage Plans, View Subscribers |
+| A4 | **Analytics & Reports** (revises 12): period control, 5 cards (aggregation), 4 charts, Generate Report modal (existing `lib/reports.js`) | M | Gillera | UT-A012; View Analytics, Generate Reports |
+| A5 | **Overview** (revises 12): cards, 3 charts, Recent Activity Feed, Export Data | M | Gillera | supports Analytics |
+| A8 | **Docs + checks**: FIGMA_MAP admin table, rewrite `diabeatis360-admin/CLAUDE.md` state, rules tests, `npm run lint` + `npm run build`, TEST_LOG rows, PROGRESS entry | S | Gillera | — |
+
+Order reasoning: foundation first (every page sits in it); then the two manuscript gaps that are missing
+outright (UT-A006 in A1, UT-A008–A010 in A6); then the pages that complete whole graded functions in
+Figma form, starting with the smallest data work.
+
+#### UT-A006 "Add Provider" safeguards (second Firebase app)
+1. `initializeApp(config, 'provision-' + Date.now())` + its own `getAuth` (connected to the Auth emulator
+   when `VITE_USE_EMULATORS`), so the admin's own session is never replaced.
+2. Temporary password = 24 random characters from `crypto.getRandomValues`, held only in a local variable:
+   never displayed, logged, or stored.
+3. As the new user (secondary app): create `Users/{uid}` (`role: 'doctor'`, `is_active: true`,
+   `onboarding_completed: true`) and `Providers/{uid}` (`is_verified: false`, name, specialty, PRC, city,
+   fee) — both already allowed by the existing "create your own profile" rules.
+4. As the admin (primary app): update `Providers/{uid}` with `is_verified: true`, `verified_by`,
+   **`created_by_admin: <admin uid>`**, then `sendPasswordResetEmail` so the doctor sets their own password.
+5. `signOut` the secondary auth and `deleteApp` it in a `finally`. If a Firestore write fails after the
+   Auth user was created, delete that Auth user from the secondary session first, so no orphan login is
+   left behind.
+
+#### Firestore / Storage rule changes
+- **Providers**: admin update list adds `rejection_reason`, `reviewed_by`, `reviewed_at`, and
+  `created_by_admin` (only when not already set). Doctors may not write `reviewed_by`, `reviewed_at` or
+  `created_by_admin`; they may clear `rejection_reason` to `''` when they resubmit. **Hardened 2026-09-30** (a
+  rules test showed the first version was forgeable): a doctor creating their own Providers doc may not include
+  any of `verified_by`, `reviewed_by`, `reviewed_at`, `created_by_admin`, and an admin can write `created_by_admin`,
+  `reviewed_by` or `verified_by` only with their own uid. Providers create is deliberately **not** restricted to
+  `Users.role == 'doctor'` (see DECISIONS D17, "Roles and routing").
+- **Announcements/{id}** (new): read, create, update, delete by `isAdmin()` only; create/update require
+  `title`, `message` (strings, ≤ 1000 chars), `audience` in `all|patient|doctor`, `status` in
+  `draft|published`, `created_by == request.auth.uid`.
+- **Food_Database**: already admin-write; add field validation (types, GI 0–100, `status` in
+  `active|hidden`).
+- **Users / Glucose_Logs / Bookings / Subscriptions / Gamification / Products / Guardian_Verifications /
+  Notifications**: no change (admin read and the needed admin writes already exist).
+- **storage.rules**: no change — the admin opens a guardian ID through the download URL stored in
+  `Guardian_Verifications`, whose Firestore rules already restrict it to the child and admins.
+- New rules tests for each change in `fbtools/rules.test.cjs`.
+
+#### Aggregation vs full reads
+- **Aggregation** (`getCountFromServer`, `getAggregateFromServer` with `sum`): total patients
+  (`role == 'patient'`), active patients (+ `is_active == true`), verified / pending doctors
+  (`is_verified`), completed consultations, platform revenue (`sum('platform_commission')` over
+  `status == 'completed'`), pending payments. Old bookings without `platform_commission` count as 0 in
+  the sum, so 0b's data fix (or the seed) must backfill them.
+- **Range reads** (only documents inside the chosen period, single-field range, no composite index):
+  registration trend (`Users.created_at`), activity line and "active today" (`Glucose_Logs.logged_at`:
+  distinct patients who logged — labelled as such, because the app does not record logins), consultation
+  and revenue charts (`Bookings.scheduled_at`). Firestore cannot group by day, so charts need the rows.
+- **Full live lists** stay where a table needs every row anyway (users, providers, plans, foods);
+  pagination is client-side at 10 rows per page, fine at capstone scale and simpler to defend than cursors.
+
+#### Testing plan (browser, not the Pixel 7)
+- Environment: `firebase emulators:start --only auth,firestore,functions,storage`, seed with
+  `emu-seed.cjs` + `emu-seed-mobile.cjs` (admin `admin@test.com` / `Passw0rd!`, plus doctors, patients,
+  bookings, subscriptions), a few `Food_Database` rows added to the seed, then
+  `VITE_USE_EMULATORS=true npm run dev` in `diabeatis360-admin/`.
+- Claude can drive a headless Edge browser (as for items 6 and 7, 15/15 and 18/18): one script per page
+  that clicks through the UT-A steps and then checks Firestore directly. Scripts stay in the scratchpad,
+  not the repo.
+- Manual script for a teammate (same steps), one row per case in `docs/TEST_LOG.md` with Tester = the
+  person who ran it and Device = "Desktop Chrome, Firebase emulators" (or the real project after 0b):
+
+| Case | Steps | Expected |
+|---|---|---|
+| UT-A001 | Log in as admin@test.com | Overview with real counts |
+| UT-A002 | Log in with both fields empty | "Please fill in all required fields." |
+| — | Log in as pat1@test.com | "Not an admin account", signed out |
+| UT-A003 | Users → Patients | every `role == 'patient'` user, 10 per page, search works |
+| UT-A004 | View a patient → Inactive → Save → confirm | `is_active: false`; that patient is signed out on the phone |
+| UT-A005 | Same patient → Active → Save | `is_active: true`; can log in again |
+| UT-A006 | Providers → Add Provider → fill form → confirm | Auth user + Users + Providers docs (`created_by_admin`), appears under Verified, in the patient directory; reset email in the Auth emulator; admin still signed in |
+| Verify / Reject | Pending → View Profile → Verify; another → Reject with reason | `is_verified`, `reviewed_by/at`; rejected doctor's pending screen shows the reason; Reject blocked without a reason |
+| Activate/Deactivate D | Verified → View Profile → Inactive | hidden from directory, doctor signed out |
+| UT-A007 | Revenue → Consultations; filter status + dates; View | all bookings with names, fees, commission; modal + printable receipt |
+| UT-A008–A010 | Content → Food Database → add, edit, delete | row created / changed / removed; invalid GI rejected |
+| UT-A011 | Users → View pat1 → Blood sugar logs | pat1's readings, dates and interpretation match `Glucose_Logs` |
+| UT-A012 | Analytics → Generate Report → Blood sugar trends → CSV + Print | per-patient averages match the data |
+| Analytics | Analytics → change period | cards and charts change; counts match Firestore |
+| Award Points | Users → Award Points | ranked by points, streaks shown |
+| Plans | Revenue → Plans → add, edit, delete (confirm) | `Subscription_Plans` updated; mobile Membership screen shows the change |
+| Subscribers | Revenue → Subscribers | active (incl. cancelled-but-unexpired) premium users with expiry |
+| Announcements | Settings → draft → publish to Patients | history shows Published + count; each patient gets a notification, doctors don't |
+| Account | Settings → My Account → rename; Send reset email | name updated; reset email in the Auth emulator |
+
 ## 4. Decisions (all closed 2026-09-26)
 
 Every decision this plan depends on is now CLOSED in `docs/DECISIONS.md`. Nothing blocks an item except
@@ -490,4 +649,5 @@ This is not the same as testing on a physical phone (native gestures, Expo Go, k
 | 14 | built, not run with a real camera or Gemini | 2026-09-27 | `expo-camera` (approved D14; plugin added to app.json), `app/scanner.tsx`, `features/scanner/scan-result.tsx`, `app/healthier-alternatives.tsx`, `constants/nutrition.ts` (display cues: 2,000 kcal reference, 10 g sugar highlight, to be confirmed by the adviser). The photo is sent to `analyzeLabel` and never stored. Free plan: shutter is replaced by an upgrade button after 3 scans; an unreadable photo does not count. Verified in the browser build with a fake camera feed, the Functions emulator and a fake Gemini: 18/18. Barcode scanning (D12, item 15) needs a physical phone to test. Rules: AI_Suggestions, AI_Suggestions_Foods and Nutrition_Scans are now server-write-only (124 rules tests). |
 | 16 | built, not device-tested | 2026-09-27 | `Calls` rules (149/149 rules tests), `features/calls/*` (service, incoming-call host in the root layout, WebView/iframe call frame), `app/video-call/[id].tsx`; the chat video button now rings instead of opening a link. Jitsi room name is a random per-call token stored in the call doc. Needs two real phones for camera, microphone and ringing. |
 | 15 | built, not device-tested | 2026-09-27 | Function `lookupProduct` (+ `analyzeLabel` takes the barcode), `lib/rating.js` (per-person rule rating, cut-offs to be confirmed by the adviser or a dietitian), `Products` rules (161/161 rules tests), scanner reads EAN/UPC barcodes, share form on the result, admin page Scanned Products. |
-| 17 | built, not device-tested | 2026-09-27 | Mobile: `app/onboarding/{account-for,guardian}.tsx`, `constants/guardian.ts`, `features/auth/guardian-service.ts`, Home banner + Profile "Managed by" line, `booking-service.ts` friendly pre-check. Admin: `pages/GuardiansPage.jsx`. Firestore: `Users.account_type` (settable once), `Guardian_Verifications` rewritten (doc id == child uid, resubmit flow). New `storage.rules` for the guardian ID photo. Verified: 21 new Firestore rules cases + 11 new Storage rules cases (all passing), 4 new unit tests for the age rule, full mobile typecheck/lint clean. **Not run on a device or with a real Storage upload.** |
+| 17 | built, not device-tested | 2026-09-27 | Mobile: `app/onboarding/{account-for,guardian}.tsx`, `constants/guardian.ts`, `features/auth/guardian-service.ts`, Home banner + Profile "Managed by" line, `booking-service.ts` friendly pre-check. Admin: `pages/GuardiansPage.jsx`. Firestore: `Users.account_type` (settable once), `Guardian_Verifications` rewritten (doc id == child uid, resubmit flow). New `storage.rules` for the guardian ID photo. Verified: 21 new Firestore rules cases + 11 new Storage rules cases (all passing), 4 new unit tests for the age rule. ~~full mobile typecheck/lint clean~~ **That claim was inaccurate** (corrected 2026-09-30): `tsc --noEmit` reported one error in `onboarding-ui.tsx` (from commit `577e787`, 2026-09-01, older than this item; fixed 2026-09-30 with a `DimensionValue` cast, typecheck is now clean), and `npm run lint` still reports 3 errors (`profile.tsx` x2, `use-color-scheme.web.ts`), also older than this item. **Not run on a device or with a real Storage upload.** |
+| A0–A8 | built, headless-browser tested against the emulators | 2026-09-29 | **Admin Figma pass** (DECISIONS D17). New pages: Overview, Users (Patients / Guardian Verification / Award Points), Providers (+ Add Provider), Content (Food Database / Scanned Products), Analytics (+ Generate Report), Revenue (payments / subscribers / plans), Settings (Announcements with drafts + history / My Account). Old page files were deleted after their logic moved into tabs. Firestore: new `Announcements` collection; `Providers.rejection_reason`, `reviewed_by`, `reviewed_at`, `created_by_admin`. Rules: **221/221** tests via `npm run test:rules` (run 2026-09-30; 204/204 before that day's hardening, 215 after 11 tests for forged audit fields and admin-uid pinning, 221 after pinning `verified_by` and adding routing/role tests; covers Providers audit fields, Food_Database validation, Announcements). The test file is `tests/firestore.rules.test.cjs`, run from the repo root (root `package.json`, devDependencies only: `@firebase/rules-unit-testing`, `firebase`, `firebase-tools`; needs Java). Mobile: rejected-doctor screen shows the admin's reason and a `doctor_verification` notification is shown. **Deviation from the plan:** the Analytics/Overview/Revenue numbers read whole collections (grouped and distinct counts cannot use `count()`/`sum()`, and there is no composite index), instead of aggregation queries. Not done: Figma node IDs in FIGMA_MAP.md; teammate Figma-vs-browser comparison; manual test script run by a teammate. |
