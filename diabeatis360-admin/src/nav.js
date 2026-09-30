@@ -1,15 +1,16 @@
-// Sidebar menu. Each admin module adds its entry here when its page exists, so the menu never has a dead link.
+import {
+  ChartIcon, ContentIcon, HomeIcon, RevenueIcon, SettingsIcon, StethoscopeIcon, UsersIcon,
+} from './components/icons'
+
+// Sidebar menu, matching the 7-item structure in FIGMA/ADMIN (Overview, Users, Providers, Content,
+// Analytics, Revenue, Settings). `badge` names a key from useAdminBadges() (see Layout.jsx) — omit it
+// for items with no pending-count badge.
 export const navItems = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/doctors', label: 'Doctors' },
-  { to: '/guardians', label: 'Guardian Verification' },
-  { to: '/users', label: 'Users' },
-  { to: '/appointments', label: 'Appointments' },
-  { to: '/points', label: 'Award Points' },
-  { to: '/plans', label: 'Membership Plans' },
-  { to: '/subscribers', label: 'Subscribers' },
-  { to: '/announcements', label: 'Announcements' },
-  { to: '/products', label: 'Scanned Products' },
-  { to: '/reports', label: 'Reports' },
-  { to: '/account', label: 'My Account' },
+  { to: '/', label: 'Overview', icon: HomeIcon },
+  { to: '/users', label: 'Users', icon: UsersIcon, badge: 'guardians' },
+  { to: '/providers', label: 'Providers', icon: StethoscopeIcon, badge: 'providers' },
+  { to: '/content', label: 'Content', icon: ContentIcon, badge: 'products' },
+  { to: '/analytics', label: 'Analytics', icon: ChartIcon },
+  { to: '/revenue', label: 'Revenue', icon: RevenueIcon },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

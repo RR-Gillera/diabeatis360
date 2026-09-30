@@ -1,23 +1,22 @@
 import { useMemo, useState } from 'react'
 
-import { useAuth } from '../auth/AuthContext'
-import DataTable, { Tabs } from '../components/DataTable'
-import { Button, Notice, PageHeader, StatusBadge } from '../components/ui'
-import { ageFrom, formatDate, toDate } from '../lib/format'
-import { guardianRelationshipLabels } from '../lib/labels'
-import { useCollection } from '../lib/useCollection'
-import { approveGuardian, notifyGuardianDecision, rejectGuardian } from '../services/guardians'
+import { useAuth } from '../../auth/AuthContext'
+import DataTable, { Tabs } from '../../components/DataTable'
+import { Button, ConfirmDialog, Notice, StatusBadge } from '../../components/ui'
+import { ageFrom, formatDate, toDate } from '../../lib/format'
+import { guardianRelationshipLabels } from '../../lib/labels'
+import { useCollection } from '../../lib/useCollection'
+import { approveGuardian, notifyGuardianDecision, rejectGuardian } from '../../services/guardians'
 
 // Guardian Verification (DECISIONS.md D16; manuscript Scope & Limitations, UT-005). A pediatric account
 // cannot book a consultation until its guardian's ID here is approved (firestore.rules enforces the same rule).
-export default function GuardiansPage() {
+export default function GuardiansTab() {
   const { admin } = useAuth()
   const verifications = useCollection('Guardian_Verifications')
   const users = useCollection('Users')
   const [tab, setTab] = useState('pending')
   const [busyId, setBusyId] = useState(null)
-  const [rejectingId, setRejectingId] = useState(null)
-  const [reason, setReason] = useState('')
+  const [rejecting, setRejecting] = useState(null) // the row being rejected (reason dialog open)
   const [error, setError] = useState('')
 
   const rows = useMemo(() => {
@@ -49,6 +48,15 @@ export default function GuardiansPage() {
 
   const shown = tab === 'all' ? rows : rows.filter((row) => row.status === tab)
 
+  // The empty message names the tab being looked at, so "Pending" does not claim there are no verifications at all
+  // when there are approved or rejected ones.
+  const emptyMessages = {
+    pending: 'No pending guardian verifications.',
+    approved: 'No approved guardian verifications yet.',
+    rejected: 'No rejected guardian verifications.',
+    all: 'No guardian verifications yet. They appear when a patient sets up a pediatric account.',
+  }
+
   const approve = async (row) => {
     setBusyId(row.id)
     setError('')
@@ -62,15 +70,13 @@ export default function GuardiansPage() {
     }
   }
 
-  const reject = async (row) => {
-    if (!reason.trim()) return
-    setBusyId(row.id)
+  const reject = async (reason) => {
+    setBusyId(rejecting.id)
     setError('')
     try {
-      await rejectGuardian(row.id, admin.id, reason)
-      await notifyGuardianDecision(row.id, false, reason)
-      setRejectingId(null)
-      setReason('')
+      await rejectGuardian(rejecting.id, admin.id, reason)
+      await notifyGuardianDecision(rejecting.id, false, reason)
+      setRejecting(null)
     } catch (value) {
       setError(value.message)
     } finally {
@@ -99,32 +105,12 @@ export default function GuardiansPage() {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: (row) => {
-        if (row.status !== 'pending') return null
-        if (rejectingId === row.id) {
-          return (
-            <div className="flex flex-col items-end gap-2">
-              <input
-                autoFocus
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Reason for rejecting…"
-                className="w-56 rounded-xl border border-gray-200 px-3 py-2 text-xs outline-none focus:border-brand"
-              />
-              <div className="flex gap-2">
-                <Button variant="ghost" className="!px-3 !py-2 !text-xs" onClick={() => { setRejectingId(null); setReason('') }}>Cancel</Button>
-                <Button variant="danger" className="!px-3 !py-2 !text-xs" disabled={busyId === row.id || !reason.trim()} onClick={() => reject(row)}>Confirm Reject</Button>
-              </div>
-            </div>
-          )
-        }
-        return (
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" className="!px-4 !py-2" disabled={busyId === row.id} onClick={() => setRejectingId(row.id)}>Reject</Button>
-            <Button className="!px-4 !py-2" disabled={busyId === row.id} onClick={() => approve(row)}>Approve</Button>
-          </div>
-        )
-      },
+      render: (row) => (row.status !== 'pending' ? null : (
+        <div className="flex justify-end gap-2">
+          <Button variant="dangerOutline" className="!px-4 !py-2" disabled={busyId === row.id} onClick={() => setRejecting(row)}>Reject</Button>
+          <Button className="!px-4 !py-2" disabled={busyId === row.id} onClick={() => approve(row)}>Approve</Button>
+        </div>
+      )),
     },
   ]
 
@@ -132,7 +118,6 @@ export default function GuardiansPage() {
 
   return (
     <div>
-      <PageHeader title="Guardian Verification" subtitle="Pediatric accounts (DECISIONS.md D16) cannot book a consultation until the guardian's ID here is approved." />
       {loadError || error ? <div className="mb-4"><Notice>{loadError || error}</Notice></div> : null}
       <Tabs
         value={tab}
@@ -144,7 +129,20 @@ export default function GuardiansPage() {
           { value: 'all', label: 'All', count: counts.all },
         ]}
       />
-      <DataTable columns={columns} rows={shown} empty="No guardian verifications yet. They appear when a patient sets up a pediatric account." />
+      <DataTable columns={columns} rows={shown} pageSize={10} empty={emptyMessages[tab]} />
+
+      <ConfirmDialog
+        open={Boolean(rejecting)}
+        title="Reject guardian verification"
+        message={`Reject the guardian ID for ${rejecting?.childName ?? 'this child'}? They will be told why and can resubmit.`}
+        confirmLabel="Reject"
+        danger
+        requireReason
+        reasonLabel="Reason for rejecting"
+        busy={Boolean(rejecting) && busyId === rejecting.id}
+        onCancel={() => setRejecting(null)}
+        onConfirm={reject}
+      />
     </div>
   )
 }

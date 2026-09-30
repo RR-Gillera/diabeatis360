@@ -1,6 +1,9 @@
 import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore'
 import {
+  browserLocalPersistence,
+  browserSessionPersistence,
   sendPasswordResetEmail,
+  setPersistence,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -17,7 +20,12 @@ export async function fetchAdminProfile(uid) {
   return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null
 }
 
-export function signInAdmin(email, password) {
+/**
+ * "Keep me logged in" (FIGMA/ADMIN login checkbox): local persistence survives closing the browser tab;
+ * session persistence (the default) clears when the browser session ends. Must be set before sign-in.
+ */
+export async function signInAdmin(email, password, remember) {
+  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence)
   return signInWithEmailAndPassword(auth, email.trim(), password)
 }
 
