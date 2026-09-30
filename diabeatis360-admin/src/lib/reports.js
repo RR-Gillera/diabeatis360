@@ -27,6 +27,11 @@ export function buildReport(type, data, from, to) {
     return {
       title: 'Users report',
       rows,
+      summary: [
+        { label: 'Accounts', value: rows.length },
+        { label: 'Patients', value: rows.filter((u) => u.role !== 'doctor').length },
+        { label: 'Doctors', value: rows.filter((u) => u.role === 'doctor').length },
+      ],
       columns: [
         { header: 'Name', value: (u) => u.full_name ?? '' },
         { header: 'Email', value: (u) => u.email ?? '' },
@@ -42,9 +47,16 @@ export function buildReport(type, data, from, to) {
     const rows = data.bookings
       .filter((booking) => inRange(booking.scheduled_at, from, to))
       .sort((a, b) => (toDate(b.scheduled_at)?.getTime() ?? 0) - (toDate(a.scheduled_at)?.getTime() ?? 0))
+    const completed = rows.filter((booking) => booking.status === 'completed')
+    const decided = rows.filter((booking) => ['completed', 'declined', 'cancelled'].includes(booking.status))
     return {
       title: 'Appointments & revenue report',
       rows,
+      summary: [
+        { label: 'Total appointments', value: rows.length },
+        { label: 'Completion rate', value: decided.length ? `${Math.round((completed.length / decided.length) * 100)}%` : '—' },
+        { label: 'Platform revenue (15%)', value: `₱${completed.reduce((sum, b) => sum + commissionOf(b), 0).toFixed(2)}` },
+      ],
       columns: [
         { header: 'Date & time', value: (b) => formatDateTime(b.scheduled_at) },
         { header: 'Patient', value: (b) => usersById[b.patient_id]?.full_name ?? b.patient_id },
@@ -78,9 +90,16 @@ export function buildReport(type, data, from, to) {
       highest: Math.max(...entry.values),
     }))
     .sort((a, b) => b.average - a.average)
+  const readings = rows.reduce((total, row) => total + row.values.length, 0)
+  const allValues = rows.flatMap((row) => row.values)
   return {
     title: 'Blood sugar trends report',
     rows,
+    summary: [
+      { label: 'Patients with readings', value: rows.length },
+      { label: 'Readings logged', value: readings },
+      { label: 'Average (mg/dL)', value: allValues.length ? Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length) : '—' },
+    ],
     columns: [
       { header: 'Patient', value: (r) => r.name },
       { header: 'Diabetes type', value: (r) => r.type },

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 
-import DataTable from '../components/DataTable'
-import { Card, Notice, PageHeader } from '../components/ui'
-import { formatDate, toDate } from '../lib/format'
-import { useCollection } from '../lib/useCollection'
+import DataTable from '../../components/DataTable'
+import { Card, Notice, SearchInput } from '../../components/ui'
+import { formatDate, toDate } from '../../lib/format'
+import { useCollection } from '../../lib/useCollection'
 
-// View Award Points (module 11, admin): every patient's wellness streak, points and badges, highest points first.
-// The mobile app keeps Gamification/{uid} up to date whenever the patient opens their rewards screen.
-export default function PointsPage() {
+// View Award Points (gamification module, admin): every patient's wellness streak, points and badges,
+// highest points first. The mobile app keeps Gamification/{uid} up to date when the patient opens Rewards.
+export default function PointsTab() {
   const gamification = useCollection('Gamification')
   const users = useCollection('Users')
   const earned = useCollection('User_Badges')
@@ -51,18 +51,14 @@ export default function PointsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Award Points"
-        subtitle="Patients ranked by points earned from logging readings and keeping streaks."
-        actions={<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" className="w-72 rounded-2xl border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-brand" />}
-      />
       {error ? <div className="mb-4"><Notice>{error}</Notice></div> : null}
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <Card><p className="text-xs font-bold uppercase text-muted">Patients with points</p><p className="mt-1 text-3xl font-extrabold">{rows.length}</p></Card>
         <Card><p className="text-xs font-bold uppercase text-muted">Total points awarded</p><p className="mt-1 text-3xl font-extrabold text-brand">{totalPoints}</p></Card>
         <Card><p className="text-xs font-bold uppercase text-muted">Longest current streak</p><p className="mt-1 text-3xl font-extrabold">{bestStreak} days</p></Card>
       </div>
-      <DataTable columns={columns} rows={rows} empty="No award points yet. Points appear after patients log readings." />
+      <SearchInput className="mb-4 max-w-md" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name or email…" />
+      <DataTable columns={columns} rows={rows} pageSize={10} empty="No award points yet. Points appear after patients log readings." />
     </div>
   )
 }

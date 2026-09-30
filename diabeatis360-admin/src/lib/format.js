@@ -34,3 +34,16 @@ export function ageFrom(birthdateValue) {
   if (!hadBirthdayThisYear) age -= 1
   return age
 }
+
+/** "just now", "5 minutes ago", "3 hours ago", "2 days ago" — used by the Overview activity feed. */
+export function timeAgo(value, now = new Date()) {
+  const date = toDate(value)
+  if (!date) return ''
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  const days = Math.floor(hours / 24)
+  return days < 30 ? `${days} day${days === 1 ? '' : 's'} ago` : formatDate(date)
+}

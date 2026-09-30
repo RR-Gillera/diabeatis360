@@ -1,23 +1,22 @@
 import { useState } from 'react'
 
-import DataTable from '../components/DataTable'
-import { Button, Card, Notice, PageHeader, TextField } from '../components/ui'
-import { formatPeso } from '../lib/format'
-import { useCollection } from '../lib/useCollection'
-import { createPlan, deletePlan, updatePlan } from '../services/plans'
+import DataTable from '../../components/DataTable'
+import { Button, Card, ConfirmDialog, Notice, TextField } from '../../components/ui'
+import { formatPeso } from '../../lib/format'
+import { createPlan, deletePlan, updatePlan } from '../../services/plans'
 
 const emptyForm = { name: '', price: '', durationDays: '' }
 
 // Manage Membership Plans (module 12, admin): add, edit and remove the plans patients see in the mobile app.
 // DECISIONS.md D5: Free (price 0), Premium Monthly 99, 6-Month 499, Annual 899.
-export default function PlansPage() {
-  const plans = useCollection('Subscription_Plans')
+export default function PlansTab({ plans }) {
   const [form, setForm] = useState(emptyForm)
   const [editingId, setEditingId] = useState(null)
+  const [deleting, setDeleting] = useState(null)
   const [message, setMessage] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  const rows = [...plans.data].sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0))
+  const rows = [...plans].sort((a, b) => Number(a.price ?? 0) - Number(b.price ?? 0))
 
   const startEdit = (plan) => {
     setEditingId(plan.id)
@@ -50,14 +49,18 @@ export default function PlansPage() {
     }
   }
 
-  const remove = async (plan) => {
-    if (!window.confirm(`Delete "${plan.plan_name}"? Existing subscriptions to it will keep working but show an unknown plan.`)) return
+  const remove = async () => {
+    setBusy(true)
     try {
-      await deletePlan(plan.id)
-      if (editingId === plan.id) reset()
+      await deletePlan(deleting.id)
+      if (editingId === deleting.id) reset()
       setMessage({ tone: 'success', text: 'Plan deleted.' })
+      setDeleting(null)
     } catch {
       setMessage({ tone: 'error', text: 'We could not delete the plan.' })
+      setDeleting(null)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -72,7 +75,7 @@ export default function PlansPage() {
       render: (p) => (
         <div className="flex justify-end gap-2">
           <Button variant="outline" className="!px-4 !py-2" onClick={() => startEdit(p)}>Edit</Button>
-          <Button variant="ghost" className="!px-4 !py-2" onClick={() => remove(p)}>Delete</Button>
+          <Button variant="ghost" className="!px-4 !py-2" onClick={() => setDeleting(p)}>Delete</Button>
         </div>
       ),
     },
@@ -80,8 +83,6 @@ export default function PlansPage() {
 
   return (
     <div>
-      <PageHeader title="Membership Plans" subtitle="The plans patients can choose from in the mobile app." />
-      {plans.error ? <div className="mb-4"><Notice>{plans.error}</Notice></div> : null}
       <Card className="mb-6">
         <form onSubmit={save} className="grid gap-4 md:grid-cols-4" noValidate>
           <TextField label="Plan name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -95,6 +96,17 @@ export default function PlansPage() {
         {message ? <div className="mt-4"><Notice tone={message.tone}>{message.text}</Notice></div> : null}
       </Card>
       <DataTable columns={columns} rows={rows} empty="No plans yet. Add the Free, Monthly, 6-Month and Annual plans." />
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        title="Delete plan"
+        message={`Delete "${deleting?.plan_name}"? Existing subscriptions to it keep working but will show an unknown plan.`}
+        confirmLabel="Delete"
+        danger
+        busy={busy}
+        onCancel={() => setDeleting(null)}
+        onConfirm={remove}
+      />
     </div>
   )
 }
