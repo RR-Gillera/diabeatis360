@@ -8,22 +8,25 @@ import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider, updateBookingStatus } from '@/features/booking/booking-service';
 import { formatFee } from '@/features/booking/booking-ui';
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState, StatusPill } from '@/features/doctor/doctor-ui';
+import { enumLabel, isChatAvailable } from '@/constants/enums';
 import type { BookingStatus, ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { subscribeToNotifications } from '@/features/notifications/notification-service';
 
-type FilterKey = 'pending' | 'accepted' | 'declined' | 'all';
+type FilterKey = 'pending' | 'confirmed' | 'completed' | 'declined' | 'all';
 
 const filters: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'pending', label: 'Pending' },
-  { key: 'accepted', label: 'Accepted' },
-  { key: 'declined', label: 'Declined' },
+  { key: 'pending', label: enumLabel('bookingStatus', 'pending') },
+  { key: 'confirmed', label: enumLabel('bookingStatus', 'confirmed') },
+  { key: 'completed', label: enumLabel('bookingStatus', 'completed') },
+  { key: 'declined', label: enumLabel('bookingStatus', 'declined') },
 ];
 
 const filterStatus: Record<Exclude<FilterKey, 'all'>, BookingStatus> = {
-  pending: 'scheduled',
-  accepted: 'accepted',
+  pending: 'pending',
+  confirmed: 'confirmed',
+  completed: 'completed',
   declined: 'declined',
 };
 
@@ -60,7 +63,7 @@ export default function DoctorAppointmentsScreen() {
     return subscribeToNotifications(uid, (items) => setUnread(items.filter((item) => !item.isRead).length), () => {});
   }, [uid]);
 
-  const pendingCount = appointments.filter((entry) => entry.status === 'scheduled').length;
+  const pendingCount = appointments.filter((entry) => entry.status === 'pending').length;
 
   const groups = useMemo(() => {
     const visible = filter === 'all' ? appointments : appointments.filter((entry) => entry.status === filterStatus[filter]);
@@ -74,7 +77,7 @@ export default function DoctorAppointmentsScreen() {
     return result;
   }, [appointments, filter]);
 
-  const decide = async (bookingId: string, status: 'accepted' | 'declined') => {
+  const decide = async (bookingId: string, status: 'confirmed' | 'declined') => {
     setActingOn(bookingId);
     try { await updateBookingStatus(bookingId, status); } finally { setActingOn(null); }
   };
@@ -83,13 +86,13 @@ export default function DoctorAppointmentsScreen() {
     <View style={doctorStyles.screen}>
       <DoctorHeader title="Appointments" subtitle="Accept, decline, and review bookings" badgeCount={pendingCount + unread} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
-        <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterScroll}>
           {filters.map((item) => (
             <Pressable key={item.key} onPress={() => setFilter(item.key)} style={[styles.filter, filter === item.key && styles.filterActive]}>
               <Text style={[styles.filterText, filter === item.key && styles.filterTextActive]}>{item.label}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
 
         {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
 
@@ -124,12 +127,12 @@ export default function DoctorAppointmentsScreen() {
 
                 <Text style={styles.bookingId} selectable>Booking ID: {entry.id}</Text>
 
-                {entry.status === 'scheduled' ? (
+                {entry.status === 'pending' ? (
                   <View style={styles.actions}>
                     <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'declined')} style={[styles.actionButton, styles.declineButton]}>
                       <Text style={styles.declineText}>Decline</Text>
                     </Pressable>
-                    <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'accepted')} style={[styles.actionButton, styles.acceptButton]}>
+                    <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'confirmed')} style={[styles.actionButton, styles.acceptButton]}>
                       <Text style={styles.acceptText}>{actingOn === entry.id ? 'Saving...' : 'Accept'}</Text>
                     </Pressable>
                   </View>
@@ -139,7 +142,7 @@ export default function DoctorAppointmentsScreen() {
                       <SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={15} tintColor={homeColors.green} />
                       <Text style={styles.viewPatientText}>View patient records</Text>
                     </Pressable>
-                    {entry.status === 'accepted' ? (
+                    {isChatAvailable(entry.status) ? (
                       <Pressable style={styles.chatAction} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
                         <SymbolView name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }} size={15} tintColor="#FFF" />
                         <Text style={styles.chatActionText}>Open Chat</Text>
@@ -158,8 +161,9 @@ export default function DoctorAppointmentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  filter: { backgroundColor: '#FFF', borderColor: '#E2E8F0', borderRadius: 22, borderWidth: 1, flex: 1, paddingVertical: 10 },
+  filterScroll: { flexGrow: 0, marginBottom: 8 },
+  filterRow: { flexDirection: 'row', gap: 8 },
+  filter: { backgroundColor: '#FFF', borderColor: '#E2E8F0', borderRadius: 22, borderWidth: 1, paddingHorizontal: 18, paddingVertical: 10 },
   filterActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
   filterText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700', textAlign: 'center' },
   filterTextActive: { color: '#FFF' },

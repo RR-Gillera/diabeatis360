@@ -1,0 +1,20 @@
+# ---- Secrets: never commit these (Diabeatis360) ----
+.env
+.env.*
+!.env.example
+serviceAccountKey*.json
+*-firebase-adminsdk-*.json
+
+# ---- Firebase CLI local files ----
+.firebase/
+firebase-debug.log*
+firestore-debug.log
+ui-debug.log
+
+# ---- Node ----
+node_modules/
+
+# ---- Cloud Functions secrets/config (the Gemini key is set with `firebase functions:secrets:set`, never in a file) ----
+functions/.secret.local
+functions/.env
+functions/.env.*

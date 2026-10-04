@@ -42,3 +42,9 @@ example
 # generated native folders
 /ios
 /android
+
+# ---- Secrets (widened after the 2026-09-25 audit) ----
+.env.*
+!.env.example
+serviceAccountKey*.json
+*-firebase-adminsdk-*.json

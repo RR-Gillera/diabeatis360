@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
+import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AddReadingModal, AiRecommendations } from '@/features/glucose/glucose-ui';
 import { wellnessStats } from '@/features/gamification/gamification-service';
@@ -42,10 +43,12 @@ const badgeStyle: Record<Interpretation, { label: string; color: string; backgro
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
   low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
   high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
 };
 
 function bannerCopy(latest: GlucoseLogEntry | undefined) {
   if (!latest) return { icon: 'info.circle.fill', iconAndroid: 'info', color: homeColors.textMuted, background: homeColors.borderSoft, text: 'Log your first blood sugar reading to get started.' } as const;
+  if (latest.interpretation === 'critical') return { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', color: homeColors.red, background: 'rgba(239, 68, 68, 0.08)', text: 'Your last reading was in a dangerous range. Contact your doctor or seek emergency care.' } as const;
   if (latest.interpretation === 'high') return { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', color: homeColors.red, background: 'rgba(239, 68, 68, 0.08)', text: 'Your last reading was high — keep an eye on it.' } as const;
   if (latest.interpretation === 'low') return { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.08)', text: 'Your last reading was low — consider a snack soon.' } as const;
   return { icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint, text: 'Blood sugar is looking stable today' } as const;
@@ -57,11 +60,19 @@ export default function UserHomeScreen() {
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
   const [logModalVisible, setLogModalVisible] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [guardianVerification, setGuardianVerification] = useState<GuardianVerification | null>(null);
 
   useEffect(() => {
     if (!uid) return;
     const unsubscribe = subscribeToGlucoseHistory(uid, setEntries, () => {});
     return unsubscribe;
+  }, [uid]);
+
+  // A pediatric account (DECISIONS.md D16) needs its guardian's verification approved; this is null once the
+  // account is an adult's own ("self"), since that account never has a Guardian_Verifications document.
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToGuardianVerification(uid, setGuardianVerification, () => {});
   }, [uid]);
 
   useEffect(() => {
@@ -102,6 +113,22 @@ export default function UserHomeScreen() {
             </Pressable>
           </View>
         </View>
+
+        {guardianVerification && guardianVerification.status !== 'approved' ? (
+          <Pressable
+            style={[styles.banner, { backgroundColor: guardianVerification.status === 'rejected' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(251, 146, 60, 0.08)' }]}
+            onPress={() => router.push({ pathname: '/onboarding/guardian', params: { mode: 'resubmit' } })}
+          >
+            <View style={[styles.bannerIconWrap, { backgroundColor: guardianVerification.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(251, 146, 60, 0.1)' }]}>
+              <SymbolView name={{ ios: 'person.badge.shield.checkmark', android: 'verified_user', web: 'verified_user' }} size={16} tintColor={guardianVerification.status === 'rejected' ? homeColors.red : homeColors.orange} />
+            </View>
+            <Text style={[styles.bannerText, { color: guardianVerification.status === 'rejected' ? homeColors.red : homeColors.orange }]}>
+              {guardianVerification.status === 'rejected'
+                ? `Guardian verification was not approved${guardianVerification.rejectionReason ? `: ${guardianVerification.rejectionReason}` : ''}. Tap to resubmit.`
+                : 'Guardian verification is pending admin review. Booking a consultation opens once it is approved.'}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View style={[styles.banner, { backgroundColor: banner.background }]}>
           <View style={[styles.bannerIconWrap, { backgroundColor: `${banner.color}1A` }]}>

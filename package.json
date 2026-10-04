@@ -1,0 +1,13 @@
+{
+  "name": "diabeatis360-repo-tools",
+  "private": true,
+  "description": "Repo-level developer tooling only (not shipped in either app): Firestore security-rules tests.",
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --project demo-diabeatis360 \"node tests/firestore.rules.test.cjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.31.0"
+  }
+}

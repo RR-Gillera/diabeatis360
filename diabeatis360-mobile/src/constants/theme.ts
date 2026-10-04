@@ -63,3 +63,37 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * Diabeatis360 design tokens, read from the current green Figma frames (docs/FIGMA_MAP.md).
+ * This is the single source for brand colours, radii and the Inter font families: the per-feature colour
+ * objects (homeColors, authColors, bookingColors) and the shared components in components/ui read from here,
+ * so a colour is never typed as a hex in more than one place.
+ */
+export const Brand = {
+  colors: {
+    primary: '#629C2C',
+    primaryTint: 'rgba(220, 242, 169, 0.2)',
+    text: '#111827',
+    textMuted: '#6B7280',
+    textFaint: '#9CA3AF',
+    background: '#F5F5F5',
+    card: '#FFFFFF',
+    border: '#F9FAFB',
+    warning: '#B45309',
+    warningTint: '#FEF3C7',
+    danger: '#D9364F',
+    dangerTint: '#FBE6E9',
+    neutral: '#475569',
+    neutralTint: '#F1F5F9',
+  },
+  radius: { card: 32, button: 16, pill: 999 },
+  sizes: { buttonHeight: 64, screenPadding: 24 },
+  /** Inter family names as loaded in app/_layout.tsx (@expo-google-fonts/inter). One family per weight. */
+  font: {
+    regular: 'Inter_400Regular',
+    medium: 'Inter_500Medium',
+    bold: 'Inter_700Bold',
+    extraBold: 'Inter_800ExtraBold',
+  },
+} as const;

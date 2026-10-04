@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Diabeatis360 Firebase Storage rules (DECISIONS.md D16). The ONLY thing ever stored here is a guardian's ID
+// photo for a pediatric account; nutrition label photos are never stored (D2), so nothing else is expected here.
+//
+// There is no separate "isAdmin" read rule below. A Storage download URL (what firebase/storage's
+// getDownloadURL() returns) already carries its own access token and works without hitting these rules again,
+// and that URL is only ever exposed through the Guardian_Verifications Firestore document, whose OWN rules
+// (firestore.rules) already restrict reading it to the child's own account and admins. That keeps the one
+// security boundary in one ruleset instead of duplicating an admin check Storage rules cannot verify against
+// Firestore without the more fragile cross-service firestore.exists() feature.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /guardian_ids/{uid}/{fileName} {
+      // Only the child's own account can read it directly through the Storage SDK (see note above for admins).
+      allow read: if request.auth != null && request.auth.uid == uid;
+      // Only the child's own account can upload it, and only a JPEG under 5 MB.
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+
+    // Default deny: anything not matched above (there should be nothing else in this bucket).
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

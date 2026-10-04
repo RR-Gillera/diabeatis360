@@ -4,12 +4,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { bookingColors, formatDate, formatFee } from './booking-ui';
 import { subscribeToBookingHistory, subscribeToProviders } from './booking-service';
+import { enumLabel } from '@/constants/enums';
 import type { AppointmentHistoryEntry, BookingStatus, Provider } from './types';
 
 const statusCopy: Record<BookingStatus, { label: string; color: string; background: string }> = {
-  scheduled: { label: 'Scheduled', color: '#475569', background: '#F1F5F9' },
-  accepted: { label: 'Accepted', color: bookingColors.green, background: '#E6F6EF' },
-  declined: { label: 'Declined', color: '#D9364F', background: '#FBE6E9' },
+  pending: { label: enumLabel('bookingStatus', 'pending'), color: '#B45309', background: '#FEF3C7' },
+  confirmed: { label: enumLabel('bookingStatus', 'confirmed'), color: bookingColors.green, background: '#E6F6EF' },
+  completed: { label: enumLabel('bookingStatus', 'completed'), color: '#475569', background: '#F1F5F9' },
+  declined: { label: enumLabel('bookingStatus', 'declined'), color: '#D9364F', background: '#FBE6E9' },
+  cancelled: { label: enumLabel('bookingStatus', 'cancelled'), color: '#D9364F', background: '#FBE6E9' },
 };
 
 // Shared "Appointment History" list — tap any entry to open its full detail
@@ -37,7 +40,7 @@ export function AppointmentHistoryList({ patientId }: { patientId: string | null
   return (
     <View style={styles.list}>
       {entries.map((entry) => {
-        const status = statusCopy[entry.status as BookingStatus] ?? statusCopy.scheduled;
+        const status = statusCopy[entry.status as BookingStatus] ?? statusCopy.pending;
         return (
           <Pressable key={entry.id} onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })} style={styles.card}>
             <View style={styles.copy}>

@@ -7,7 +7,7 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
-import { subscribeToProviders } from '@/features/booking/booking-service';
+import { subscribeToBookableProviders } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import type { Provider } from '@/features/booking/types';
@@ -23,7 +23,7 @@ export default function FindDoctorScreen() {
   const [filter, setFilter] = useState('All');
   const [error, setError] = useState('');
 
-  useEffect(() => subscribeToProviders(setProviders, (value) => setError(value.message)), []);
+  useEffect(() => subscribeToBookableProviders(setProviders, (value) => setError(value.message)), []);
 
   const visibleProviders = useMemo(() => providers.filter((provider) => {
     const matchesSearch = `${provider.fullName} ${provider.specialty} ${provider.city}`.toLowerCase().includes(search.toLowerCase());

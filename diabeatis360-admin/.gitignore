@@ -24,3 +24,11 @@ dist-ssr
 *.sw?
 *.env
 serviceAccountKey.json
+
+# ---- Secrets (widened after the 2026-09-25 audit) ----
+.env.*
+!.env.example
+serviceAccountKey*.json
+*-firebase-adminsdk-*.json
+# Firebase console "add app" snippet that was once committed by mistake
+For Firebase JS SDK*.txt

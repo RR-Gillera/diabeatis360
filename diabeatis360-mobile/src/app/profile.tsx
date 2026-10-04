@@ -5,7 +5,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { authColors, authStyles, AuthButton, Section } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { getOnboardingValue, saveOnboardingValue } from '@/features/auth/onboarding';
+import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
 import { BirthdateField } from '@/features/auth/birthdate-picker';
+import { enumLabel } from '@/constants/enums';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { BottomNav } from '@/features/home/home-ui';
 
@@ -39,8 +41,15 @@ export default function ProfileScreen() {
   const [savingHealth, setSavingHealth] = useState(false);
   const [healthSaved, setHealthSaved] = useState(false);
   const [loadingHealth, setLoadingHealth] = useState(true);
+  const [guardianVerification, setGuardianVerification] = useState<GuardianVerification | null>(null);
 
   useEffect(() => { setName(displayName ?? ''); }, [displayName]);
+
+  // Set only on a pediatric account (DECISIONS.md D16); null for an adult's own account.
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToGuardianVerification(uid, setGuardianVerification, () => {});
+  }, [uid]);
 
   useEffect(() => {
     if (!email) { setLoadingHealth(false); return; }
@@ -72,6 +81,21 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.role}>PROFILE</Text>
         <Text style={styles.email}>{email}</Text>
+
+        {guardianVerification ? (
+          <View style={styles.guardianBox}>
+            <Text style={styles.guardianTitle}>Managed by: {guardianVerification.guardianFullName || 'Guardian'} ({enumLabel('guardianRelationship', guardianVerification.relationship)})</Text>
+            <Text style={[styles.guardianStatus, guardianVerification.status === 'rejected' && styles.guardianStatusRejected]}>
+              {enumLabel('verificationStatus', guardianVerification.status)}
+              {guardianVerification.status === 'rejected' && guardianVerification.rejectionReason ? ` — ${guardianVerification.rejectionReason}` : ''}
+            </Text>
+            {guardianVerification.status === 'rejected' ? (
+              <Pressable onPress={() => router.push({ pathname: '/onboarding/guardian', params: { mode: 'resubmit' } })}>
+                <Text style={styles.link}>Resubmit guardian verification →</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         <Section title="Edit Profile">
           <TextInput value={name} onChangeText={(value) => { setName(value); setNameSaved(false); }} placeholder="Full name" style={styles.input} />
@@ -129,6 +153,10 @@ const styles = StyleSheet.create({
   scroll: { padding: 24, paddingBottom: 130, gap: 8 },
   role: { color: authColors.navy, fontSize: 32, fontWeight: '900', marginTop: 12 },
   email: { color: authColors.muted, fontSize: 14, marginBottom: 8 },
+  guardianBox: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, gap: 4, marginTop: 8, padding: 14 },
+  guardianTitle: { color: authColors.navy, fontSize: 13, fontWeight: '800' },
+  guardianStatus: { color: authColors.muted, fontSize: 12, fontWeight: '700' },
+  guardianStatusRejected: { color: '#D9364F' },
   input: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, color: authColors.navy, fontSize: 15, minHeight: 46, paddingHorizontal: 14 },
   fieldRow: { gap: 6 },
   fieldLabel: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },

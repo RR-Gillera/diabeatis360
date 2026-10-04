@@ -32,6 +32,7 @@ export default function NotificationsScreen() {
     if (entry.type === 'message' && entry.relatedId) router.push({ pathname: '/consultation/[id]', params: { id: entry.relatedId } });
     else if (entry.type === 'booking_update' && entry.relatedId) router.push({ pathname: '/booking/appointment', params: { id: entry.relatedId } });
     else if (entry.type === 'glucose_alert') router.push('/booking/find-doctor');
+    else if (entry.type === 'guardian_verification') router.push('/profile');
   };
 
   return (
@@ -69,7 +70,8 @@ export default function NotificationsScreen() {
                   {entry.sentAt ? entry.sentAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Just now'}
                   {entry.type === 'glucose_alert' ? ' · Tap to find a doctor'
                     : entry.type === 'message' ? ' · Tap to open chat'
-                    : entry.type === 'booking_update' ? ' · Tap to view appointment' : ''}
+                    : entry.type === 'booking_update' ? ' · Tap to view appointment'
+                    : entry.type === 'guardian_verification' ? ' · Tap to view Profile' : ''}
                 </Text>
               </View>
               {!entry.isRead ? <View style={styles.unreadDot} /> : null}

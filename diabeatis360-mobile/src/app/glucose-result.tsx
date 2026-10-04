@@ -15,12 +15,14 @@ const badgeStyle: Record<Interpretation, { label: string; color: string; backgro
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
   low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
   high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
 };
 
 const explanation: Record<Interpretation, string> = {
   normal: 'Your blood sugar level is within the healthy range. This is great! Your body is managing glucose well at this time.',
   high: 'Your blood sugar level is higher than the healthy target range. A few adjustments now can help bring it back down.',
   low: 'Your blood sugar level is below the healthy target range. A quick snack now can help bring it back up safely.',
+  critical: 'Your blood sugar level is in a dangerous range. Please contact your doctor or seek emergency care now.',
 };
 
 export default function GlucoseResultScreen() {
@@ -43,7 +45,7 @@ export default function GlucoseResultScreen() {
   }
 
   const badge = badgeStyle[latest.interpretation];
-  const alert = glucoseAlert(latest.readingMgdl, latest.interpretation);
+  const alert = glucoseAlert(latest.readingMgdl, latest.context);
   const time = latest.loggedAt ? latest.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—';
 
   return (

@@ -1,23 +1,27 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
-import { addGlucoseLog, deleteGlucoseLog, getInterpretation, updateGlucoseLog } from './glucose-service';
+import { interpretGlucose } from '@/constants/glucose';
+import { addGlucoseLog, deleteGlucoseLog, updateGlucoseLog } from './glucose-service';
+import { enumLabel } from '@/constants/enums';
 import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
 
 const contexts: { value: MealContext; label: string }[] = [
-  { value: 'before_meal', label: 'Before Meal' },
-  { value: 'after_meal', label: 'After Meal' },
+  { value: 'before_meal', label: enumLabel('mealContext', 'before_meal') },
+  { value: 'after_meal', label: enumLabel('mealContext', 'after_meal') },
 ];
 
 const livePreviewCopy: Record<Interpretation, { label: string; color: string; background: string }> = {
   low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
   normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
   high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
 };
 
 // Shared "Add a Reading" bottom sheet — used from the Log tab's FAB and from
@@ -46,7 +50,7 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
 
   const readingValue = Number(reading);
   const isValidReading = reading.trim() !== '' && Number.isFinite(readingValue) && readingValue > 0;
-  const livePreview = isValidReading ? livePreviewCopy[getInterpretation(readingValue, context)] : null;
+  const livePreview = isValidReading ? livePreviewCopy[interpretGlucose(readingValue, context)] : null;
 
   const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); };
   const close = () => { reset(); onClose(); };
@@ -132,6 +136,10 @@ const guidance: Record<Interpretation, { meal: string; exercise: string }> = {
     meal: 'A small snack with fast-acting carbohydrates (like fruit juice or a glucose tablet) can help raise your level.',
     exercise: 'Hold off on strenuous exercise until your level stabilizes and you re-check your next reading.',
   },
+  critical: {
+    meal: 'Your reading is in a dangerous range. Follow the alert above and contact your doctor or seek emergency care now.',
+    exercise: 'Do not exercise right now. Contact your doctor or seek emergency care.',
+  },
 };
 
 export function AiRecommendations({ interpretation }: { interpretation: Interpretation }) {
@@ -162,10 +170,11 @@ export function AiRecommendations({ interpretation }: { interpretation: Interpre
             <Text style={recStyles.cardText}>{copy.exercise}</Text>
           </View>
         </View>
-        <Pressable style={recStyles.button} onPress={() => Alert.alert('Coming Soon', 'Exercise tips are on the way.')}>
+        <Pressable style={recStyles.button} onPress={() => router.push('/exercise-tips')}>
           <Text style={recStyles.buttonText}>View Exercise Tips</Text>
         </Pressable>
       </View>
+      <AiDisclaimer />
     </View>
   );
 }

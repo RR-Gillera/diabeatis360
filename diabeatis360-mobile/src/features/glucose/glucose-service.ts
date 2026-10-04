@@ -1,19 +1,10 @@
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { interpretGlucose } from '@/constants/glucose';
 import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
 
-import type { GlucoseLogEntry, GlucoseLogRecord, Interpretation, MealContext } from './types';
-
-// TODO: placeholder thresholds, confirm with adviser before treating as clinically
-// authoritative. Rough ballpark ADA-style ranges (fasting/before-meal vs. post-meal
-// targets differ), not sourced from a vetted clinical reference for this project.
-export function getInterpretation(readingMgdl: number, context: MealContext): Interpretation {
-  if (readingMgdl < 70) return 'low';
-  const highThreshold = context === 'before_meal' ? 130 : 180;
-  if (readingMgdl > highThreshold) return 'high';
-  return 'normal';
-}
+import type { GlucoseLogEntry, GlucoseLogRecord, MealContext } from './types';
 
 export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date) {
   const record: GlucoseLogRecord = {
@@ -22,6 +13,7 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
     context,
     notes: notes.trim(),
     logged_at: Timestamp.fromDate(loggedAt),
+    interpretation: interpretGlucose(readingMgdl, context),
     created_at: serverTimestamp(),
   };
   const reference = await addDoc(collection(db, 'Glucose_Logs'), record);
@@ -29,7 +21,7 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
   // A reading outside the target range raises a real notification, so the
   // patient still gets told to see a doctor even if they leave the result
   // screen immediately. Failing to notify must never fail the log itself.
-  const alert = glucoseAlert(readingMgdl, getInterpretation(readingMgdl, context));
+  const alert = glucoseAlert(readingMgdl, context);
   if (alert) {
     try {
       await createNotification(patientId, 'glucose_alert', alert.message, alert.severity);
@@ -49,6 +41,7 @@ export async function updateGlucoseLog(logId: string, readingMgdl: number, conte
     reading_mgdl: readingMgdl,
     context,
     notes: notes.trim(),
+    interpretation: interpretGlucose(readingMgdl, context),
   });
 }
 
@@ -100,7 +93,7 @@ export function subscribeToGlucoseHistory(
             context,
             notes: String(data.notes ?? ''),
             loggedAt: (data.logged_at as Timestamp | undefined)?.toDate() ?? null,
-            interpretation: getInterpretation(readingMgdl, context),
+            interpretation: interpretGlucose(readingMgdl, context),
           };
         })
         .sort((a, b) => (b.loggedAt?.getTime() ?? 0) - (a.loggedAt?.getTime() ?? 0));
