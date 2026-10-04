@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
+import { PlanComparison } from '@/features/subscription/plan-comparison';
 import {
   activeSubscription,
   cancelSubscription,
@@ -48,6 +49,9 @@ export default function SubscriptionScreen() {
 
   const active = useMemo(() => activeSubscription(subscriptions), [subscriptions]);
   const activePlan = plans.find((plan) => plan.id === active?.planId) ?? null;
+  // The Free plan is stored as data (price 0) for the comparison table; only paid plans can be subscribed to.
+  const paidPlans = useMemo(() => plans.filter((plan) => plan.price > 0), [plans]);
+  const monthlyPlan = paidPlans.find((plan) => plan.durationDays <= 31) ?? paidPlans[0] ?? null;
   const remaining = daysLeft(active?.expiresAt ?? null);
 
   const onSubscribe = async (plan: MembershipPlan) => {
@@ -140,10 +144,12 @@ export default function SubscriptionScreen() {
           )}
         </View>
 
+        <PlanComparison monthlyPrice={monthlyPlan?.price ?? null} showHero={!active} />
+
         <Text style={styles.sectionTitle}>Membership Plans</Text>
-        {plans.length === 0 ? (
+        {paidPlans.length === 0 ? (
           <Text style={styles.empty}>No membership plans are available yet.</Text>
-        ) : plans.map((plan) => {
+        ) : paidPlans.map((plan) => {
           const isCurrent = plan.id === active?.planId;
           return (
             <View key={plan.id} style={[styles.planCard, isCurrent && styles.planCardCurrent]}>

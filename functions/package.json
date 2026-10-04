@@ -1,0 +1,17 @@
+{
+  "name": "diabeatis360-functions",
+  "private": true,
+  "description": "Server-side Gemini calls for Diabeatis360 (DECISIONS.md D1: the app never holds the API key)",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
+  }
+}

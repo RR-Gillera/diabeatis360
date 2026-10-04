@@ -28,6 +28,7 @@ export function subscribeToDoctorProfile(
         consultationFee: Number(data.consultation_fee ?? 0),
         isVerified: Boolean(data.is_verified),
         isActive: data.is_active !== false,
+        rejectionReason: String(data.rejection_reason ?? ''),
         availableDays: Array.isArray(data.available_days) ? data.available_days.map(Number) : [],
         availableRanges: Array.isArray(data.available_ranges)
           ? (data.available_ranges as TimeRange[]).filter((range) => range?.start && range?.end).map((range) => ({ start: String(range.start), end: String(range.end) }))
@@ -123,7 +124,7 @@ export function subscribeToDoctorPatients(
             fullName: existing?.fullName ?? '',
             appointmentCount: (existing?.appointmentCount ?? 0) + 1,
             lastAppointmentAt: !existing?.lastAppointmentAt || (scheduledAt && scheduledAt > existing.lastAppointmentAt) ? scheduledAt : existing.lastAppointmentAt,
-            hasPendingRequest: (existing?.hasPendingRequest ?? false) || data.status === 'scheduled',
+            hasPendingRequest: (existing?.hasPendingRequest ?? false) || data.status === 'pending',
           });
         }
         // Names come from the Users docs — resolved per unique patient rather

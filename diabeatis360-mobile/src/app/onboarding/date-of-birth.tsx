@@ -1,20 +1,43 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AuthButton, authColors, authStyles } from '@/features/auth/auth-ui';
-import { saveOnboardingValue } from '@/features/auth/onboarding';
+import { getOnboardingValue, saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
 import { BirthdateWheels } from '@/features/auth/birthdate-picker';
-
+import { parseBirthdate } from '@/features/auth/birthdate';
+import { isUnderAdultAge } from '@/constants/guardian';
+import type { AccountType } from '@/constants/enums';
 
 export default function DateOfBirthScreen() {
   const router = useRouter();
   const { email, uid } = useAuth();
   const [formatted, setFormatted] = useState<string | null>(null);
+  const [accountType, setAccountType] = useState<AccountType>('self');
+  const [ageError, setAgeError] = useState('');
+
+  // Which "For me" / "For my child" answer this birthdate is being checked against (DECISIONS.md D16).
+  useEffect(() => {
+    if (!email) return;
+    getOnboardingValue(email, 'accountType').then((value) => { if (value === 'minor') setAccountType('minor'); });
+  }, [email]);
 
   const save = async () => {
     if (!email || !formatted) return;
+    setAgeError('');
+    const birthdate = parseBirthdate(formatted);
+    if (birthdate) {
+      const isMinor = isUnderAdultAge(birthdate);
+      if (accountType === 'minor' && !isMinor) {
+        setAgeError("This looks like an adult's birthdate. Guardian accounts are for children under 18.");
+        return;
+      }
+      if (accountType === 'self' && isMinor) {
+        setAgeError("You must be 18 or older to use your own account. If this is for a child, set it up as a child's account instead.");
+        return;
+      }
+    }
     await saveOnboardingValue(email, 'dateOfBirth', formatted, uid);
     router.push('/onboarding/condition');
   };
@@ -31,6 +54,15 @@ export default function DateOfBirthScreen() {
       <Text style={styles.calendar}>▣</Text>
       <Text style={styles.dateText}>{formatted ?? 'Select your date of birth'}</Text>
     </View>
+
+    {ageError ? (
+      <View style={styles.ageErrorBox}>
+        <Text style={styles.ageErrorText}>{ageError}</Text>
+        <Pressable onPress={() => router.push(accountType === 'minor' ? '/onboarding/account-for' : '/onboarding/guardian')}>
+          <Text style={styles.ageErrorLink}>{accountType === 'minor' ? "Go back and choose 'For me'" : "Set up as a child's account"}</Text>
+        </Pressable>
+      </View>
+    ) : null}
 
     <View style={styles.bottom}>
       <AuthButton title="Next  ›" onPress={save} disabled={!formatted} />
@@ -57,4 +89,7 @@ const styles = StyleSheet.create({
   dateText: { color: authColors.navy, fontSize: 15, fontWeight: '800' },
   bottom: { marginTop: 'auto', paddingTop: 28 },
   hint: { color: '#91A4BF', fontSize: 12, marginTop: 24, textAlign: 'center' },
+  ageErrorBox: { backgroundColor: '#FDECEC', borderRadius: 14, gap: 8, marginTop: 20, padding: 16 },
+  ageErrorText: { color: '#B3261E', fontSize: 13, lineHeight: 19 },
+  ageErrorLink: { color: authColors.green, fontSize: 13, fontWeight: '800' },
 });

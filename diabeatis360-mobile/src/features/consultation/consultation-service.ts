@@ -1,7 +1,10 @@
 import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import type { ConsultationStatus } from '@/constants/enums';
 import { createNotification } from '@/features/notifications/notification-service';
+
+export type { ConsultationStatus };
 
 export type SenderRole = 'patient' | 'doctor';
 
@@ -14,22 +17,11 @@ export type ChatMessage = {
   sentAt: Date | null;
 };
 
-export type ConsultationStatus = 'not_started' | 'active' | 'ended';
-
 export type ConsultationState = {
   status: ConsultationStatus;
   summary: string;
   endedAt: Date | null;
 };
-
-/**
- * Deterministic video room for a booking. Both sides derive the same name from
- * the booking ID, so nobody has to send a link — and because Firestore IDs are
- * 20 random characters, the room is effectively unguessable by outsiders.
- */
-export function videoRoomUrl(bookingId: string) {
-  return `https://meet.jit.si/diabeatis360-${bookingId}`;
-}
 
 // Messages live in their own flat collection keyed by booking_id, matching the
 // ERD's convention of plain-string foreign keys rather than subcollections.
@@ -119,11 +111,35 @@ export function subscribeToConsultation(
   );
 }
 
-/** Ends the consultation and records the doctor's written summary. */
-export async function endConsultation(bookingId: string, summary: string) {
+/**
+ * Ends the consultation: the booking becomes `completed` and the chat turns read-only.
+ * Either side can end it. The doctor writes the summary while ending; when the PATIENT ends it the summary
+ * is empty and the doctor can add one afterwards with saveConsultationSummary.
+ */
+export async function endConsultation(bookingId: string, summary: string, endedBy: SenderRole) {
   await setDoc(doc(db, 'Bookings', bookingId), {
+    status: 'completed',
     consultation_status: 'ended',
-    consultation_summary: summary.trim(),
+    consultation_summary: endedBy === 'doctor' ? summary.trim() : '',
     consultation_ended_at: serverTimestamp(),
+    consultation_ended_by: endedBy,
   }, { merge: true });
+
+  // Tell the other party. Failing to notify must never undo the end itself.
+  try {
+    const booking = await getDoc(doc(db, 'Bookings', bookingId));
+    const data = booking.data();
+    if (!data) return;
+    const recipientId = endedBy === 'doctor' ? String(data.patient_id ?? '') : String(data.provider_id ?? '');
+    if (!recipientId) return;
+    const who = endedBy === 'doctor' ? 'Your doctor' : 'Your patient';
+    await createNotification(recipientId, 'booking_update', `${who} ended the consultation.`, 'info', bookingId);
+  } catch {
+    // Swallowed on purpose: the consultation is already ended.
+  }
+}
+
+/** Lets the doctor add or change the written summary after the consultation ended (e.g. the patient ended it). */
+export async function saveConsultationSummary(bookingId: string, summary: string) {
+  await setDoc(doc(db, 'Bookings', bookingId), { consultation_summary: summary.trim() }, { merge: true });
 }

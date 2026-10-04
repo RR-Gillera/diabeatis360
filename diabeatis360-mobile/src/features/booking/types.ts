@@ -1,5 +1,11 @@
 import type { Timestamp } from 'firebase/firestore';
 
+import type { BookingStatus, PaymentStatus } from '@/constants/enums';
+
+// The status enums live in one place (constants/enums.ts, DECISIONS.md D6);
+// re-exported here so existing imports keep working.
+export type { BookingStatus, PaymentStatus };
+
 export type Provider = {
   id: string;
   fullName: string;
@@ -8,14 +14,14 @@ export type Provider = {
   city: string;
   consultationFee: number;
   isVerified: boolean;
+  isActive: boolean;
 };
 
 export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';
 
-// Payment now happens AFTER the doctor accepts, so a booking carries a payment
-// state of its own rather than only existing once money changed hands.
-// 'onsite' means settled in person at the clinic, not online.
-export type PaymentStatus = 'unpaid' | 'paid' | 'onsite';
+// Payment now happens AFTER the doctor confirms, so a booking carries a payment
+// state of its own (PaymentStatus) rather than only existing once money changed
+// hands. 'onsite' means settled in person at the clinic, not online.
 
 export type BookingDraft = {
   provider: Provider | null;
@@ -25,14 +31,14 @@ export type BookingDraft = {
   bookingId: string | null;
 };
 
-export type BookingStatus = 'scheduled' | 'accepted' | 'declined';
-
 export type BookingRecord = {
   patient_id: string;
   provider_id: string;
   status: BookingStatus;
   scheduled_at: Timestamp;
   fee: number;
+  /** 15% of the fee (DECISIONS.md D3), stored so admin revenue never depends on the current rate. */
+  platform_commission: number;
   payment_status: PaymentStatus;
   payment_method: PaymentMethod | null;
   /** Assigned when the doctor accepts — null while the request is pending. */

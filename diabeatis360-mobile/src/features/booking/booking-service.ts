@@ -1,7 +1,8 @@
-import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 import type { DocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { platformCommission } from '@/constants/commission';
 import { createNotification } from '@/features/notifications/notification-service';
 
 import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, PaymentMethod, PaymentStatus, Provider, ProviderBookingEntry } from './types';
@@ -19,6 +20,7 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
     city: String(data.city ?? 'Philippines'),
     consultationFee: Number(data.consultation_fee ?? 0),
     isVerified: Boolean(data.is_verified),
+    isActive: data.is_active !== false,
   };
 }
 
@@ -33,21 +35,62 @@ export function subscribeToProviders(
   );
 }
 
+// The doctor directory: only doctors an admin verified and who are still active can be booked (module 10).
+// subscribeToProviders stays unfiltered because booking history still needs the names of doctors who were
+// later deactivated.
+export function subscribeToBookableProviders(
+  onChange: (providers: Provider[]) => void,
+  onError: (error: Error) => void,
+) {
+  return subscribeToProviders(
+    (providers) => onChange(providers.filter((provider) => provider.isVerified && provider.isActive)),
+    onError,
+  );
+}
+
+// The booking's document id is the doctor plus the slot (UTC, so every device agrees), e.g.
+// "<providerId>_202609281400". Two patients picking the same slot therefore write the SAME document, which is
+// what makes double-booking impossible rather than merely unlikely.
+export function bookingIdFor(providerId: string, slot: Date) {
+  return `${providerId}_${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`;
+}
+
 // Creates the booking as a REQUEST: the doctor has to accept before the patient
 // is asked to pay, so no payment method is chosen here and nothing is marked paid.
+// A slot is free if nobody booked it, or the earlier booking was declined/cancelled; anything else means
+// someone got there first. firestore.rules enforces the same thing, so this is the friendly error, not the guard.
 export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number) {
+  // A pediatric account (DECISIONS.md D16) may not book a consultation until an admin approves the guardian
+  // verification. firestore.rules enforces the same rule; this is only the friendly message before that.
+  const patientSnapshot = await getDoc(doc(db, 'Users', patientId));
+  if (patientSnapshot.data()?.account_type === 'minor') {
+    const guardianSnapshot = await getDoc(doc(db, 'Guardian_Verifications', patientId));
+    if (guardianSnapshot.data()?.verification_status !== 'approved') {
+      throw new Error('This account needs guardian verification to be approved before booking a consultation. An admin is reviewing it, or you can resubmit it from Profile if it was rejected.');
+    }
+  }
+
+  const reference = doc(db, 'Bookings', bookingIdFor(providerId, selectedDate));
   const record: BookingRecord = {
     patient_id: patientId,
     provider_id: providerId,
-    status: 'scheduled',
+    status: 'pending',
     scheduled_at: Timestamp.fromDate(selectedDate),
     fee,
+    platform_commission: platformCommission(fee),
     payment_status: 'unpaid',
     payment_method: null,
     queue_number: null,
     created_at: serverTimestamp(),
   };
-  const reference = await addDoc(collection(db, 'Bookings'), record);
+  await runTransaction(db, async (transaction) => {
+    const existing = await transaction.get(reference);
+    const status = existing.data()?.status;
+    if (existing.exists() && status !== 'declined' && status !== 'cancelled') {
+      throw new Error('That time slot was just booked by someone else. Please pick another time.');
+    }
+    transaction.set(reference, record);
+  });
   return reference.id;
 }
 
@@ -83,7 +126,7 @@ export function subscribeToBookingHistory(
             provider,
             patientId: String(data.patient_id ?? ''),
             patientName: '',
-            status: String(data.status ?? 'scheduled'),
+            status: String(data.status ?? 'pending'),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
@@ -125,7 +168,7 @@ export function subscribeToBooking(
           provider: providerSnapshot?.exists() ? providerFromDoc(providerSnapshot) : null,
           patientId,
           patientName: String(patientSnapshot?.data()?.full_name ?? ''),
-          status: String(data.status ?? 'scheduled'),
+          status: String(data.status ?? 'pending'),
           scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
           fee: Number(data.fee ?? 0),
           paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
@@ -162,7 +205,7 @@ export function subscribeToBookingsForProvider(
             patientName: String(patientSnapshot?.data()?.full_name ?? 'Unknown patient'),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
-            status: (data.status ?? 'scheduled') as BookingStatus,
+            status: (data.status ?? 'pending') as BookingStatus,
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
             queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
@@ -191,7 +234,7 @@ async function resequenceQueue(providerId: string, day: Date) {
     .filter((entry) => {
       const data = entry.data();
       const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
-      return data.status === 'accepted' && scheduledAt?.toDateString() === day.toDateString();
+      return data.status === 'confirmed' && scheduledAt?.toDateString() === day.toDateString();
     })
     .sort((a, b) => {
       const left = (a.data().scheduled_at as Timestamp | undefined)?.toDate()?.getTime() ?? 0;
@@ -224,7 +267,7 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   const reference = doc(db, 'Bookings', bookingId);
   const snapshot = await getDoc(reference);
   const data = snapshot.data();
-  await updateDoc(reference, { status, ...(status === 'declined' ? { queue_number: null } : {}) });
+  await updateDoc(reference, { status, ...((status === 'declined' || status === 'cancelled') ? { queue_number: null } : {}) });
   if (!data) return;
 
   const providerId = String(data.provider_id ?? '');
@@ -233,7 +276,7 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   if (!providerId || !scheduledAt) return;
 
   const positions = await resequenceQueue(providerId, scheduledAt);
-  if (status !== 'accepted' || !patientId) return;
+  if (status !== 'confirmed' || !patientId) return;
 
   const providerSnapshot = await getDoc(doc(db, 'Providers', providerId));
   const doctorName = String(providerSnapshot.data()?.full_name ?? 'your doctor');
@@ -266,7 +309,7 @@ export function subscribeToBookedTimes(
       const bookedTimes = new Set<string>();
       for (const document of snapshot.docs) {
         const data = document.data();
-        if (data.status === 'declined') continue;
+        if (data.status === 'declined' || data.status === 'cancelled') continue;
         const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
         if (!scheduledAt || scheduledAt.toDateString() !== date.toDateString()) continue;
         // hour: '2-digit' zero-pads to match the "09:30 AM"-style labels in the time picker.

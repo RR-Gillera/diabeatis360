@@ -1,12 +1,12 @@
 import { SymbolView } from 'expo-symbols';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Fonts, Spacing } from '@/constants/theme';
+import { Brand, Fonts, Spacing } from '@/constants/theme';
 
 export const bookingColors = {
   navy: '#10182D',
-  green: '#5D9F27',
-  background: '#F5F7F9',
+  green: Brand.colors.primary,
+  background: Brand.colors.background,
   muted: '#70819D',
   border: '#DDE5EF',
   paleGreen: '#EAF6E5',

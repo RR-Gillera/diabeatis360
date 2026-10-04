@@ -16,6 +16,8 @@ const firestoreFields: Record<string, string> = {
   activity: 'activity_level',
   diet: 'dietary_preference',
   language: 'language_preference',
+  // 'self' or 'minor' (DECISIONS.md D16) — already the lowercase code the rules and enums.ts expect.
+  accountType: 'account_type',
 };
 
 /**

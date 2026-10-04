@@ -20,7 +20,8 @@ export default function ProfileTypeScreen() {
     // Providers doc and marks onboarding complete. Finishing here instead would
     // publish a doctor with a blank specialty and no licence number — bookable
     // by patients before anyone had checked they were real.
-    router.push(profileType === 'doctor' ? '/onboarding/professional-info' : '/onboarding/date-of-birth');
+    // Patients go through "For me" / "For my child" first (DECISIONS.md D16, UT-005).
+    router.push(profileType === 'doctor' ? '/onboarding/professional-info' : '/onboarding/account-for');
   };
   return <View style={[authStyles.screen, styles.screen]}><View style={styles.progress}><Text style={styles.progressLabel}>INITIAL SETUP</Text><Text style={styles.step}>{percent}% Complete</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${percent}%` }]} /></View><Text style={styles.title}>Choose Your{`\n`}Profile Type</Text><Text style={styles.subtitle}>Select the role that best describes your usage of Diabeatis360.</Text><Option title="Patient / User" detail="Track blood sugar, meals, and consult with specialists." selected={profileType === 'patient'} onPress={() => setProfileType('patient')} icon="♥" /><Option title="Medical Doctor" detail="Manage telehealth appointments, view patient logs, and provide expert care." selected={profileType === 'doctor'} onPress={() => setProfileType('doctor')} icon="♧" /><View style={styles.bottom}><AuthButton title="Next Step  →" onPress={finish} /></View></View>;
 }

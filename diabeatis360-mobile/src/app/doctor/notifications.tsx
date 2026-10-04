@@ -35,7 +35,7 @@ type Notice = {
 function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
   return appointments.map((entry) => {
     const when = entry.scheduledAt;
-    if (entry.status === 'scheduled') {
+    if (entry.status === 'pending') {
       return {
         id: entry.id, patientId: entry.patientId,
         title: 'New booking request',
@@ -43,12 +43,28 @@ function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
         when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: '#B45309', background: '#FEF3C7',
       };
     }
-    if (entry.status === 'accepted') {
+    if (entry.status === 'confirmed') {
       return {
         id: entry.id, patientId: entry.patientId,
         title: 'Appointment confirmed',
         detail: `You accepted ${entry.patientName}'s consultation${when ? ` on ${when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}.`,
         when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint,
+      };
+    }
+    if (entry.status === 'completed') {
+      return {
+        id: entry.id, patientId: entry.patientId,
+        title: 'Consultation completed',
+        detail: `Your consultation with ${entry.patientName} has ended.`,
+        when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: '#475569', background: '#F1F5F9',
+      };
+    }
+    if (entry.status === 'cancelled') {
+      return {
+        id: entry.id, patientId: entry.patientId,
+        title: 'Appointment cancelled',
+        detail: `${entry.patientName} cancelled their consultation request.`,
+        when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
       };
     }
     return {
@@ -79,8 +95,8 @@ export default function DoctorNotificationsScreen() {
   }, [uid]);
 
   const notices = useMemo(() => {
-    // Chat notifications are real Notifications docs; booking activity is derived
-    // from the bookings themselves. Both belong in one list for the doctor.
+    // Chat and credential-review notifications are real Notifications docs; booking activity is derived
+    // from the bookings themselves. All three belong in one list for the doctor.
     const messageNotices: Notice[] = stored
       .filter((entry) => entry.type === 'message')
       .map((entry) => ({
@@ -97,7 +113,22 @@ export default function DoctorNotificationsScreen() {
         color: homeColors.green,
         background: homeColors.greenTint,
       }));
-    const list = [...messageNotices, ...toNotices(appointments)];
+    const verificationNotices: Notice[] = stored
+      .filter((entry) => entry.type === 'doctor_verification')
+      .map((entry) => ({
+        id: entry.id,
+        patientId: '',
+        notificationId: entry.id,
+        unread: !entry.isRead,
+        title: entry.severity === 'warning' ? 'Credential review: changes needed' : 'Credentials verified',
+        detail: entry.message,
+        when: entry.sentAt,
+        icon: entry.severity === 'warning' ? 'exclamationmark.triangle.fill' as const : 'checkmark.seal.fill' as const,
+        iconAndroid: entry.severity === 'warning' ? 'warning' as const : 'verified' as const,
+        color: entry.severity === 'warning' ? '#D9364F' : homeColors.green,
+        background: entry.severity === 'warning' ? '#FBE6E9' : homeColors.greenTint,
+      }));
+    const list = [...messageNotices, ...verificationNotices, ...toNotices(appointments)];
     // Pending requests first, then most recent — the doctor's action queue
     // matters more than strict chronology.
     return list.sort((a, b) => {

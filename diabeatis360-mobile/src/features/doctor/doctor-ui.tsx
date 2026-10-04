@@ -4,12 +4,15 @@ import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { homeColors } from '@/features/home/home-ui';
+import { enumLabel } from '@/constants/enums';
 import type { BookingStatus } from '@/features/booking/types';
 
 export const statusStyle: Record<BookingStatus, { label: string; color: string; background: string }> = {
-  scheduled: { label: 'Pending', color: '#B45309', background: '#FEF3C7' },
-  accepted: { label: 'Accepted', color: homeColors.green, background: homeColors.greenTint },
-  declined: { label: 'Declined', color: '#D9364F', background: '#FBE6E9' },
+  pending: { label: enumLabel('bookingStatus', 'pending'), color: '#B45309', background: '#FEF3C7' },
+  confirmed: { label: enumLabel('bookingStatus', 'confirmed'), color: homeColors.green, background: homeColors.greenTint },
+  completed: { label: enumLabel('bookingStatus', 'completed'), color: '#475569', background: '#F1F5F9' },
+  declined: { label: enumLabel('bookingStatus', 'declined'), color: '#D9364F', background: '#FBE6E9' },
+  cancelled: { label: enumLabel('bookingStatus', 'cancelled'), color: '#D9364F', background: '#FBE6E9' },
 };
 
 type DoctorTab = 'home' | 'appointments' | 'patients' | 'profile';
@@ -66,7 +69,7 @@ export function DoctorHeader({ title, subtitle, onBack, badgeCount }: { title: s
 }
 
 export function StatusPill({ status }: { status: BookingStatus }) {
-  const style = statusStyle[status] ?? statusStyle.scheduled;
+  const style = statusStyle[status] ?? statusStyle.pending;
   return (
     <View style={[styles.pill, { backgroundColor: style.background }]}>
       <Text style={[styles.pillText, { color: style.color }]}>{style.label}</Text>
