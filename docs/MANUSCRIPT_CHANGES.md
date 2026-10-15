@@ -41,8 +41,8 @@ To find a passage in Word, press Ctrl+F and paste the quoted words.
   - **Built:** two AI features, meal and exercise recommendations and nutrition-label analysis (plus the barcode product lookup).
   - **Edit:** remove them from the described system and list them under Recommendations (E5). **[TEAM]** Only keep the statements if you build the risk screen (ROADMAP Tier 7).
 
-- [ ] **A5. Technology stack wording** (D1)
-  - "The back end will be built with Node.js and Express.js": the build uses Firebase Cloud Functions on the Node.js 22 runtime (`firebase-functions`, Gemini through `@google/genai`). There is no Express server.
+- [ ] **A5. Technology stack wording** (D1, D19)
+  - "The back end will be built with Node.js and Express.js": since D19 (2026-10-15), the AI back end is **Node.js serverless functions hosted on Vercel** (free plan, Singapore region), which call Gemini over its REST API. The same code can also run as Firebase Cloud Functions if the project ever moves to Blaze. There is no Express server. Write it like that in the Technology Stack, the Network Model ("app → Vercel functions → Gemini"; the key never on the phone), and the software table (add Vercel).
   - "styled with NativeWind" (Technology Stack) and "React Native, Expo, and NativeWind" (Network Model, Presentation Layer): the app uses React Native `StyleSheet` with shared theme tokens. NativeWind and Tailwind are listed in the mobile `package.json`, but there is no Tailwind config and no screen uses NativeWind classes (70 of the 88 `.tsx` files use `StyleSheet.create`). **[TEAM]** Reword to "StyleSheet with a shared theme". Optionally ask Claude to remove the unused packages.
   - The admin line (React, Vite, Tailwind CSS, Recharts) is correct.
   - Table 22 (Software Specifications) lists only the OS, Figma, VS Code, the browser and Firestore. Add what the project uses: Expo and React Native, Firebase Authentication, Cloud Firestore, Cloud Functions, Storage, the Gemini API, React and Vite.

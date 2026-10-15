@@ -4,6 +4,9 @@ Status 2026-10-04: the Firebase project `diabeatis360-b2ab8` **cannot be upgrade
 This guide is split in two. **Part A works on the free Spark plan; do it now.** **Part B needs Blaze; do it when billing is possible.** Part C says exactly what a Spark-only test can and cannot cover.
 **[PERSON]** steps need your own login or phone, and Claude never sees a key. Details of the AI functions are in `functions/README.md`.
 
+> **Update 2026-10-15 (DECISIONS D19): the AI no longer needs Blaze.** The same AI code now also runs on a free **Vercel** server (section **A7**). Once A7 is done and the app has `EXPO_PUBLIC_AI_BASE_URL`, AI meals and exercise, the label scanner and product lookup work on Spark. Only the **guardian ID photo** (Cloud Storage) still needs Blaze. The tables below describe the app **before** A7, or with no AI address set.
+> **Live since 2026-10-15:** Firestore rules, and the admin panel at https://diabeatis360-b2ab8.web.app.
+
 | Works on Spark (Part A) | Needs Blaze (Part B) |
 |---|---|
 | Authentication (Email/Password) | Cloud Functions: AI meals and exercise, nutrition label scanner, product lookup |
@@ -111,9 +114,28 @@ EAS does not need a paid Firebase plan. Respondents install an APK instead of ru
 
 Record every result in `docs/TEST_LOG.md` with the tester's name; that is what lets ROADMAP rows become `[x]`.
 
+## A7. AI on Spark: the free Vercel server (DECISIONS D19)
+The three AI functions run on Vercel instead of Cloud Functions. The code is `functions/api/*.js` (thin wrappers) around the same `functions/lib/handlers.js`. The Gemini key and the service account stay on Vercel, only signed-in users get answers, and the Free limits, allergen filter and critical-reading block are still enforced on the server.
+1. **Gemini key [PERSON]:** https://aistudio.google.com/apikey > **Create API key** (signed in as diabeatis360@gmail.com). Keep it private. On the free tier Google may use prompts to improve its products. The prompts contain diabetes type, allergies and the latest reading but no names, so mention it in the manuscript's limitations.
+2. **Vercel account [PERSON]:** https://vercel.com/signup > **Hobby** > **Continue with GitHub**. No card needed.
+3. **Service-account key [PERSON]:** Firebase console > Project settings > Service accounts > **Generate new private key**. Keep the file private; it gives full access to the project.
+4. **Sign the CLI in [PERSON]:** in your own terminal, `npx.cmd vercel login` > Continue with GitHub.
+5. **Create the project (Claude):** from `functions/`, `npx vercel` links a new project, then deploys. `vercel.json` puts it in Singapore (`sin1`), next to Firestore, with 60 s for Gemini.
+6. **Two environment variables [PERSON]:** vercel.com > the project > Settings > Environment Variables. Tick Production and Preview, and mark each as Sensitive:
+   - `GEMINI_API_KEY`: the key from step 1.
+   - `FIREBASE_SERVICE_ACCOUNT`: the **whole contents** of the service-account `.json` file.
+**Live address (2026-10-15): https://diabeatis360-ai.vercel.app** (Vercel project `diabeatis360-ai`, region sin1). Signed-out calls already get 401; it needs the two environment variables below before it can answer.
+7. **Production deploy (Claude):** `npx vercel --prod` from `functions/`. Check that `https://<project>.vercel.app/api/generateRecommendations` answers a signed-out POST with **401 UNAUTHENTICATED**.
+8. **Point the app at it:** add `EXPO_PUBLIC_AI_BASE_URL=https://<project>.vercel.app` to `diabeatis360-mobile/.env`, and push it to EAS (`npx eas-cli env:push preview --path .env`) before building the APK.
+
+Tested locally on 2026-10-15: `npm test` in `functions/` (10 wrapper tests), plus the end-to-end run with the real Firebase client SDK, the emulators and a fake Gemini, 8/8:
+`firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node --test functions/test/vercel-e2e.test.js"`.
+
 ---
 
 # Part B: needs Blaze (later)
+
+> Since D19 only **B2 step 1 (Storage)** and its rules are needed for Spark's last gap, the guardian ID photo. Deploying the functions to Firebase is optional: the Vercel server already does the same job.
 
 ## B1. Upgrade **[PERSON]**
 Upgrade `diabeatis360-b2ab8` to **Blaze** and set a budget alert (Google Cloud console > Billing > Budgets & alerts, for example PHP 50). Capstone usage stays inside the free quota.
@@ -144,6 +166,8 @@ Check: `npx firebase functions:list` shows `generateRecommendations`, `analyzeLa
 # Part C: what a Spark-only test can and cannot cover (Table 24)
 
 Table 24 has 23 module-points and 57 function-by-role ticks.
+
+> **After A7 (Vercel AI) is live**, AI Health Assistant and Nutrition Scanner become fully testable on Spark, the Subscription and Blood Sugar caveats go away, and **21 of 23 module-points are fully testable**. The remaining 2 (Account Management and Health Profile, Patient) only lack the child-account branch, which needs Storage (Blaze). UT-009 to UT-012, IT-002, IT-005 and Table 29 rows 4 and 5 can then be recorded; only UT-005 waits for Blaze. The text below describes Spark **without** A7.
 
 **Cannot be tested on Spark: 4 ticks, 2 module-points (Patient).**
 
