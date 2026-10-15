@@ -1,8 +1,9 @@
 import { doc, onSnapshot, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getDownloadURL, list, ref, uploadBytes } from 'firebase/storage';
 
 import { db, storage } from '@/firebase';
 import type { GuardianRelationship } from '@/constants/enums';
+import { FEATURE_UNAVAILABLE_TITLE, isStorageMissing } from '@/lib/feature-unavailable';
 
 /**
  * Pediatric accounts under guardian supervision (DECISIONS.md D16; manuscript Scope & Limitations, UT-005).
@@ -18,6 +19,31 @@ export type GuardianVerification = {
   rejectionReason: string;
   submittedAt: Date | null;
 };
+
+/** Shown when the ID photo cannot be stored because Cloud Storage is not set up yet (the Firebase project is not on the Blaze plan). */
+export const GUARDIAN_UPLOAD_UNAVAILABLE =
+  `${FEATURE_UNAVAILABLE_TITLE}. A child's account needs the guardian's ID photo, and photo upload is still being set up. Please check back soon.`;
+
+/**
+ * Asks Cloud Storage whether it exists, without saving anything. Choosing "For my child" is permanent (firestore.rules:
+ * account_type is set once) and a child's account cannot be verified without the ID photo, so the app checks this
+ * BEFORE that choice is saved, instead of letting someone lock in a child's account that can never be verified.
+ * Listing a folder the rules do not let us list answers 403 ("forbidden") when the bucket exists and 404 ("not
+ * found") when it does not, so no real file is needed. Only a clear "not found" says no: being offline, slow or any
+ * other answer counts as available, so nobody is blocked on a guess.
+ */
+export async function isGuardianPhotoStorageAvailable(): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), 8000); });
+    await Promise.race([list(ref(storage, 'guardian_ids'), { maxResults: 1 }), timeout]);
+    return true;
+  } catch (error) {
+    return !isStorageMissing(error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Uploads the guardian's ID photo (its local `file://` URI, as `expo-camera` returns it) to a path only the
@@ -50,7 +76,16 @@ export async function submitGuardianVerification(
   relationship: GuardianRelationship,
   photoUri: string,
 ) {
-  const photoUrl = await uploadGuardianId(uid, photoUri);
+  let photoUrl: string;
+  try {
+    photoUrl = await uploadGuardianId(uid, photoUri);
+  } catch (error) {
+    // "Not available yet" when Storage does not exist; otherwise a short plain message (with Firebase's error code,
+    // which helps the team during testing) instead of Firebase's long wording.
+    if (isStorageMissing(error)) throw new Error(GUARDIAN_UPLOAD_UNAVAILABLE);
+    const code = typeof error === 'object' && error && 'code' in error ? ` (${String((error as { code: unknown }).code)})` : '';
+    throw new Error(`We could not upload the ID photo${code}. Please check your connection and try again.`);
+  }
   await setDoc(doc(db, 'Guardian_Verifications', uid), {
     user_id: uid,
     guardian_full_name: guardianFullName.trim(),

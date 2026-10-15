@@ -5,11 +5,15 @@ import type {
   ExerciseSuggestion, LabelAnalysis, MealSuggestion, ProductLookup, RecommendationResult, SuggestionKind,
 } from '@/features/ai/types';
 
+import { FEATURE_UNAVAILABLE_MESSAGE, isFunctionMissing } from './feature-unavailable';
+
 // The ONLY place the app asks for AI output (DECISIONS.md D1, option A). It calls Firebase Cloud Functions; the
 // Gemini key never exists in the app. The functions read the user's profile and latest reading themselves, so the
 // app sends almost nothing, and they enforce sign-in, the critical-reading block and the Free-plan daily limits.
 
-export type AiErrorCode = 'limit' | 'unavailable' | 'signed-out' | 'invalid' | 'unknown';
+// 'feature-unavailable' = the function is not deployed at all (the Firebase project is not on the Blaze plan yet);
+// 'unavailable' = it exists but could not be reached or is busy right now, so trying again can work.
+export type AiErrorCode = 'limit' | 'unavailable' | 'feature-unavailable' | 'signed-out' | 'invalid' | 'unknown';
 
 export class AiError extends Error {
   code: AiErrorCode;
@@ -23,6 +27,7 @@ function toAiError(error: unknown): AiError {
   const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
   // The Functions client can append the HTTP status to the server's message ("... tomorrow. [429]"); people should not see it.
   const message = error instanceof Error ? error.message.replace(/\s*\[\d{3}\]\s*$/, '') : '';
+  if (isFunctionMissing(error)) return new AiError('feature-unavailable', FEATURE_UNAVAILABLE_MESSAGE);
   if (code === 'functions/resource-exhausted') return new AiError('limit', message || 'You have reached today\'s free limit.');
   if (code === 'functions/unauthenticated') return new AiError('signed-out', 'Please sign in again to use this feature.');
   if (code === 'functions/invalid-argument') return new AiError('invalid', message || 'That request was not valid.');

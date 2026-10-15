@@ -37,7 +37,9 @@ payment chips (the app only records `unpaid`/`paid`/`onsite`, payment is mocked)
   `firebase-admin` or `serviceAccountKey*.json` from `src/`. `serviceAccountKey.json` is gitignored.
 - Env vars need the `VITE_` prefix and are public in the browser bundle: config only, never secrets.
   `.env` is gitignored; share it privately. `VITE_USE_EMULATORS=true` points the panel at the local
-  Auth (9099) + Firestore (8080) emulators for testing.
+  Auth (9099) + Firestore (8080) emulators for testing. The flag is ignored on `*.web.app` and
+  `*.firebaseapp.com` (`src/firebase.js`), so a hosted build can never use emulators. Hosting steps:
+  `../docs/GO_LIVE.md` A4 (`firebase.json` serves `dist/`; build with the flag forced off).
 - Scripts: `npm run dev`, `npm run build`, `npm run lint`. Keep lint and build clean.
 - No PDF library: reports and receipts open a print view (`src/lib/printHtml.js`); "Save as PDF" is in the
   browser's print dialog. CSV is built by `src/lib/csv.js`.

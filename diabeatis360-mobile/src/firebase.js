@@ -36,7 +36,9 @@ export const auth = Platform.OS === 'web'
 // Opt-in local testing: with EXPO_PUBLIC_USE_EMULATORS=true the app talks to the Firebase emulators
 // (firebase emulators:start) instead of the real project, so no real data is touched. Off by default.
 // On a physical phone set EXPO_PUBLIC_EMULATOR_HOST to your computer's LAN IP instead of 127.0.0.1.
-if (process.env.EXPO_PUBLIC_USE_EMULATORS === 'true') {
+// Only honoured in development (Expo Go / the dev server): a release build such as the EAS APK ignores it, so a
+// stray flag in the build's environment can never point installed apps at emulators that do not exist.
+if (__DEV__ && process.env.EXPO_PUBLIC_USE_EMULATORS === 'true') {
   const host = process.env.EXPO_PUBLIC_EMULATOR_HOST || '127.0.0.1';
   connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
   connectFirestoreEmulator(db, host, 8080);

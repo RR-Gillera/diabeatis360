@@ -14,6 +14,7 @@ import { ScanResult } from '@/features/scanner/scan-result';
 import { canUseFeature } from '@/features/subscription/subscription-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { AiError, requestLabelAnalysis, requestProductLookup } from '@/lib/ai';
+import { FEATURE_UNAVAILABLE_DETAIL, FEATURE_UNAVAILABLE_TITLE } from '@/lib/feature-unavailable';
 
 type Phase = 'camera' | 'analyzing' | 'result' | 'retry';
 
@@ -158,14 +159,17 @@ export default function ScannerScreen() {
   }
 
   if (phase === 'retry') {
+    // The scan function is not deployed yet (the Firebase project is not on the Blaze plan): trying again cannot
+    // help, and the camera would just re-read the same barcode, so this screen offers only Back.
+    const unavailable = error?.code === 'feature-unavailable';
     return (
       <View style={[styles.light, styles.center]}>
         <SymbolView name={{ ios: 'exclamationmark.circle', android: 'error', web: 'error' }} size={40} tintColor={Brand.colors.warning} />
-        <AppText weight="bold" style={styles.retryTitle}>{error?.code === 'limit' ? 'Daily scan limit reached' : 'Let\'s try that again'}</AppText>
-        <AppText style={styles.retryText}>{error ? error.message : message}</AppText>
+        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? FEATURE_UNAVAILABLE_TITLE : error?.code === 'limit' ? 'Daily scan limit reached' : 'Let\'s try that again'}</AppText>
+        <AppText style={styles.retryText}>{unavailable ? FEATURE_UNAVAILABLE_DETAIL : error ? error.message : message}</AppText>
         {error?.code === 'limit' ? (
           <PrimaryButton title="Upgrade to Premium" onPress={() => router.push('/subscription')} style={styles.retryButton} />
-        ) : (
+        ) : unavailable ? null : (
           <PrimaryButton title="Scan Again" onPress={scanAgain} style={styles.retryButton} />
         )}
         <PrimaryButton title="Back" variant="outline" onPress={() => goBack()} style={styles.retryButton} />

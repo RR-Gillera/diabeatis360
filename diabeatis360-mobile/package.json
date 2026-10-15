@@ -50,7 +50,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --test \"src/constants/*.test.mjs\" \"src/features/reminders/*.test.mjs\""
+    "test": "node --test \"src/constants/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/lib/*.test.mjs\""
   },
   "private": true
 }

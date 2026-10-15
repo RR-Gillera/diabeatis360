@@ -111,7 +111,9 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
           <View style={styles.pad}>
             <PrimaryButton title={saved ? 'Generate new suggestions' : 'Generate suggestions'} onPress={generate} loading={busy} />
             {usage ? <AppText style={styles.usage}>{usage}</AppText> : null}
-            {error ? (
+            {error?.code === 'feature-unavailable' ? (
+              <AppText style={styles.unavailable}>{error.message}</AppText>
+            ) : error ? (
               <View style={styles.errorBox}>
                 <AppText style={styles.errorText}>{error.message}</AppText>
                 {error.code === 'limit' ? (
@@ -175,6 +177,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24 },
   subtitle: { color: Brand.colors.textMuted, fontSize: 16, lineHeight: 24, paddingBottom: 16, paddingHorizontal: Brand.sizes.screenPadding },
   notice: { backgroundColor: Brand.colors.warningTint, borderRadius: 16, color: Brand.colors.text, fontSize: 14, lineHeight: 21, marginBottom: 12, overflow: 'hidden', padding: 16 },
+  unavailable: { backgroundColor: Brand.colors.warningTint, borderRadius: 16, color: Brand.colors.text, fontSize: 14, lineHeight: 21, marginTop: 12, overflow: 'hidden', padding: 16 },
   usage: { color: Brand.colors.textMuted, fontSize: 13, marginTop: 10, textAlign: 'center' },
   errorBox: { backgroundColor: Brand.colors.dangerTint, borderRadius: 16, gap: 12, marginTop: 12, padding: 16 },
   errorText: { color: Brand.colors.danger, fontSize: 14, lineHeight: 21 },

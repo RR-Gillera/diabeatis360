@@ -34,6 +34,10 @@ out with a message. A provider with `is_verified == false` sees a "pending verif
   `auth.currentUser` in a mount effect (`app/booking/select-date-time.tsx` still does the latter).
 - Env vars must be prefixed `EXPO_PUBLIC_` to reach the app. Anything EXPO_PUBLIC_ is bundled into
   the app and is NOT secret. Never put the Gemini key there: DECISIONS.md D1 routes all AI calls through Cloud Functions.
+  `EXPO_PUBLIC_USE_EMULATORS` is ignored in release builds (`src/firebase.js`).
+- Features that need the Blaze plan (the AI Cloud Functions, Storage for the guardian ID photo) must never show a
+  raw Firebase error or crash when the service does not exist yet: recognise it with `src/lib/feature-unavailable.ts`
+  and show its "This feature isn't available yet" message (DECISIONS.md D18, `../docs/GO_LIVE.md`). `npm test` checks it.
 - Scripts: `npm run lint` (expo lint). No typecheck script; use `npx tsc --noEmit`.
 - Testing happens in **Expo Go on a physical phone**. Things that need a development build
   (not Expo Go): native Google Sign-In, remote push notifications. Don't choose a library that
