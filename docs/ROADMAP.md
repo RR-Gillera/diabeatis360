@@ -12,7 +12,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Mobile: single `src/firebase.js` with RN auth persistence ✔; bottom nav shell ✔; `Brand` theme tokens + Inter loaded ✔ (newer screens use them, older screens still use the system font); `npm run lint` works (3 pre-existing errors: profile.tsx x2, Expo template hook)
 - [x] Admin: auth guard (`AdminRoute`) + layout shell built and tested end to end against the Firebase emulators (2026-09-26): router, Tailwind 4, `Layout`, `AuthContext`; 15/15 headless-browser checks pass
 - [x] Glucose thresholds constants + `interpretGlucose()` with tests (DECISIONS D4): `constants/glucose.ts` + 9 unit tests (`npm test`, all pass), critical class added (2026-09-26)
-- [~] Docs hygiene: `LIST_OF_MODULES.md` restored to the official Table 24 (2026-09-26, check it against the signed copy); `docs/` is still untracked in git; the earlier PROGRESS log was lost [item 0a]
+- [~] Docs hygiene: `LIST_OF_MODULES.md` restored to the official Table 24 (2026-09-26); compared by script with Table 24 in the committed manuscript on 2026-10-04 and identical (40 functions, 57 role ticks, 23 points), but the signed paper copy itself was not seen; `docs/` is now tracked in git; the earlier PROGRESS log was lost [item 0a]
 
 ## Tier 1 — Accounts & profile (Account Mgmt P/D/A, Health Profile P/D)
 - [~] Patient: sign up → role gate → onboarding steps → Users doc → dashboard (email verification is mocked)
@@ -63,7 +63,9 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 ## Tier 7 — If time allows
 - [ ] AI Diabetes Risk Prediction screen · Google Sign-In (dev build) · real push (FCM)
 
-## Before acceptance testing (starts 2026-09-28)
+## Before acceptance testing (was 2026-09-28; the adviser moved it to about 2026-10-12, told to Claude on 2026-10-04, exact dates not recorded yet)
+- [ ] Put the real project live on the free Spark plan and build the Android APK: follow `docs/GO_LIVE.md` Part A. As of 2026-10-04 nothing is deployed and Blaze is not available yet, so AI meals and exercise, the scanner, product lookup and the child-account ID photo say "This feature isn't available yet" until Part B is done (DECISIONS D18).
+- [ ] Bring the manuscript in line with the build: `docs/MANUSCRIPT_CHANGES.md` (the false statements in its section A first).
 - [ ] Seed realistic demo data (3+ verified doctors with schedules, food DB of Filipino dishes, badges, plans). `seed.cjs` currently creates one placeholder doc per collection. [item 0b]
 - [ ] Walk through every row of the manuscript's UT/IT test tables on a real phone and record Actual Result in `docs/TEST_LOG.md`
 - [ ] Fill the "Actual Result / Remarks" columns in the manuscript from that walkthrough

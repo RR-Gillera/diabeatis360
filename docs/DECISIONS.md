@@ -278,3 +278,12 @@ Figma sidebar (Overview, Users, Providers, Content, Analytics, Revenue, Settings
 **Manuscript needs editing:** data dictionary — `Announcements` table; `Providers.rejection_reason`, `reviewed_by`,
 `reviewed_at`, `created_by_admin`; `Notifications.notification_type` gains `doctor_verification`,
 `guardian_verification`. Admin screenshots/test-case results (UT-A001–A012) should be refreshed from the new panel.
+
+### D18 — Spark-plan interim: four features degrade gracefully — CLOSED 2026-10-04 (team decision in session)
+**Why:** the Firebase project cannot be upgraded to Blaze yet, and Blaze is what Cloud Functions (D1), the Gemini key and Cloud Storage (the D16 guardian ID photo) need. Testing and the admin panel must still work on the free Spark plan.
+1. **Graceful, not hidden.** On Spark the three AI functions answer HTTP 404 and no Storage bucket exists (checked against the live project on 2026-10-04). The app turns that into "This feature isn't available yet. We're still setting it up. Please check back soon." for AI meals and exercise, the nutrition scanner, product lookup and the guardian ID photo. No crash, no key in the app, and a function that exists but is busy still says "try again". The same code works unchanged as soon as the services exist (emulators or Blaze). Code: `src/lib/feature-unavailable.ts`, tested in `npm test` against the real Firebase SDK.
+2. **"For my child" is checked before it is saved.** That choice is permanent (the rules let `account_type` be set once) and a child's account cannot be verified without the ID photo, so the app first checks that Storage exists. Without it the choice is not saved and "For me" still works.
+3. **The emulator flag cannot reach production.** A release build of the app ignores `EXPO_PUBLIC_USE_EMULATORS`, and the admin panel ignores `VITE_USE_EMULATORS` on `*.web.app` and `*.firebaseapp.com`.
+4. **The admin panel is hosted on Firebase Hosting (free on Spark).** Config is in `firebase.json`; steps are in `docs/GO_LIVE.md` A4.
+5. **Effect on grading:** until Blaze, 2 of 23 module-points (AI Health Assistant and Nutrition Scanner, Patient) and 4 of 57 ticks cannot be shown, and 4 more Patient module-points are testable with one caveat. See `docs/GO_LIVE.md` Part C.
+**Manuscript needs editing:** Scope and Limitations (these features need Cloud Functions and Cloud Storage, which need the Blaze plan; say which plan the respondents tested on). Test rows UT-009 to UT-012, IT-002, IT-005 and UT-005 can only be recorded after Blaze.
