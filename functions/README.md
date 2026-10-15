@@ -3,6 +3,21 @@
 The **only** place that talks to Google Gemini (DECISIONS.md D1, option A). The mobile app calls these functions; the
 Gemini API key lives here as a Firebase secret and is never in either app.
 
+## Two ways to host the same code (DECISIONS.md D19)
+All the logic is in `lib/` (tested in `test/`). It runs in one of two hosts:
+- **Vercel (used now; the project stays on the free Spark plan):** `api/*.js` are Vercel serverless functions wrapping
+  `lib/handlers.js` through `server/callable.js` (Firebase's callable protocol, so the app still uses the Firebase SDK) and
+  `server/runtime.js` (firebase-admin + Gemini). Secrets: `GEMINI_API_KEY` and `FIREBASE_SERVICE_ACCOUNT` (the whole
+  service-account JSON) in Vercel's environment settings. Deploy from this folder: `npx vercel --prod`. The app finds it
+  through `EXPO_PUBLIC_AI_BASE_URL`. Steps: `../docs/GO_LIVE.md` A7.
+- **Firebase Cloud Functions (needs Blaze):** `index.js`, set up as described below. Used when `EXPO_PUBLIC_AI_BASE_URL`
+  is not set (also the emulators).
+
+End-to-end test of the Vercel endpoints (real Firebase client SDK, emulators, fake Gemini), from the repo root:
+```
+firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node --test functions/test/vercel-e2e.test.js"
+```
+
 | Function | Input | What it does |
 |---|---|---|
 | `generateRecommendations` | `{ kind: 'meal' \| 'exercise' }` | Reads the signed-in user's profile and latest glucose reading **on the server**, asks Gemini for 3 suggestions, removes anything that mentions the user's allergens, saves it to `AI_Suggestions`. |
@@ -23,7 +38,7 @@ Rules enforced here (the app cannot be trusted with them):
    firebase functions:secrets:set GEMINI_API_KEY
    ```
 4. Deploy: `firebase deploy --only functions` (the first deploy asks to enable a few Google APIs; say yes).
-5. Optional: `GEMINI_MODEL` overrides the model (default `gemini-2.5-flash`).
+5. Optional: `GEMINI_MODEL` overrides the model (default `gemini-3.8-flash`; `gemini-2.5-flash` is no longer offered to new keys).
 
 ## Tests
 ```

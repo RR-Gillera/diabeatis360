@@ -1,4 +1,4 @@
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, httpsCallableFromURL } from 'firebase/functions';
 
 import { functions } from '@/firebase';
 import type {
@@ -7,7 +7,7 @@ import type {
 
 import { FEATURE_UNAVAILABLE_MESSAGE, isFunctionMissing } from './feature-unavailable';
 
-// The ONLY place the app asks for AI output (DECISIONS.md D1, option A). It calls Firebase Cloud Functions; the
+// The ONLY place the app asks for AI output (DECISIONS.md D1, D19). It calls the AI functions (Vercel or Firebase); the
 // Gemini key never exists in the app. The functions read the user's profile and latest reading themselves, so the
 // app sends almost nothing, and they enforce sign-in, the critical-reading block and the Free-plan daily limits.
 
@@ -37,9 +37,18 @@ function toAiError(error: unknown): AiError {
   return new AiError('unknown', 'Something went wrong. Please try again.');
 }
 
+// Where the AI functions live. Without Blaze there are no Cloud Functions, so the same code runs on a free Vercel
+// server (DECISIONS.md D19) and EXPO_PUBLIC_AI_BASE_URL holds its address, e.g. https://diabeatis360-ai.vercel.app.
+// That address is not a secret: only signed-in users get answers, and the Gemini key stays on the server.
+// Unset: Firebase Cloud Functions (the emulators now, or Blaze later). The Firebase SDK sends the sign-in token either way.
+const AI_BASE_URL = (process.env.EXPO_PUBLIC_AI_BASE_URL ?? '').replace(/\/+$/, '');
+
 async function call<Input, Output>(name: string, data: Input): Promise<Output> {
   try {
-    const result = await httpsCallable<Input, Output>(functions, name)(data);
+    const callable = AI_BASE_URL
+      ? httpsCallableFromURL<Input, Output>(functions, `${AI_BASE_URL}/api/${name}`)
+      : httpsCallable<Input, Output>(functions, name);
+    const result = await callable(data);
     return result.data;
   } catch (error) {
     throw toAiError(error);

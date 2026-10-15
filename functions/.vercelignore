@@ -1,0 +1,9 @@
+# Never upload local secrets or test files to Vercel (secrets go in Vercel's environment settings instead).
+node_modules
+test
+.secret.local
+.env
+.env.*
+*.local
+serviceAccountKey*.json
+*-firebase-adminsdk-*.json
