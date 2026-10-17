@@ -49,11 +49,12 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 | Interpretation result (Blood Sugar) | `glucose_logs.interpretation: "low" \| "normal" \| "high" \| "critical"` (the app derives it on read today; `critical` is added with the D4 work) |
 | Doctor schedule (Manage Schedule) | `providers.availability: [{ day: 0-6, start: "09:00", end: "12:00" }]`, `providers.slot_minutes: 30` |
 | Doctor profile extras shown in Figma | `providers.years_experience`, `providers.photo_url` (optional) |
-| Decline reason / consultation summary (Appointment, Chat) | on bookings: `decline_reason`, as built: `consultation_status` (`not_started`/`active`/`ended`), `consultation_summary`, `consultation_ended_at`, `consultation_ended_by` (`patient`/`doctor`) |
+| Decline reason / patient's concern (Appointment, Request Details) | **As built (D24, 2026-10-18):** on bookings, `concern` (string, optional, up to 300 characters, written by the patient when booking; admins can read it too, as with all of Bookings) and `decline_reason` (string, optional, up to 500, written by the doctor only together with `status: 'declined'`). Since D24 a booking create may hold **only** the app's fields: patient_id, provider_id, status, scheduled_at, fee, platform_commission, payment_status, payment_method, queue_number, created_at, concern. |
+| Consultation summary (Appointment, Chat) | on bookings, as built: `consultation_status` (`not_started`/`active`/`ended`), `consultation_ended_at`, `consultation_ended_by` (`patient`/`doctor`). **The written summary moved to its own document, `Consultation_Notes/{bookingId}` (D22, 2026-10-17)**; it used to be `bookings.consultation_summary`. |
 | Chat messages (Consultation Chat) — no table exists | top-level `Messages` collection (DECISIONS.md D8): booking_id, sender_id, sender_role, message, sent_at |
 | Payment + commission (Book Appointment, admin revenue) | on bookings: `payment_method`, `payment_status` (`unpaid`/`paid`/`onsite`, mocked online payment), `platform_commission` — or a `payments` collection (DECISIONS.md D3) |
 | Announcements (Send Announcements) | `announcements` collection (title, message, created_by, created_at) read by both apps, or fan-out into notifications |
-| Daily usage limits (Subscription) | count today's `ai_suggestions` / `nutrition_scans` by user_id + date — no new collection needed |
+| Daily usage limits (Subscription) | **As built (DECISIONS.md D20, 2026-10-16): server-only `Usage_Counters`.** The first version counted today's `ai_suggestions` / `nutrition_scans`, but requests sent at the same moment all passed that check. See "Usage_Counters" below. |
 | Risk prediction (dashboard, manuscript scope, not in Table 24) | optional `risk_predictions` or store as `ai_suggestions` with type "Risk" |
 
 
@@ -81,6 +82,27 @@ data under the Data Privacy Act and needs real, lasting access control, unlike a
 |---|---|
 | `guardian_ids/{uid}/id.jpg` | Only the account at `{uid}` may read or write it directly (owner-only path match); a JPEG under 5 MB. There is no separate admin rule here: `getDownloadURL()` returns a URL carrying its own access token, and that URL is exposed ONLY through the `Guardian_Verifications` Firestore field, which Firestore's own rules already restrict to the owner and admins — one security boundary, not two. |
 
+## Usage_Counters — server-only daily counters (DECISIONS.md D20, production hardening, 2026-10-16)
+Counts how many Gemini-backed features each person, and everyone together, used today. Only the AI server
+(`functions/lib/usage.js`, Admin SDK) reads or writes it; `firestore.rules` gives every app, admins included, no
+access, so nobody can reset their own count. Not on the ERD (no relationships to draw); describe it in a note.
+| Doc ID | Fields | Meaning |
+|---|---|---|
+| `{day}` e.g. `2026-10-16` | `day`, `gemini` (number) | Everyone together: the project-wide daily cap (default 200, Vercel variable `GEMINI_DAILY_CAP`). |
+| `{day}_{uid}` | `day`, `user_id`, `ai` (number), `scan` (number) | One person: Free 2 AI + 3 scans a day, Premium fair-use ceiling 30 + 30. |
+`{day}` is the **Manila** calendar day (UTC+8), the day the Free limits reset on. A slot is reserved inside a Firestore
+transaction before each Gemini call and given back when nothing useful came out. No index is needed (documents are read
+by id). Deleting a person's account must also delete their `{day}_{uid}` documents (production hardening item 6).
+
+## Booking privacy — `Booked_Slots`, `Care_Links`, `Consultation_Notes` (DECISIONS.md D22, 2026-10-17)
+Three new collections that let bookings be private. All three are written by the app, but only in the same write as the booking they belong to, and `firestore.rules` checks that they agree with it.
+| Collection | Doc ID | Fields | Who reads | Meaning |
+|---|---|---|---|---|
+| Booked_Slots | `<providerId>_<epoch milliseconds>` (the rules build it from the booking's doctor and time; the app cannot choose another) | provider_id, scheduled_at (timestamp), booking_id, active (bool) | any signed-in user | A doctor, a time, taken or not. **No patient information.** `active` is true exactly while the booking is `pending`, `confirmed` or `completed`; a decline or cancellation frees it in the same write. Two bookings for one doctor and time always meet at this one document, so a slot cannot be double-booked even by an app that picks its own booking ids. The time picker reads this instead of the bookings. |
+| Care_Links | `<providerId>_<patientId>` | provider_id, patient_id, booking_id (the booking that justifies it), updated_at | the patient, the doctor, admins | The patient shares their health profile and blood sugar readings with ONE doctor. Made by the patient in the same write as a booking request with that doctor (manuscript UT-023: a doctor sees only patients who have a booking with them). Removed by the patient at any time, or by the doctor in the same write as a decline when the patient has no other live booking with them. |
+| Consultation_Notes | booking_id | booking_id, patient_id, provider_id, summary (text, up to 5,000 characters; labelled **Diagnosis notes** since D24), advice (text, up to 2,000, optional, D24), follow_up_at (timestamp or null, optional, D24), updated_at | the patient and the doctor on that booking only (not admins) | What the doctor wrote when ending the consultation, or added afterwards. It replaces `bookings.consultation_summary`. `follow_up_at` is a suggested date only; no booking is made from it. |
+Reads that follow from this: a doctor's `Users/{patientId}` get and `Glucose_Logs where patient_id == {patientId}` query succeed only when `Care_Links/{doctorId}_{patientId}` exists (a query that does not name the patient is refused); `Bookings` are listed by `where patient_id ==` (patients), `where provider_id ==` (doctors) or without a filter (admins). Doctor- and patient-side code must never read another person's booking. No index is needed. Bookings made before this change have no slot or share and cannot be accepted, declined or ended; the live database is wiped before respondents, so there is nothing to migrate.
+
 ## Indexes you'll likely need
 - glucose_logs: `user_id ==` + `logged_at desc`
 - bookings: `provider_id ==` + `status ==` + `scheduled_at`; `patient_id ==` + `scheduled_at desc`
@@ -104,8 +126,8 @@ Keep rules simple enough to explain in the defense; test them with the Firebase 
 
 ### As implemented in `firestore.rules` (2026-09-25): where it differs from the plan above
 - Field names are the app's (`patient_id`, not `user_id`, on `Glucose_Logs` and `Bookings`), because the rules must match what the app writes.
-- **Bookings are readable by any signed-in user** (plan: only the patient and doctor). Reason: patients query a doctor's bookings to grey out taken time slots, and a rule cannot allow that query while hiding other patients' bookings. Follow-up: a `Booked_Slots` collection holding only times.
-- **Doctors read patient data only when `Providers/{uid}.is_verified == true`.** Rules cannot search Bookings to prove "this patient booked me", so any verified doctor can read any patient's profile/glucose logs. Until the admin panel can verify doctors, set `is_verified: true` by hand in the Firebase console for test doctors.
+- **Bookings are private (D22, 2026-10-17):** read only by the patient, the doctor on the booking and admins. (Until then any signed-in user could read every booking, because patients queried a doctor's bookings to grey out taken times; now they read `Booked_Slots`, which holds no patient information. See "Booking privacy" below.)
+- **Doctors read patient data only through a share the patient made (D22):** an admin-verified, active doctor with a confirmed email AND a `Care_Links` document from that patient (made when the patient booked that doctor). (Until then any verified doctor could read any patient's profile and readings, because rules cannot search Bookings to prove "this patient booked me".)
 - **Chat** is the top-level `Messages` collection (D8): read by the booking's two parties, created only while the booking is `confirmed`, never edited or deleted.
 - Notifications can be created for yourself, for the other party of a booking you are in (tagged with `related_id` = booking id), or by an admin for anyone.
 - Bookings: the doctor changes status/queue/consultation fields; the patient can only pay (after confirmation), end their own confirmed consultation, or cancel. `fee` must equal the doctor's `consultation_fee` and `platform_commission` must be 15% of it. A slot whose booking was declined/cancelled can be re-booked; an active booking can never be overwritten.
@@ -117,3 +139,15 @@ Keep rules simple enough to explain in the defense; test them with the Firebase 
   resubmit only while it is `rejected`, and only an admin may change `verification_status`/`reviewed_by`/
   `reviewed_at`/`rejection_reason`. 21 new rules-emulator cases (182 total, 0 failed) plus 11 Storage-emulator
   cases for `storage.rules` (0 failed).
+- **`Subscriptions` create is validated (D20, 2026-10-16):** it must name a real paid plan in `Subscription_Plans`
+  (price > 0, `duration_days` > 0), carry exactly `user_id`, `plan_id`, `status`, `started_at`, `expires_at`,
+  `created_at`, start `active`, have `started_at == request.time` (the app sends `serverTimestamp()`) and an
+  `expires_at` within one day of start + the plan's length. A missing or null `expires_at`, a Free or unknown plan, an
+  extra field and a client-chosen start are all refused. Cancelling (owner, `status` only) is unchanged.
+  `Usage_Counters` has an explicit `allow read, write: if false`. 248 rules-emulator cases, 0 failed.
+- **Email confirmation (D21, 2026-10-16):** a `verifiedEmail()` helper (`request.auth.token.email_verified == true`, the signed
+  sign-in token's claim, which nobody can fake from the app or by editing a document) is required for `Bookings` create and
+  re-book, `Messages` create, `Calls` create and re-ring, and inside `isVerifiedDoctor()` (so patient profiles and readings
+  need a doctor whose own email is confirmed). Deliberately **not** required: creating a `Users` or `Providers` profile (the
+  admin panel's "Add Provider" writes a new doctor's profile before that doctor can open any email), anything an admin does,
+  and reading your own documents. 267 rules-emulator cases, 0 failed.

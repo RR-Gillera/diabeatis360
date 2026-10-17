@@ -24,7 +24,7 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 - Successful login → role dashboard (UT-002, UT-019, UT-A001, IT-010). Deactivated → blocked with message.
 - Reset password → `sendPasswordResetEmail`. Update → edit name/other profile fields (UT-004).
 - Doctor signup continues to Professional Verification (PRC license number, specialty, city, fee).
-- Google Sign-In: optional, deferred (needs dev build) — see DECISIONS.md.
+- Google and Facebook sign-in: built 2026-10-17 (DECISIONS.md D23; native code, so the installed APK only, not Expo Go). Facebook replaced Apple (D7). Not a Table 24 row.
 - Figma: Login Screen, Sign Up Screen, Role Selection Gate, Doctor Account Verification, Profile screens.
 - **Pediatric account setup (manuscript UT-005, DECISIONS.md D16):** on the patient path, Role Selection Gate
   is followed by "For me" / "For my child". "For my child" collects the guardian's name, relationship and an

@@ -23,7 +23,7 @@ data) · **Not finalized** (works but doesn't follow a CLOSED decision, or uses 
 
 | Module group | Function | Role | Status | What's missing | Files involved |
 |---|---|---|---|---|---|
-| Account | Create Account | P | Partial | exact "Please fill in all required fields." (UT-003); email verification mocked (any 6 chars); `is_active: true` not written on create | `app/sign-up.tsx`, `app/verify-email.tsx`, `features/auth/auth-context.tsx` |
+| Account | Create Account | P | Partial | exact "Please fill in all required fields." (UT-003); email verification mocked (any 6 chars) [made real on 2026-10-16: an emailed link, DECISIONS D21]; `is_active: true` not written on create | `app/sign-up.tsx`, `app/verify-email.tsx`, `features/auth/auth-context.tsx` |
 | Account | Create Account | D | Partial | no "pending verification" screen; an unverified doctor lands on `/doctor` (D9) | `app/onboarding/professional-info.tsx`, `app/doctor/index.tsx` |
 | Account | Login Account | P | Partial | no blank-field message; `is_active == false` not signed out (D9) | `app/login.tsx`, `features/auth/auth-context.tsx` |
 | Account | Login Account | D | Partial | same as P | same |
@@ -85,8 +85,9 @@ data) · **Not finalized** (works but doesn't follow a CLOSED decision, or uses 
 ### Other sample data / placeholders found
 - Home Exercise and Hydration cards use hardcoded numbers (`app/user-home.tsx:18–21`).
 - "Coming Soon" alerts: `app/glucose-log.tsx:78,81`, `app/booking/find-doctor.tsx:49`, `app/meal-suggestions.tsx:66`,
-  Google/Apple sign-in buttons.
-- Expo template leftovers: `app/(tabs)/*`, `app/explore.tsx`, `constants/theme.ts`.
+  Google/Apple sign-in buttons. [Apple became Facebook on 2026-10-17, DECISIONS D7, and both buttons now sign people in, D23.]
+- Expo template leftovers: `app/(tabs)/*`, `app/explore.tsx` and their components and hooks **were deleted on 2026-10-17** (hardening item 5, checked with grep first; `/explore` is now an unmatched route). `constants/theme.ts` stays: real screens use `Brand`, `Fonts` and `Spacing`.
+- **Update 2026-10-17:** the header bell on Find a Doctor and the booking headers now opens Notifications with an unread count (`features/notifications/notification-bell.tsx`). Still Coming Soon alerts, waiting for the updated Figma (blocked by the Figma connector's monthly limit): the "more" (three dots) button on Find a Doctor and the booking headers, and the calendar and "more" buttons on `glucose-log.tsx`. `professional-info.tsx` "Photo upload not available yet" needs Storage (Blaze, D18).
 
 ### Foundation gaps that block modules
 - `firestore.rules` is written and compile-checked but **not deployed**; test doctors need `is_verified: true`,
@@ -199,7 +200,7 @@ appointments, admin acceptance; Gulay: interpretation, feedback, notifications, 
   - In `auth-context.tsx`, sign out with a message when `Users.is_active == false`, or when
     `Providers.is_active == false` for a doctor.
   - Add a pending-verification screen shown instead of `/doctor` while `Providers.is_verified == false`.
-  - Keep email verification mocked, labelled as a limitation.
+  - Keep email verification mocked, labelled as a limitation. [Superseded 2026-10-16: it is real now, DECISIONS D21.]
 - **Firestore:** `Users.is_active`, `Providers.is_verified`, `Providers.is_active`.
 - **Rules:** none (already enforced).
 - **Tests:** UT-001, UT-002, UT-003, UT-004, UT-019, IT-001, IT-010.
@@ -604,11 +605,11 @@ Not agreed yet. `SCHEDULE.md` keeps the original dates until the adviser approve
 - **Blood sugar interpretation:** the D4 threshold table with the ADA citation.
 - **Business model / pricing (D5):** manuscript prices; Figma must change ₱149 → ₱99.
 - **Scope and limitations:**
-  - Mocked payment and email verification.
+  - Mocked payment. [Email verification was mocked too until 2026-10-16; it is real now, DECISIONS D21.]
   - Free-plan limits are enforced in Cloud Functions; the Blaze plan is required (budget alert set).
   - Calls ring only while the app is open.
   - No push notifications.
-  - Any verified doctor can read patient data.
+  - Any verified doctor can read patient data. [Fixed 2026-10-17: a doctor reads only the patients who booked them, DECISIONS D22.]
 - **List of Modules:** only if the adviser formally adds video call and product memory.
 - **Test plan (Tables 25–27):** new rows for patient End Consultation, video call and product memory; fill in
   Actual Result / Remarks.

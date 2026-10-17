@@ -21,9 +21,9 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Screen | Node ID | Module |
 |---|---|---|
 | Splash | 3:754 | Account |
-| Login Screen | 25:2528 | Account |
+| Login Screen | 25:2528 | Account — **the frame's Apple button is a Facebook button in the build** (team decision 2026-10-17, DECISIONS.md D7); same on Sign Up. Both the Google and Facebook buttons sign people in (D23); the look is unchanged except for a spinner in the button that is working. Tell the adviser. |
 | Sign Up Screen | 25:99 | Account |
-| Doctor Account Verification (code entry) | 230:3825 | Account |
+| Doctor Account Verification (code entry) | 230:3825 | Account — **built as "Check your email" (an emailed LINK, not a 6-digit code), DECISIONS.md D21.** Header, "Step 2 of 3" bar, title, resend line with a timer, big green button and footer follow the frame; the six code boxes are replaced by the address the link was sent to. Used by patients and doctors alike. |
 | Role Selection Gate | 25:191 | Account |
 | *(no frame)* "For me" / "For my child" (D16, UT-005) | — | Account |
 | *(no frame)* Guardian's details (D16, UT-005) | — | Health Profile |
@@ -50,6 +50,38 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Premium comparison (Free vs Premium) | 3:630 | Subscription |
 | My Rewards System | 25:1726 | Gamification |
 | Bottom Nav component | 194:350 | shared |
+
+## Updated frames exported 2026-10-17 (PNG in `FIGMA/PATIENT`, `FIGMA/DOCTOR`, `FIGMA/ADMIN`; DECISIONS D24)
+Node IDs could not be read (the Figma connector's monthly limit is used up), so these are matched by the code in the file
+name. Built in batch 1 (patient):
+| Frame | Screen in the app |
+|---|---|
+| [P-01] Forgot Password, [P-02] Reset Link Sent (and D-01, D-02) | `app/forgot-password.tsx` |
+| [P-03] Verify Email | `app/verify-email.tsx`: **stays an emailed link**, the frame shows code boxes (D21, D24) |
+| [P-07] Edit Blood Sugar Log, [P-13] Empty - Glucose Log | `app/glucose-log.tsx` (calendar = date filter, no three-dots) |
+| [P-14] AI Generating, [P-15] AI Limit Reached | `features/ai/suggestion-screen.tsx`, `components/ui/limit-reached.tsx` |
+| [P-16] to [P-20] Scanner states | `app/scanner.tsx`, `features/scanner/scan-result.tsx` (New Product form) |
+| [P-21] My Appointments | `app/booking/my-appointments.tsx` (opened from the three-dots menu) |
+| [P-22] Notifications | `app/notifications.tsx` |
+| [P-23] Chat menu and confirm, [P-24] Chat ended | `app/consultation/[id].tsx` |
+| [P-25] Consultation Summary (and None Yet) | `app/consultation/summary/[id].tsx` (Doctor's notes, Advice and Follow-up, batch 3) |
+| [P-26] to [P-29] Video call | `app/video-call/[id].tsx` |
+| [P-30] to [P-32] Subscription | `app/subscription.tsx` ("Premium until", never "renews": payments are a demo) |
+Already matching in earlier work: P-04 to P-06, P-08 to P-12. Built in batch 2 (doctor and admin):
+| Frame | Screen in the app |
+|---|---|
+| Dashboard Earnings and Notifications | `app/doctor/index.tsx` (no 24/7 card) |
+| [D-03] Pending Verification, [D-04] Verification Not Approved | `features/doctor/pending-verification.tsx` (+ resubmit via `app/onboarding/professional-info.tsx`) |
+| [D-05] Manage Schedule | `app/doctor/schedule.tsx` (one set of hours for all working days; no 24/7 switch) |
+| Background+HorizontalBorder (Set Consultation Fee) | `app/doctor/fee.tsx` |
+| [D-06] Patient Health Profile | `app/doctor/patient/[id].tsx` (age only, no gender or city) |
+| [D-07] End Consultation (Confirm, Notes) | `app/consultation/[id].tsx`; the Notes step is `features/consultation/doctor-notes-form.tsx` (Diagnosis notes, Advice, Follow-up; batch 3) |
+| [D-08] to [D-10] Video call | `app/video-call/[id].tsx` (shared with patients) |
+| [D-11] Empty - Requests | `app/doctor/appointments.tsx` |
+| Request Details, if declined (modal) | `app/doctor/request/[id].tsx` (patient's concern card and the decline reason, batch 3; no medical-record files) |
+| After Consultation / End Chat (Consultation Details) | `app/doctor/consultation/[id].tsx`, listed by `app/doctor/history.tsx` |
+| [A-01] Login errors, [A-02] Forgot password | admin `src/pages/LoginPage.jsx` (brand panel instead of the photo) |
+Not built: the 24/7 frames (Background "24/7 Availability Enabled", the dashboard and schedule 24/7 parts), D24.
 
 ## Legacy (teal) frames still needed
 | Screen | Node ID | Module |
