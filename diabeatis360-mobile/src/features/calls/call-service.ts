@@ -53,10 +53,20 @@ function fromDoc(id: string, data: Record<string, unknown>): CallRecord {
   };
 }
 
-/** A person's display name (doctors live in Providers, everyone else in Users). */
+/**
+ * A person's display name (doctors live in Providers, everyone else in Users). Each read is tried on its own: since the
+ * booking-privacy rules (D22) a patient may not read a doctor's Users document, and reading both together failed as a
+ * whole, so the patient saw "Your doctor" instead of the doctor's name.
+ */
 export async function fetchDisplayName(userId: string) {
-  const [provider, user] = await Promise.all([getDoc(doc(db, 'Providers', userId)), getDoc(doc(db, 'Users', userId))]);
-  return String(provider.data()?.full_name || user.data()?.full_name || 'Diabeatis360 user');
+  const nameIn = async (collectionName: string) => {
+    try {
+      return (await getDoc(doc(db, collectionName, userId))).data()?.full_name as string | undefined;
+    } catch {
+      return undefined; // not allowed to read it: try the other place
+    }
+  };
+  return String((await nameIn('Providers')) || (await nameIn('Users')) || 'Diabeatis360 user');
 }
 
 /**

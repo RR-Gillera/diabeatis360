@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { BookingMoreMenu, bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { subscribeToBookableProviders } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
+import { NotificationBell } from '@/features/notifications/notification-bell';
 import type { Provider } from '@/features/booking/types';
 
 const filters = ['All', 'Endocrinologist', 'Diabetologist', 'Nutritionist'];
@@ -43,12 +44,8 @@ export default function FindDoctorScreen() {
           <Text style={styles.subtitle}>Consult with diabetes experts</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.headerButton} onPress={() => Alert.alert('Notifications', 'You are all caught up.')}>
-            <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-          </Pressable>
-          <Pressable style={styles.headerButton} onPress={() => Alert.alert('Coming Soon', 'More options are on the way.')}>
-            <SymbolView name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={16} tintColor="#64748B" />
-          </Pressable>
+          <NotificationBell style={styles.headerButton} />
+          <BookingMoreMenu style={styles.headerButton} />
         </View>
       </View>
 

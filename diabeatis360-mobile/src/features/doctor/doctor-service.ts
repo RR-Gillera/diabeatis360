@@ -130,8 +130,10 @@ export function subscribeToDoctorPatients(
         // Names come from the Users docs — resolved per unique patient rather
         // than per booking, so a patient with many appointments is one read.
         const patients = await Promise.all([...byPatient.values()].map(async (patient) => {
-          const userSnapshot = await getDoc(doc(db, 'Users', patient.id));
-          return { ...patient, fullName: String(userSnapshot.data()?.full_name ?? 'Unknown patient') };
+          // Readable because the patient shared their profile with this doctor by booking (Care_Links, D22); a patient who
+          // stopped sharing shows as "Unknown patient" instead of breaking the list.
+          const userSnapshot = await getDoc(doc(db, 'Users', patient.id)).catch(() => null);
+          return { ...patient, fullName: String(userSnapshot?.data()?.full_name ?? 'Unknown patient') };
         }));
         patients.sort((a, b) => (b.lastAppointmentAt?.getTime() ?? 0) - (a.lastAppointmentAt?.getTime() ?? 0));
         onChange(patients);

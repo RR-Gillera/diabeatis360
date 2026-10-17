@@ -1,21 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { subscribeToDoctorProfile, updateDoctorAvailability, WEEKDAY_LABELS } from '@/features/doctor/doctor-service';
+import { subscribeToDoctorProfile, updateDoctorAvailability } from '@/features/doctor/doctor-service';
 import { TimePickerSheet } from '@/features/doctor/time-picker';
-import { labelFromMinutes, minutesFromLabel, slotsFromRanges, type TimeRange } from '@/features/doctor/time-slots';
+import { labelFromMinutes, minutesFromLabel, SLOT_INTERVAL_MINUTES, slotsFromRanges, type TimeRange } from '@/features/doctor/time-slots';
+import { formatFee } from '@/features/booking/booking-ui';
 import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 const DEFAULT_RANGE: TimeRange = { start: '09:00 AM', end: '12:00 PM' };
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+// Manage Schedule (Figma D-05, DECISIONS D24). One set of hours applies to every working day (that is how availability is
+// stored), so each day row shows the same hours; the frame's different hours per day would need a data change. The
+// frame's 'Available 24/7' switch is not built (D24).
 
 export default function DoctorScheduleScreen() {
   const goBack = useSafeBack('/doctor/profile');
+  const router = useRouter();
   const { uid } = useAuth();
+  const [fee, setFee] = useState<number | null>(null);
   const [days, setDays] = useState<number[]>([]);
   const [ranges, setRanges] = useState<TimeRange[]>([]);
   const [picker, setPicker] = useState<{ index: number; edge: 'start' | 'end' } | null>(null);
@@ -27,6 +36,7 @@ export default function DoctorScheduleScreen() {
   useEffect(() => {
     if (!uid) return;
     return subscribeToDoctorProfile(uid, (profile) => {
+      if (profile) setFee(profile.consultationFee);
       // Seed the editors from Firestore once — after that the doctor's in-progress
       // edits win, rather than being overwritten by the snapshot their own save triggers.
       if (seeded.current || !profile) return;
@@ -82,6 +92,8 @@ export default function DoctorScheduleScreen() {
   };
 
   const generatedSlots = slotsFromRanges(ranges);
+  // '9:00 AM – 12:00 PM, 7:00 PM – 9:00 PM', shown under every working day.
+  const hoursText = ranges.map((range) => `${range.start.replace(/^0/, '')} – ${range.end.replace(/^0/, '')}`).join(', ');
   const nothingSet = days.length === 0 || generatedSlots.length === 0;
 
   return (
@@ -97,18 +109,29 @@ export default function DoctorScheduleScreen() {
           </Text>
         </View>
 
-        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Working Days</Text>
-        <View style={[doctorStyles.card, styles.card]}>
-          <View style={styles.dayRow}>
-            {WEEKDAY_LABELS.map((label, index) => (
-              <Pressable key={label} onPress={() => toggleDay(index)} style={[styles.dayChip, days.includes(index) && styles.dayChipActive]}>
-                <Text style={[styles.dayChipText, days.includes(index) && styles.dayChipTextActive]}>{label}</Text>
-              </Pressable>
-            ))}
-          </View>
+        <View style={[doctorStyles.card, styles.daysCard]}>
+          {DAY_NAMES.map((name, index) => {
+            const on = days.includes(index);
+            return (
+              <View key={name} style={[styles.dayLine, index > 0 && styles.dayDivider]}>
+                <View style={styles.dayCopy}>
+                  <Text style={[styles.dayName, !on && styles.dayOff]}>{name}</Text>
+                  <Text style={styles.dayHours}>{on ? (hoursText || 'Add hours below') : 'Off'}</Text>
+                </View>
+                <Switch
+                  accessibilityLabel={`${name} ${on ? 'on' : 'off'}`}
+                  value={on}
+                  onValueChange={() => toggleDay(index)}
+                  trackColor={{ false: '#D1D5DB', true: homeColors.green }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            );
+          })}
         </View>
 
-        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Available Hours</Text>
+        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Working Hours</Text>
+        <Text style={styles.hoursNote}>The same hours apply to every day that is switched on.</Text>
         <View style={[doctorStyles.card, styles.card]}>
           {ranges.length === 0 ? (
             <Text style={styles.emptyRanges}>No hours set yet. Add a window like 7:00 PM to 9:00 PM.</Text>
@@ -133,24 +156,27 @@ export default function DoctorScheduleScreen() {
           </Pressable>
         </View>
 
-        {generatedSlots.length ? (
-          <>
-            <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Slots Patients Will See</Text>
-            <View style={[doctorStyles.card, styles.card]}>
-              <View style={styles.slotPreview}>
-                {generatedSlots.map((slot) => (
-                  <View key={slot} style={styles.slotChip}><Text style={styles.slotChipText}>{slot}</Text></View>
-                ))}
-              </View>
-              <Text style={styles.slotHint}>Generated in 30-minute steps from the windows above.</Text>
+        <View style={[doctorStyles.card, styles.feeCard]}>
+          <View style={styles.feeLine}>
+            <Text style={styles.feeLabel}>Slot length</Text>
+            <Text style={styles.feeValue}>{SLOT_INTERVAL_MINUTES} minutes</Text>
+          </View>
+          <View style={styles.feeDivider} />
+          <View style={styles.feeLine}>
+            <View>
+              <Text style={styles.feeLabelSmall}>Consultation fee</Text>
+              <Text style={styles.feeAmount}>{fee !== null ? formatFee(fee) : '—'}</Text>
             </View>
-          </>
-        ) : null}
+            <Pressable accessibilityRole="button" onPress={() => router.push('/doctor/fee' as never)} hitSlop={8}>
+              <Text style={styles.modify}>Modify fee</Text>
+            </Pressable>
+          </View>
+        </View>
 
         {error ? <Text style={[doctorStyles.error, styles.sectionSpacing]}>{error}</Text> : null}
 
         <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={save} disabled={saving}>
-          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : saved ? 'Schedule Saved ✓' : 'Save Schedule'}</Text>
+          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : saved ? 'Schedule saved ✓' : 'Save schedule'}</Text>
         </Pressable>
       </ScrollView>
 
@@ -170,11 +196,22 @@ const styles = StyleSheet.create({
   noticeText: { color: homeColors.textMuted, flex: 1, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
   sectionSpacing: { marginTop: 28 },
   card: { gap: 14, marginTop: 16 },
-  dayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  dayChip: { alignItems: 'center', backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, minWidth: 52, paddingVertical: 12 },
-  dayChipActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
-  dayChipText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
-  dayChipTextActive: { color: '#FFF' },
+  daysCard: { marginTop: 20, paddingVertical: 6 },
+  dayLine: { alignItems: 'center', flexDirection: 'row', paddingVertical: 10 },
+  dayDivider: { borderTopColor: homeColors.border, borderTopWidth: 1 },
+  dayCopy: { flex: 1 },
+  dayName: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  dayOff: { color: '#64748B' },
+  dayHours: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, marginTop: 2 },
+  hoursNote: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 4 },
+  feeCard: { gap: 12, marginTop: 24 },
+  feeLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  feeLabel: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 15 },
+  feeValue: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  feeDivider: { backgroundColor: homeColors.border, height: 1 },
+  feeLabelSmall: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13 },
+  feeAmount: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900', marginTop: 2 },
+  modify: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   emptyRanges: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 13, fontStyle: 'italic' },
   rangeRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   timeButton: { alignItems: 'center', backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
@@ -183,20 +220,7 @@ const styles = StyleSheet.create({
   removeButton: { alignItems: 'center', backgroundColor: '#FBE6E9', borderRadius: 10, height: 36, justifyContent: 'center', width: 36 },
   addButton: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 12, borderStyle: 'dashed', borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46 },
   addButtonText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
-  slotPreview: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  slotChip: { backgroundColor: homeColors.greenTint, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  slotChipText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '700' },
-  slotHint: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11 },
   saveButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 28, minHeight: 52 },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
-  modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '70%', padding: 24 },
-  modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  modalTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
-  modalList: { maxHeight: 420 },
-  timeOption: { alignItems: 'center', borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
-  timeOptionActive: { backgroundColor: homeColors.green },
-  timeOptionText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '600' },
-  timeOptionTextActive: { color: '#FFF', fontWeight: '800' },
 });

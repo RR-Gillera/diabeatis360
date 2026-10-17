@@ -51,7 +51,9 @@ export function subscribeToSubscriptions(
     subscriptionQuery,
     (snapshot) => onChange(snapshot.docs
       .map((document) => {
-        const data = document.data();
+        // 'estimate': a subscription just made on this phone still has a pending server start time; show the phone's
+        // estimate for that instant instead of a blank "Started" and a wrong sort order.
+        const data = document.data({ serverTimestamps: 'estimate' });
         return {
           id: document.id,
           planId: String(data.plan_id ?? ''),
@@ -84,18 +86,22 @@ export function isExpired(subscription: Subscription) {
   return Boolean(subscription.expiresAt && subscription.expiresAt.getTime() <= Date.now());
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 // NOTE: no real billing is wired up — this records the subscription exactly the
 // way the mocked consultation payment does, and must not be mistaken for a
 // charge actually being taken.
+//
+// The start time is the SERVER's clock (serverTimestamp), and firestore.rules only accepts an expiry of start + the
+// plan's length (give or take a day for a phone clock that is a little off), so a patient cannot choose their own
+// Premium dates. A phone whose clock is days wrong is refused with "permission denied" (DECISIONS.md D20).
 export async function subscribeToPlan(userId: string, plan: MembershipPlan) {
-  const startedAt = new Date();
-  const expiresAt = new Date(startedAt);
-  expiresAt.setDate(expiresAt.getDate() + plan.durationDays);
+  const expiresAt = new Date(Date.now() + plan.durationDays * DAY_MS);
   const reference = await addDoc(collection(db, 'Subscriptions'), {
     user_id: userId,
     plan_id: plan.id,
     status: 'active' as SubscriptionStatus,
-    started_at: Timestamp.fromDate(startedAt),
+    started_at: serverTimestamp(),
     expires_at: Timestamp.fromDate(expiresAt),
     created_at: serverTimestamp(),
   });

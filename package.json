@@ -3,7 +3,9 @@
   "private": true,
   "description": "Repo-level developer tooling only (not shipped in either app): Firestore security-rules tests.",
   "scripts": {
-    "test:rules": "firebase emulators:exec --only firestore --project demo-diabeatis360 \"node tests/firestore.rules.test.cjs\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-diabeatis360 \"node tests/firestore.rules.test.cjs\"",
+    "test:booking-privacy": "firebase emulators:exec --only auth,firestore --project demo-diabeatis360 \"node --import ./diabeatis360-mobile/scripts/register-ts-alias.mjs --test --test-force-exit diabeatis360-mobile/src/features/booking/booking-privacy.emulator.test.mjs\"",
+    "test:social-login": "firebase emulators:exec --only auth,firestore --project demo-diabeatis360 \"node --import ./diabeatis360-mobile/scripts/register-ts-alias.mjs --test --test-force-exit diabeatis360-mobile/src/features/auth/social-service.emulator.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",

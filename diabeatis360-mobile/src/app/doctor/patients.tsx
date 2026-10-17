@@ -60,7 +60,7 @@ export default function DoctorPatientsScreen() {
           </Pressable>
         ))}
       </ScrollView>
-      <DoctorBottomNav active="patients" />
+      <DoctorBottomNav active="home" />
     </View>
   );
 }

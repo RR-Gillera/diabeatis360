@@ -43,6 +43,8 @@ export type BookingRecord = {
   payment_method: PaymentMethod | null;
   /** Assigned when the doctor accepts — null while the request is pending. */
   queue_number: number | null;
+  /** What the patient wants to discuss, in their own words (optional, at most 300 characters; DECISIONS D24). */
+  concern?: string;
   created_at: ReturnType<typeof import('firebase/firestore').serverTimestamp>;
 };
 
@@ -61,6 +63,9 @@ export type AppointmentHistoryEntry = {
   paymentMethod: PaymentMethod | null;
   /** Position in this doctor's queue for that day. Null until accepted. */
   queueNumber: number | null;
+  /** The patient's own words when booking, and the doctor's reason when declining (D24). Empty when none. */
+  concern: string;
+  declineReason: string;
 };
 
 // The doctor-side mirror of AppointmentHistoryEntry — needs patient identity, not

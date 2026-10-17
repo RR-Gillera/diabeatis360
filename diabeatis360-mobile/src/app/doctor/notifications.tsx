@@ -7,11 +7,10 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatFee } from '@/features/booking/booking-ui';
-import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
+import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
-import { useSafeBack } from '@/hooks/use-safe-back';
 
 type Notice = {
   id: string;
@@ -78,7 +77,6 @@ function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
 
 export default function DoctorNotificationsScreen() {
   const router = useRouter();
-  const goBack = useSafeBack('/doctor');
   const { uid } = useAuth();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const [error, setError] = useState('');
@@ -141,7 +139,7 @@ export default function DoctorNotificationsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Notifications" subtitle="Booking activity from your patients" onBack={() => goBack()} />
+      <DoctorHeader title="Notifications" subtitle="Booking activity from your patients" />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
         {notices.length === 0 ? (
@@ -166,6 +164,7 @@ export default function DoctorNotificationsScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      <DoctorBottomNav active="notifications" />
     </View>
   );
 }

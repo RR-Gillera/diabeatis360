@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { BookingHeader, BookingHeaderActions, bookingColors, combineDateAndTime, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
-import { createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
+import { CONCERN_LIMIT, createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { bookableSlots, subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { DEFAULT_BOOKING_WINDOW, isMorning, slotsFromRanges } from '@/features/doctor/time-slots';
@@ -34,6 +34,8 @@ export default function SelectDateTimeScreen() {
   const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState('');
+  // What the patient wants to discuss (DECISIONS D24): optional, shown to the doctor on Request Details.
+  const [concern, setConcern] = useState('');
 
   useEffect(() => {
     if (!provider || !selectedDate) return;
@@ -70,7 +72,7 @@ export default function SelectDateTimeScreen() {
     try {
       const patientId = auth.currentUser?.uid;
       if (!patientId) throw new Error('You need to be signed in to book an appointment.');
-      const bookingId = await createBookingRequest(patientId, provider.id, combineDateAndTime(selectedDate, selectedTime), fee);
+      const bookingId = await createBookingRequest(patientId, provider.id, combineDateAndTime(selectedDate, selectedTime), fee, concern);
       setBookingId(bookingId);
       router.replace({ pathname: '/booking/request-sent', params: { id: bookingId } });
     } catch (value) {
@@ -105,6 +107,18 @@ export default function SelectDateTimeScreen() {
         <View style={styles.timeGrid}>{afternoonTimes.map((time) => <TimeButton key={time} time={time} selected={selectedTime === time} taken={bookedTimes.has(time)} onPress={() => selectTime(time)} />)}</View>
         {afternoonTimes.length === 0 ? <Text style={styles.noSlots}>No afternoon slots offered.</Text> : null}
         <View style={styles.summary}><View><Text style={styles.summaryLabel}>SELECTED SLOT</Text><Text style={styles.summaryValue}>{selectedDate && selectedTime ? `${formatDate(selectedDate)} • ${selectedTime}` : 'Select a date and time'}</Text></View><View><Text style={styles.summaryLabel}>TOTAL FEE</Text><Text style={styles.summaryValue}>{formatFee(fee)}</Text></View></View>
+        <Text style={ui.sectionTitle}>What would you like to discuss?</Text>
+        <TextInput
+          accessibilityLabel="What would you like to discuss? (optional)"
+          value={concern}
+          onChangeText={setConcern}
+          placeholder="Optional. For example: spikes after breakfast, feeling tired."
+          placeholderTextColor="#94A3B8"
+          style={styles.concern}
+          multiline
+          maxLength={CONCERN_LIMIT}
+        />
+        <Text style={styles.concernCount}>{concern.length}/{CONCERN_LIMIT} · Shared with your doctor.</Text>
         {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
         <PrimaryButton title="Request Appointment" onPress={requestAppointment} disabled={!selectedDate || !selectedTime} loading={requesting} />
         <Text style={styles.requestHint}>Your doctor reviews the request first. You will choose how to pay once it is accepted.</Text>
@@ -116,5 +130,5 @@ export default function SelectDateTimeScreen() {
 function TimeButton({ time, selected, taken, onPress }: { time: string; selected: boolean; taken: boolean; onPress: () => void }) { return <Pressable disabled={taken} onPress={onPress} style={[styles.timeButton, selected && styles.selectedTime, taken && styles.takenTime]}><Text style={[styles.timeText, selected && styles.selectedTimeText, taken && styles.takenTimeText]}>{time}</Text></Pressable>; }
 
 const styles = StyleSheet.create({
-  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: 'center' }, summary: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -24, padding: 24 }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
+  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: 'center' }, summary: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -24, padding: 24 }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
 });

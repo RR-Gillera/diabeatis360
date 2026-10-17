@@ -6,7 +6,9 @@ import { SymbolView } from 'expo-symbols';
 import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
 import { AppText } from '@/components/ui/app-text';
 import { Card } from '@/components/ui/card';
+import { LimitReached } from '@/components/ui/limit-reached';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { FREE_LIMITS } from '@/constants/plans';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { CriticalNotice } from '@/features/glucose/critical-notice';
@@ -49,6 +51,9 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
   const [error, setError] = useState<AiError | null>(null);
   const [notice, setNotice] = useState('');
   const [usage, setUsage] = useState('');
+  // The Free plan's daily limit is used up (Figma P-15). Known from the count before anyone taps, or from the server's
+  // answer when they do.
+  const [freeLimit, setFreeLimit] = useState<number | null>(null);
 
   useEffect(() => {
     if (!uid) return;
@@ -70,6 +75,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
       .then((value) => {
         if (cancelled) return;
         setUsage(value.premium ? 'Premium: unlimited suggestions' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} left today`);
+        setFreeLimit(!value.premium && !value.allowed ? value.limit : null);
       })
       .catch(() => { if (!cancelled) setUsage(''); });
     return () => { cancelled = true; };
@@ -92,6 +98,9 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
   };
 
   const critical = latest?.interpretation === 'critical';
+  // Only the Free plan's limit offers Premium; Premium's fair-use ceiling and the system-wide cap do not (D20).
+  const limitReached = freeLimit !== null || (error?.code === 'limit');
+  const limitCount = freeLimit ?? FREE_LIMITS.ai;
 
   return (
     <View style={styles.screen}>
@@ -107,7 +116,20 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
         {critical ? <CriticalNotice readingMgdl={latest?.readingMgdl ?? null} /> : null}
         {notice && !critical ? <View style={styles.pad}><AppText style={styles.notice}>{notice}</AppText></View> : null}
 
-        {!critical ? (
+        {!critical && limitReached ? (
+          <View style={styles.pad}>
+            <LimitReached
+              icon={{ ios: 'sparkle', android: 'auto_awesome', web: 'auto_awesome' }}
+              title={`You've used ${limitCount} of ${limitCount} free suggestions today`}
+              text="Premium gives you unlimited AI suggestions."
+              footer="Come back tomorrow"
+              onUpgrade={() => router.push('/subscription')}
+              onFooter={() => goBack()}
+            />
+          </View>
+        ) : null}
+
+        {!critical && !limitReached ? (
           <View style={styles.pad}>
             <PrimaryButton title={saved ? 'Generate new suggestions' : 'Generate suggestions'} onPress={generate} loading={busy} />
             {usage ? <AppText style={styles.usage}>{usage}</AppText> : null}
@@ -126,11 +148,34 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
 
         {!loaded ? <ActivityIndicator color={Brand.colors.primary} style={styles.loader} /> : null}
 
-        {loaded && !saved && !critical ? (
+        {busy && !critical ? (
+          // Figma P-14: placeholder cards while Gemini works (it can take several seconds).
+          <View style={styles.pad}>
+            <View style={styles.preparing}>
+              <SymbolView name={{ ios: 'sparkle', android: 'auto_awesome', web: 'auto_awesome' }} size={18} tintColor={Brand.colors.primary} />
+              <AppText weight="bold" style={styles.preparingText}>Preparing your suggestions...</AppText>
+            </View>
+            {[0, 1, 2].map((row) => (
+              <Card key={row} style={styles.skeleton}>
+                <View style={styles.cardTop}>
+                  <View style={[styles.bone, styles.boneIcon]} />
+                  <View style={styles.copy}>
+                    <View style={[styles.bone, styles.boneTitle]} />
+                    <View style={[styles.bone, styles.boneShort]} />
+                  </View>
+                </View>
+                <View style={[styles.bone, styles.boneLine]} />
+                <View style={[styles.bone, styles.boneLineShort]} />
+              </Card>
+            ))}
+          </View>
+        ) : null}
+
+        {loaded && !saved && !critical && !busy && !limitReached ? (
           <AppText style={styles.empty}>No suggestions yet. Tap Generate to get ideas based on your health profile and latest reading.</AppText>
         ) : null}
 
-        {!critical && saved ? (
+        {!critical && saved && !busy ? (
           <>
             {saved.generatedAt ? (
               <AppText style={styles.when}>
@@ -192,4 +237,13 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18 },
   cardText: { color: Brand.colors.textMuted, fontSize: 14, lineHeight: 22 },
   viewButton: { height: 48 },
+  preparing: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 20 },
+  preparingText: { color: Brand.colors.primary, fontSize: 15 },
+  skeleton: { gap: 14, marginTop: 16 },
+  bone: { backgroundColor: '#E5E7EB', borderRadius: 8 },
+  boneIcon: { borderRadius: 14, height: 44, width: 44 },
+  boneTitle: { height: 12, width: '70%' },
+  boneShort: { height: 10, marginTop: 8, width: '45%' },
+  boneLine: { height: 10, width: '100%' },
+  boneLineShort: { height: 10, width: '70%' },
 });

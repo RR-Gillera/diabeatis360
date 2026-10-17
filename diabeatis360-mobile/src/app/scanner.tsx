@@ -5,7 +5,10 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { AppText } from '@/components/ui/app-text';
+import { LimitReached } from '@/components/ui/limit-reached';
 import { PrimaryButton } from '@/components/ui/primary-button';
+import { RoundBackButton } from '@/components/ui/round-back-button';
+import { FREE_LIMITS } from '@/constants/plans';
 import { Brand } from '@/constants/theme';
 import type { LabelAnalysis } from '@/features/ai/types';
 import { useAuth } from '@/features/auth/auth-context';
@@ -48,6 +51,10 @@ export default function ScannerScreen() {
   // from starting a second lookup.
   const [barcode, setBarcode] = useState<string | null>(null);
   const lastCode = useRef<string | null>(null);
+  // Figma P-16: "Barcode" or "Scan nutrition label". Only the guidance changes; a barcode in view is always read.
+  const [mode, setMode] = useState<'barcode' | 'label'>('label');
+  // Free scans used up, but the person chose to look up a barcode (that needs no scan, D12) instead of the limit screen.
+  const [barcodeOnly, setBarcodeOnly] = useState(false);
 
   // Free-plan usage line. Re-read whenever `usageTick` changes (after a scan), never synchronously in the effect.
   const [usageTick, setUsageTick] = useState(0);
@@ -148,6 +155,7 @@ export default function ScannerScreen() {
         <ScrollView contentContainerStyle={styles.resultScroll}>
           <ScanResult
             analysis={analysis}
+            barcode={barcode ?? undefined}
             onAlternatives={() => router.push({ pathname: '/healthier-alternatives', params: { id: analysis.scan_id } } as never)}
             onScanAgain={scanAgain}
             onShare={barcode && uid && !analysis.from_memory ? (name, brand) => saveProduct(uid, barcode, analysis, name, brand) : undefined}
@@ -158,18 +166,53 @@ export default function ScannerScreen() {
     );
   }
 
+  // Figma P-20: the Free plan's 3 scans are used up (known before scanning, or from the server's answer).
+  if ((phase === 'camera' && !allowed && !barcodeOnly) || (phase === 'retry' && error?.code === 'limit')) {
+    return (
+      <ScrollView style={styles.light} contentContainerStyle={styles.limitScroll}>
+        <RoundBackButton onPress={() => goBack()} />
+        <AppText weight="extraBold" style={styles.limitTitle}>Scan Nutrition Label</AppText>
+        <LimitReached
+          icon={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }}
+          title={`You've used ${FREE_LIMITS.scan} of ${FREE_LIMITS.scan} free scans today`}
+          text="Premium gives you unlimited label scans."
+          footer="Your free scans reset tomorrow"
+          onUpgrade={() => router.push('/subscription')}
+        />
+        <PrimaryButton title="Scan a barcode instead" variant="outline" onPress={() => { scanAgain(); setBarcodeOnly(true); setMode('barcode'); }} />
+        <AppText style={styles.limitNote}>Products other patients already shared are looked up by barcode without using a scan.</AppText>
+      </ScrollView>
+    );
+  }
+
+  // Figma P-19: the photo could not be read. A card over the dark camera background, and one way forward.
+  if (phase === 'retry' && !error) {
+    return (
+      <View style={[styles.dark, styles.cantRead]}>
+        <View style={styles.cantReadCard}>
+          <View style={styles.cantReadIcon}><SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={26} tintColor="#F59E0B" /></View>
+          <AppText weight="extraBold" style={styles.cantReadTitle}>We couldn&apos;t read that label. Try better light</AppText>
+          <AppText style={styles.cantReadText}>{message || 'Hold your phone steady and keep the whole label in the frame.'}</AppText>
+          <PrimaryButton title="Retake photo" onPress={scanAgain} style={styles.retryButton} />
+        </View>
+      </View>
+    );
+  }
+
   if (phase === 'retry') {
     // The scan function is not deployed yet (the Firebase project is not on the Blaze plan): trying again cannot
     // help, and the camera would just re-read the same barcode, so this screen offers only Back.
     const unavailable = error?.code === 'feature-unavailable';
+    // A limit Premium cannot lift (fair use, or the whole project's daily cap, D20): trying again today cannot help.
+    const capped = error?.code === 'daily-cap';
     return (
       <View style={[styles.light, styles.center]}>
         <SymbolView name={{ ios: 'exclamationmark.circle', android: 'error', web: 'error' }} size={40} tintColor={Brand.colors.warning} />
-        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? FEATURE_UNAVAILABLE_TITLE : error?.code === 'limit' ? 'Daily scan limit reached' : 'Let\'s try that again'}</AppText>
+        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? FEATURE_UNAVAILABLE_TITLE : error?.code === 'limit' || capped ? 'Daily scan limit reached' : 'Let\'s try that again'}</AppText>
         <AppText style={styles.retryText}>{unavailable ? FEATURE_UNAVAILABLE_DETAIL : error ? error.message : message}</AppText>
         {error?.code === 'limit' ? (
           <PrimaryButton title="Upgrade to Premium" onPress={() => router.push('/subscription')} style={styles.retryButton} />
-        ) : unavailable ? null : (
+        ) : unavailable || capped ? null : (
           <PrimaryButton title="Scan Again" onPress={scanAgain} style={styles.retryButton} />
         )}
         <PrimaryButton title="Back" variant="outline" onPress={() => goBack()} style={styles.retryButton} />
@@ -189,19 +232,33 @@ export default function ScannerScreen() {
         <Pressable style={styles.round} onPress={() => goBack()} hitSlop={8}>
           <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#FFF" />
         </Pressable>
-        <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>Scan Nutrition Label</AppText></View>
+        <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{mode === 'barcode' ? 'Scan Barcode' : 'Scan Nutrition Label'}</AppText></View>
         <Pressable style={[styles.round, torch && styles.roundOn]} onPress={() => setTorch((value) => !value)} hitSlop={8}>
           <SymbolView name={{ ios: 'bolt.fill', android: 'flash_on', web: 'flash_on' }} size={16} tintColor="#FFF" />
         </Pressable>
       </View>
 
       <View style={styles.frameWrap} pointerEvents="none">
-        <View style={styles.frame} />
-        <AppText style={styles.hint}>{barcode ? 'New product. Now fit its nutrition facts label inside the frame' : 'Point at the barcode, or fit the nutrition facts label inside the frame'}</AppText>
+        <View style={[styles.frame, mode === 'barcode' && styles.frameBarcode]}>
+          {mode === 'barcode' ? <View style={styles.scanLine} /> : null}
+        </View>
+        <AppText style={styles.hint}>
+          {barcode
+            ? 'New product. Now fit its nutrition facts label inside the frame'
+            : mode === 'barcode' ? 'Point the camera at the barcode' : 'Fit the nutrition facts label inside the frame'}
+        </AppText>
       </View>
 
       <View style={styles.bottomBar}>
         {usage ? <AppText style={styles.usageDark}>{usage}</AppText> : null}
+        <View style={styles.modes}>
+          {(['barcode', 'label'] as const).map((option) => (
+            <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: mode === option }} style={[styles.modeButton, mode === option && styles.modeActive]} onPress={() => setMode(option)}>
+              {option === 'barcode' ? <SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={14} tintColor="#FFF" /> : null}
+              <AppText weight="bold" style={styles.modeText}>{option === 'barcode' ? 'Barcode' : 'Scan nutrition label'}</AppText>
+            </Pressable>
+          ))}
+        </View>
         {allowed ? (
           <Pressable style={[styles.shutter, (!ready || phase === 'analyzing') && styles.shutterDisabled]} onPress={capture} disabled={!ready || phase === 'analyzing'}>
             <View style={styles.shutterInner} />
@@ -252,4 +309,18 @@ const styles = StyleSheet.create({
   retryTitle: { fontSize: 20, marginTop: 8 },
   retryText: { color: Brand.colors.textMuted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   retryButton: { alignSelf: 'stretch', marginTop: 8 },
+  limitScroll: { gap: 12, padding: Brand.sizes.screenPadding, paddingTop: 56 },
+  limitTitle: { fontSize: 24, marginTop: 12 },
+  limitNote: { color: Brand.colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  cantRead: { justifyContent: 'center', padding: 24 },
+  cantReadCard: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 32, gap: 10, padding: 24 },
+  cantReadIcon: { alignItems: 'center', backgroundColor: '#FEEFD9', borderRadius: 32, height: 64, justifyContent: 'center', width: 64 },
+  cantReadTitle: { fontSize: 19, lineHeight: 25, textAlign: 'center' },
+  cantReadText: { color: Brand.colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  frameBarcode: { alignItems: 'center', borderColor: '#22C55E', borderStyle: 'solid', height: 160, justifyContent: 'center' },
+  scanLine: { backgroundColor: '#22C55E', height: 2, width: '88%' },
+  modes: { backgroundColor: 'rgba(17,24,39,0.75)', borderRadius: 999, flexDirection: 'row', padding: 5 },
+  modeButton: { alignItems: 'center', borderRadius: 999, flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  modeActive: { backgroundColor: Brand.colors.primary },
+  modeText: { color: '#FFF', fontSize: 13 },
 });

@@ -1,31 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
+import { NOTIFICATION_FILTERS, matchesFilter, notificationTitle, shortTime, type NotificationFilter } from '@/features/notifications/notification-display';
+import { markAllNotificationsRead, markNotificationRead, subscribeToNotifications, type NotificationEntry, type NotificationType } from '@/features/notifications/notification-service';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
-const severityStyle = {
-  critical: { color: homeColors.red, background: 'rgba(239, 68, 68, 0.1)', icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning' },
-  warning: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)', icon: 'exclamationmark.circle.fill', iconAndroid: 'error' },
-  info: { color: homeColors.green, background: homeColors.greenTint, icon: 'bell.fill', iconAndroid: 'notifications' },
-} as const;
+// Icon and colour per kind of notification (Figma P-22). A critical blood sugar alert is red instead of orange.
+const kindStyle = {
+  booking_update: { color: homeColors.green, background: homeColors.greenTint, icon: 'calendar', iconAndroid: 'calendar_month' },
+  message: { color: '#64748B', background: '#EEF1F5', icon: 'bubble.left.fill', iconAndroid: 'chat' },
+  glucose_alert: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.14)', icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning' },
+  announcement: { color: '#64748B', background: '#EEF1F5', icon: 'megaphone.fill', iconAndroid: 'campaign' },
+  reminder: { color: '#F59E0B', background: '#FEF3C7', icon: 'clock.fill', iconAndroid: 'schedule' },
+  guardian_verification: { color: homeColors.green, background: homeColors.greenTint, icon: 'person.badge.shield.checkmark', iconAndroid: 'verified_user' },
+  doctor_verification: { color: homeColors.green, background: homeColors.greenTint, icon: 'person.badge.shield.checkmark', iconAndroid: 'verified_user' },
+} as const satisfies Record<NotificationType, { color: string; background: string; icon: string; iconAndroid: string }>;
+
+const emptyText: Record<NotificationFilter, string> = {
+  all: 'Alerts about your readings, appointments and messages will show up here.',
+  appointments: 'Updates about your bookings will show up here.',
+  messages: 'New messages from your doctor will show up here.',
+  alerts: 'Out-of-range readings and verification results will show up here.',
+};
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
   const [entries, setEntries] = useState<NotificationEntry[]>([]);
+  const [filter, setFilter] = useState<NotificationFilter>('all');
   const [error, setError] = useState('');
+  const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
     return subscribeToNotifications(uid, setEntries, (value) => setError(value.message));
   }, [uid]);
+
+  const shown = useMemo(() => entries.filter((entry) => matchesFilter(entry.type, filter)), [entries, filter]);
+  const unreadIds = entries.filter((entry) => !entry.isRead).map((entry) => entry.id);
 
   const open = (entry: NotificationEntry) => {
     void markNotificationRead(entry.id);
@@ -35,49 +53,74 @@ export default function NotificationsScreen() {
     else if (entry.type === 'guardian_verification') router.push('/profile');
   };
 
+  const markAll = async () => {
+    if (marking || unreadIds.length === 0) return;
+    setMarking(true); setError('');
+    try {
+      await markAllNotificationsRead(unreadIds);
+    } catch {
+      setError('We could not mark them as read. Please try again.');
+    } finally {
+      setMarking(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => goBack()} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" style={styles.backButton} onPress={() => goBack()} hitSlop={10}>
           <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
         </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>Notifications</Text>
-          <Text style={styles.subtitle}>Health alerts and reminders</Text>
-        </View>
+        <Text style={styles.title}>Notifications</Text>
+        {unreadIds.length > 0 ? (
+          <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
+            <Text style={styles.markAll}>{marking ? 'Marking...' : 'Mark all as read'}</Text>
+          </Pressable>
+        ) : null}
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
+        {NOTIFICATION_FILTERS.map((tab) => (
+          <Pressable key={tab.key} accessibilityRole="button" accessibilityState={{ selected: filter === tab.key }} style={[styles.tab, filter === tab.key && styles.tabActive]} onPress={() => setFilter(tab.key)}>
+            <Text style={[styles.tabText, filter === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {entries.length === 0 ? (
+        {shown.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <SymbolView name={{ ios: 'bell.fill', android: 'inbox', web: 'inbox' }} size={22} tintColor={homeColors.textFaint} />
             </View>
             <Text style={styles.emptyTitle}>You are all caught up</Text>
-            <Text style={styles.emptyDetail}>Alerts about your blood sugar readings will show up here.</Text>
+            <Text style={styles.emptyDetail}>{emptyText[filter]}</Text>
           </View>
-        ) : entries.map((entry) => {
-          const style = severityStyle[entry.severity] ?? severityStyle.info;
-          return (
-            <Pressable key={entry.id} style={[styles.card, !entry.isRead && styles.cardUnread]} onPress={() => open(entry)}>
-              <View style={[styles.icon, { backgroundColor: style.background }]}>
-                <SymbolView name={{ ios: style.icon, android: style.iconAndroid, web: style.iconAndroid }} size={16} tintColor={style.color} />
-              </View>
-              <View style={styles.copy}>
-                <Text style={styles.message}>{entry.message}</Text>
-                <Text style={styles.when}>
-                  {entry.sentAt ? entry.sentAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Just now'}
-                  {entry.type === 'glucose_alert' ? ' · Tap to find a doctor'
-                    : entry.type === 'message' ? ' · Tap to open chat'
-                    : entry.type === 'booking_update' ? ' · Tap to view appointment'
-                    : entry.type === 'guardian_verification' ? ' · Tap to view Profile' : ''}
-                </Text>
-              </View>
-              {!entry.isRead ? <View style={styles.unreadDot} /> : null}
-            </Pressable>
-          );
-        })}
+        ) : (
+          <View style={styles.list}>
+            {shown.map((entry, index) => {
+              const look = entry.type === 'glucose_alert' && entry.severity === 'critical'
+                ? { ...kindStyle.glucose_alert, color: homeColors.red, background: 'rgba(239, 68, 68, 0.1)' }
+                : kindStyle[entry.type] ?? kindStyle.announcement;
+              return (
+                <Pressable key={entry.id} accessibilityRole="button" style={[styles.row, index > 0 && styles.rowDivider]} onPress={() => open(entry)}>
+                  <View style={[styles.icon, { backgroundColor: look.background }]}>
+                    <SymbolView name={{ ios: look.icon, android: look.iconAndroid, web: look.iconAndroid }} size={18} tintColor={look.color} />
+                  </View>
+                  <View style={styles.copy}>
+                    <Text style={styles.rowTitle}>{notificationTitle(entry.type)}</Text>
+                    <Text style={styles.message}>{entry.message}</Text>
+                  </View>
+                  <View style={styles.side}>
+                    <Text style={styles.when}>{shortTime(entry.sentAt)}</Text>
+                    {!entry.isRead ? <View style={styles.unreadDot} accessibilityLabel="Unread" /> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
       <BottomNav active="home" />
     </View>
@@ -86,20 +129,28 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 14, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 56 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingTop: 56 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
-  headerCopy: { flex: 1 },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
-  subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500', marginTop: 2 },
+  title: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900' },
+  markAll: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  tabsScroll: { flexGrow: 0, marginTop: 16 },
+  tabs: { gap: 8, paddingHorizontal: 24 },
+  tab: { backgroundColor: '#FFFFFF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
+  tabActive: { backgroundColor: 'rgba(220, 242, 169, 0.9)' },
+  tabText: { color: '#64748B', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  tabTextActive: { color: homeColors.green },
   scroll: { padding: 24, paddingBottom: 140 },
-  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13 },
-  card: { alignItems: 'flex-start', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 14, marginBottom: 12, padding: 18 },
-  cardUnread: { borderColor: 'rgba(98, 156, 44, 0.35)' },
-  icon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
-  copy: { flex: 1, gap: 4 },
-  message: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  when: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11 },
-  unreadDot: { backgroundColor: homeColors.green, borderRadius: 4, height: 8, marginTop: 6, width: 8 },
+  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginBottom: 12 },
+  list: { backgroundColor: homeColors.card, borderRadius: 28, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.06, shadowRadius: 8 },
+  row: { alignItems: 'flex-start', flexDirection: 'row', gap: 14, paddingVertical: 16 },
+  rowDivider: { borderTopColor: homeColors.border, borderTopWidth: 1 },
+  icon: { alignItems: 'center', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
+  copy: { flex: 1, gap: 3 },
+  rowTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  message: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
+  side: { alignItems: 'flex-end', gap: 8, minWidth: 44 },
+  when: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
+  unreadDot: { backgroundColor: homeColors.green, borderRadius: 5, height: 10, width: 10 },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 60 },
   emptyIcon: { alignItems: 'center', backgroundColor: homeColors.borderSoft, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   emptyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700', marginTop: 4 },

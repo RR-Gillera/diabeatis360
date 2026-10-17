@@ -31,7 +31,13 @@ export default function DoctorLayout() {
   }
 
   if (profile && !profile.isVerified) {
-    return <PendingVerification profile={profile} onSignOut={() => { signOut(); router.replace('/login'); }} />;
+    return (
+      <PendingVerification
+        profile={profile}
+        onSignOut={() => { signOut(); router.replace('/login'); }}
+        onResubmit={() => router.push({ pathname: '/onboarding/professional-info', params: { resubmit: '1' } } as never)}
+      />
+    );
   }
 
   return <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />;

@@ -15,12 +15,15 @@ export const statusStyle: Record<BookingStatus, { label: string; color: string; 
   cancelled: { label: enumLabel('bookingStatus', 'cancelled'), color: '#D9364F', background: '#FBE6E9' },
 };
 
-type DoctorTab = 'home' | 'appointments' | 'patients' | 'profile';
+type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
 
+// The five tabs of the doctor frames (Dashboard, D-05, D-11; DECISIONS D24). The patients list stays reachable from the
+// dashboard's "My Patients" and from the History cards.
 const navItems = [
   { key: 'home', label: 'Home', href: '/doctor', icon: 'house.fill', iconAndroid: 'home' },
-  { key: 'appointments', label: 'Bookings', href: '/doctor/appointments', icon: 'calendar', iconAndroid: 'calendar_month' },
-  { key: 'patients', label: 'Patients', href: '/doctor/patients', icon: 'person.2.fill', iconAndroid: 'groups' },
+  { key: 'requests', label: 'Requests', href: '/doctor/appointments', icon: 'tray.fill', iconAndroid: 'inbox' },
+  { key: 'history', label: 'History', href: '/doctor/history' as Href, icon: 'clock.arrow.circlepath', iconAndroid: 'history' },
+  { key: 'notifications', label: 'Notifications', href: '/doctor/notifications', icon: 'bell.fill', iconAndroid: 'notifications' },
   { key: 'profile', label: 'Profile', href: '/doctor/profile', icon: 'person.fill', iconAndroid: 'person' },
 ] as const satisfies { key: DoctorTab; label: string; href: Href; icon: string; iconAndroid: string }[];
 

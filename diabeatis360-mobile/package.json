@@ -27,7 +27,10 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-fbsdk-next": "^13.4.3",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-nitro-google-signin": "^2.3.0",
+    "react-native-nitro-modules": "^0.37.1",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
@@ -45,12 +48,11 @@
   },
   "scripts": {
     "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --test \"src/constants/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/lib/*.test.mjs\""
+    "test": "node --test \"src/constants/*.test.mjs\" \"src/features/auth/*.test.mjs\" \"src/features/booking/appointment-tabs.test.mjs\" \"src/features/consultation/consultation-format.test.mjs\" \"src/features/doctor/doctor-stats.test.mjs\" \"src/features/notifications/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/features/subscription/plan-display.test.mjs\" \"src/lib/*.test.mjs\""
   },
   "private": true
 }

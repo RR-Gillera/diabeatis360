@@ -1,5 +1,5 @@
-import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
-import type { DocumentSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
+import type { DocumentReference, DocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 import { platformCommission } from '@/constants/commission';
@@ -55,11 +55,25 @@ export function bookingIdFor(providerId: string, slot: Date) {
   return `${providerId}_${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`;
 }
 
+// The Booked_Slots document for a doctor and a time (DECISIONS.md D22): "<providerId>_<epoch milliseconds>". firestore.rules
+// builds the same id from the booking's data and refuses any other, so two bookings for one doctor and time always meet
+// at this one document. It says only "taken or not"; it holds no patient information.
+export function slotIdFor(providerId: string, slot: Date) {
+  return `${providerId}_${slot.getTime()}`;
+}
+
+// The Care_Links document through which a patient shares their profile and readings with one doctor (D22).
+const careLinkIdFor = (providerId: string, patientId: string) => `${providerId}_${patientId}`;
+
 // Creates the booking as a REQUEST: the doctor has to accept before the patient
 // is asked to pay, so no payment method is chosen here and nothing is marked paid.
-// A slot is free if nobody booked it, or the earlier booking was declined/cancelled; anything else means
-// someone got there first. firestore.rules enforces the same thing, so this is the friendly error, not the guard.
-export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number) {
+// A slot is free if nobody holds it (never booked, or the earlier booking was declined/cancelled); otherwise someone
+// got there first. The same write also takes the slot (Booked_Slots) and shares the patient's profile with the doctor
+// (Care_Links); firestore.rules refuses a booking without both, so this is the friendly error, not the guard.
+/** The longest concern a patient can send with a request (the rules refuse anything longer). */
+export const CONCERN_LIMIT = 300;
+
+export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number, concern = '') {
   // A pediatric account (DECISIONS.md D16) may not book a consultation until an admin approves the guardian
   // verification. firestore.rules enforces the same rule; this is only the friendly message before that.
   const patientSnapshot = await getDoc(doc(db, 'Users', patientId));
@@ -71,26 +85,40 @@ export async function createBookingRequest(patientId: string, providerId: string
   }
 
   const reference = doc(db, 'Bookings', bookingIdFor(providerId, selectedDate));
+  const slotReference = doc(db, 'Booked_Slots', slotIdFor(providerId, selectedDate));
+  const linkReference = doc(db, 'Care_Links', careLinkIdFor(providerId, patientId));
+  const scheduledAt = Timestamp.fromDate(selectedDate); // the same value in the booking and its slot: the rules compare them
   const record: BookingRecord = {
     patient_id: patientId,
     provider_id: providerId,
     status: 'pending',
-    scheduled_at: Timestamp.fromDate(selectedDate),
+    scheduled_at: scheduledAt,
     fee,
     platform_commission: platformCommission(fee),
     payment_status: 'unpaid',
     payment_method: null,
     queue_number: null,
     created_at: serverTimestamp(),
+    // Only sent when the patient wrote something (D24): the doctor reads it on Request Details.
+    ...(concern.trim() ? { concern: concern.trim().slice(0, CONCERN_LIMIT) } : {}),
   };
-  await runTransaction(db, async (transaction) => {
-    const existing = await transaction.get(reference);
-    const status = existing.data()?.status;
-    if (existing.exists() && status !== 'declined' && status !== 'cancelled') {
-      throw new Error('That time slot was just booked by someone else. Please pick another time.');
+  const taken = 'That time slot was just booked by someone else. Please pick another time.';
+  try {
+    await runTransaction(db, async (transaction) => {
+      // Other people's bookings are private, so "is it free?" is answered by the slot, not by reading the booking.
+      const slot = await transaction.get(slotReference);
+      if (slot.exists() && slot.data().active === true) throw new Error(taken);
+      transaction.set(reference, record);
+      transaction.set(slotReference, { provider_id: providerId, scheduled_at: scheduledAt, booking_id: reference.id, active: true });
+      transaction.set(linkReference, { provider_id: providerId, patient_id: patientId, booking_id: reference.id, updated_at: serverTimestamp() });
+    });
+  } catch (error) {
+    // Losing a race for the slot, or an email that is not confirmed yet, both come back from the rules as "denied".
+    if (typeof error === 'object' && error && (error as { code?: string }).code === 'permission-denied') {
+      throw new Error(`${taken} (If this keeps happening, check that your email address is confirmed.)`);
     }
-    transaction.set(reference, record);
-  });
+    throw error;
+  }
   return reference.id;
 }
 
@@ -132,6 +160,8 @@ export function subscribeToBookingHistory(
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
             queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
+            concern: String(data.concern ?? ''),
+            declineReason: String(data.decline_reason ?? ''),
           };
         })
         .sort((a, b) => (b.scheduledAt?.getTime() ?? 0) - (a.scheduledAt?.getTime() ?? 0));
@@ -159,9 +189,10 @@ export function subscribeToBooking(
         const patientId = String(data.patient_id ?? '');
         // Both sides of the booking are joined here so a consultation can name
         // the person on the other end, whichever role is viewing.
+        // A name that cannot be read (a doctor whose patient stopped sharing) leaves the name blank instead of failing the screen.
         const [providerSnapshot, patientSnapshot] = await Promise.all([
-          providerId ? getDoc(doc(db, 'Providers', providerId)) : Promise.resolve(null),
-          patientId ? getDoc(doc(db, 'Users', patientId)) : Promise.resolve(null),
+          providerId ? getDoc(doc(db, 'Providers', providerId)).catch(() => null) : Promise.resolve(null),
+          patientId ? getDoc(doc(db, 'Users', patientId)).catch(() => null) : Promise.resolve(null),
         ]);
         onChange({
           id: snapshot.id,
@@ -174,6 +205,8 @@ export function subscribeToBooking(
           paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
           paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
           queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
+          concern: String(data.concern ?? ''),
+          declineReason: String(data.decline_reason ?? ''),
         });
       })();
     },
@@ -198,7 +231,8 @@ export function subscribeToBookingsForProvider(
         const entries = await Promise.all(snapshot.docs.map(async (document) => {
           const data = document.data();
           const patientId = String(data.patient_id ?? '');
-          const patientSnapshot = patientId ? await getDoc(doc(db, 'Users', patientId)) : null;
+          // The patient shared their profile with this doctor by booking (Care_Links, D22); if the name cannot be read, say so.
+          const patientSnapshot = patientId ? await getDoc(doc(db, 'Users', patientId)).catch(() => null) : null;
           return {
             id: document.id,
             patientId,
@@ -263,11 +297,19 @@ async function resequenceQueue(providerId: string, day: Date) {
  * appointment screen, but are not re-notified — a queue that pinged everyone
  * every time it moved would be noise, not news.
  */
-export async function updateBookingStatus(bookingId: string, status: BookingStatus) {
+/** The longest decline reason a doctor can give (the rules refuse anything longer). */
+export const DECLINE_REASON_LIMIT = 500;
+
+/** Accept or decline (or cancel) a booking. A decline may carry the doctor's reason, which the patient sees (D24). */
+export async function updateBookingStatus(bookingId: string, status: BookingStatus, reason = '') {
   const reference = doc(db, 'Bookings', bookingId);
   const snapshot = await getDoc(reference);
   const data = snapshot.data();
-  await updateDoc(reference, { status, ...((status === 'declined' || status === 'cancelled') ? { queue_number: null } : {}) });
+  if (data && (status === 'declined' || status === 'cancelled')) {
+    await releaseBooking(reference, data, status, status === 'declined' ? reason.trim().slice(0, DECLINE_REASON_LIMIT) : '');
+  } else {
+    await updateDoc(reference, { status });
+  }
   if (!data) return;
 
   const providerId = String(data.provider_id ?? '');
@@ -276,12 +318,22 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   if (!providerId || !scheduledAt) return;
 
   const positions = await resequenceQueue(providerId, scheduledAt);
-  if (status !== 'confirmed' || !patientId) return;
+  if ((status !== 'confirmed' && status !== 'declined') || !patientId) return;
 
   const providerSnapshot = await getDoc(doc(db, 'Providers', providerId));
   const doctorName = String(providerSnapshot.data()?.full_name ?? 'your doctor');
   const queueNumber = positions.get(bookingId);
   const when = scheduledAt.toLocaleString('en-US', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  if (status === 'declined') {
+    // The patient learns about a decline (and the doctor's reason, D24) without having to open the app's lists.
+    const why = reason.trim() ? ` Reason: ${reason.trim().slice(0, DECLINE_REASON_LIMIT)}` : '';
+    try {
+      await createNotification(patientId, 'booking_update', `${doctorName} declined your request for ${when}.${why}`, 'info', bookingId);
+    } catch {
+      // The decline itself is saved; a missing note must not make the doctor think it failed.
+    }
+    return;
+  }
   const queueLine = queueNumber ? ` You are number ${queueNumber} in the queue for that day.` : '';
   await createNotification(
     patientId,
@@ -292,24 +344,52 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   );
 }
 
-// Which "09:30 AM"-style slots are already taken for one provider on one day,
-// so the time picker can gray those out instead of allowing a double-book.
-// Same single-equality-filter, sort/filter-client-side shape as the other
-// subscribe* functions here, to avoid needing a composite index.
+// A decline or cancellation: the booking, the time slot it held and (when this was the patient's last live booking with
+// the doctor) the patient's share with the doctor are changed in ONE write (DECISIONS.md D22). firestore.rules refuses a
+// decline that leaves the slot marked taken, and lets the doctor drop the share only when the booking it points to is no
+// longer live. A patient who still has another live booking with this doctor keeps being shared, so their other
+// appointments are not cut off.
+async function releaseBooking(reference: DocumentReference, data: Record<string, unknown>, status: 'declined' | 'cancelled', reason: string) {
+  const providerId = String(data.provider_id ?? '');
+  const patientId = String(data.patient_id ?? '');
+  const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null;
+  const batch = writeBatch(db);
+  batch.update(reference, reason ? { status, queue_number: null, decline_reason: reason } : { status, queue_number: null });
+  if (!providerId || !scheduledAt) {
+    await batch.commit();
+    return;
+  }
+  batch.update(doc(db, 'Booked_Slots', slotIdFor(providerId, scheduledAt)), { active: false });
+
+  const linkReference = doc(db, 'Care_Links', careLinkIdFor(providerId, patientId));
+  const [mine, link] = await Promise.all([
+    getDocs(query(collection(db, 'Bookings'), where('provider_id', '==', providerId))),
+    getDoc(linkReference).catch(() => null), // an older booking may have no share to drop
+  ]);
+  const stillLive = mine.docs.some((other) => other.id !== reference.id
+    && other.data().patient_id === patientId
+    && ['pending', 'confirmed', 'completed'].includes(String(other.data().status)));
+  if (!stillLive && link?.exists()) batch.delete(linkReference);
+  await batch.commit();
+}
+
+// Which "09:30 AM"-style slots are already taken for one provider on one day, so the time picker can gray those out
+// instead of allowing a double-book. It reads Booked_Slots (a doctor, a time, taken or not), not the bookings: other
+// patients' bookings are private (DECISIONS.md D22). Single equality filter, filtered client-side, so no composite index.
 export function subscribeToBookedTimes(
   providerId: string,
   date: Date,
   onChange: (bookedTimes: Set<string>) => void,
   onError: (error: Error) => void,
 ) {
-  const bookingsQuery = query(collection(db, 'Bookings'), where('provider_id', '==', providerId));
+  const slotsQuery = query(collection(db, 'Booked_Slots'), where('provider_id', '==', providerId));
   return onSnapshot(
-    bookingsQuery,
+    slotsQuery,
     (snapshot) => {
       const bookedTimes = new Set<string>();
       for (const document of snapshot.docs) {
         const data = document.data();
-        if (data.status === 'declined' || data.status === 'cancelled') continue;
+        if (data.active !== true) continue;
         const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
         if (!scheduledAt || scheduledAt.toDateString() !== date.toDateString()) continue;
         // hour: '2-digit' zero-pads to match the "09:30 AM"-style labels in the time picker.

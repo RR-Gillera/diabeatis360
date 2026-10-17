@@ -1,7 +1,10 @@
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { MoreMenu } from '@/components/ui/more-menu';
 import { Brand, Fonts, Spacing } from '@/constants/theme';
+import { NotificationBell } from '@/features/notifications/notification-bell';
 
 export const bookingColors = {
   navy: '#10182D',
@@ -37,14 +40,19 @@ export function BookingHeader({ title, subtitle, onBack, actions }: { title: str
 export function BookingHeaderActions() {
   return (
     <View style={styles.headerActions}>
-      <Pressable style={styles.headerActionButton} onPress={() => Alert.alert('Notifications', 'You are all caught up.')}>
-        <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-      </Pressable>
-      <Pressable style={styles.headerActionButton} onPress={() => Alert.alert('Coming Soon', 'More options are on the way.')}>
-        <SymbolView name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={16} tintColor="#64748B" />
-      </Pressable>
+      <NotificationBell style={styles.headerActionButton} />
+      <BookingMoreMenu style={styles.headerActionButton} />
     </View>
   );
+}
+
+/** The three-dots menu on the patient's booking screens (DECISIONS D24): My appointments and Notifications. */
+export function BookingMoreMenu({ style }: { style?: StyleProp<ViewStyle> }) {
+  const router = useRouter();
+  return <MoreMenu style={style} items={[
+    { label: 'My appointments', icon: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, onPress: () => router.push('/booking/my-appointments' as never) },
+    { label: 'Notifications', icon: { ios: 'bell', android: 'notifications', web: 'notifications' }, onPress: () => router.push('/notifications') },
+  ]} />;
 }
 
 export function PrimaryButton({ title, onPress, disabled, loading }: { title: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
