@@ -64,16 +64,50 @@ before(async () => {
 
   // The real Firebase client SDK, signed in through the Auth emulator, exactly like the app.
   const { initializeApp } = require('firebase/app')
-  const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, signOut } = require('firebase/auth')
+  const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, reload, sendEmailVerification, signOut } = require('firebase/auth')
   const { getFunctions, httpsCallableFromURL } = require('firebase/functions')
   const app = initializeApp({ apiKey: 'fake-key', projectId: PROJECT }, 'e2e')
   const auth = getAuth(app)
   connectAuthEmulator(auth, `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`, { disableWarnings: true })
   const functions = getFunctions(app)
+  // The real Firestore client too, so the email-confirmation test can show that the RULES see the renewed token (D21).
+  const { collection, connectFirestoreEmulator, doc, getFirestore, serverTimestamp, writeBatch } = require('firebase/firestore')
+  const clientDb = getFirestore(app)
+  const [firestoreHost, firestorePort] = process.env.FIRESTORE_EMULATOR_HOST.split(':')
+  connectFirestoreEmulator(clientDb, firestoreHost, Number(firestorePort))
+
+  // What a real person does to confirm their email (D21): Firebase emails a link, they tap it, and the app asks Firebase
+  // again. The Auth emulator keeps the "email" in a list instead of sending it, so the test reads the link from there.
+  const tapVerificationLink = async (user, { refreshToken = true } = {}) => {
+    await sendEmailVerification(user)
+    const inbox = await (await fetch(`http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/emulator/v1/projects/${PROJECT}/oobCodes`)).json()
+    const link = inbox.oobCodes.filter((code) => code.email === user.email && code.requestType === 'VERIFY_EMAIL').pop().oobLink
+    await fetch(link) // "tap the link in the email"
+    await reload(user) // the app's user object learns the email is confirmed ...
+    if (refreshToken) await user.getIdToken(true) // ... and the sign-in token (which the servers and rules read) is renewed
+  }
+
   client = {
-    auth, signOut,
-    signUp: async (email) => (await createUserWithEmailAndPassword(auth, email, 'Passw0rd!')).user.uid,
+    auth, signOut, tapVerificationLink,
+    // A new account starts unconfirmed, like a real sign-up. Most tests want a person who already confirmed their email.
+    signUp: async (email, { verified = true } = {}) => {
+      const { user } = await createUserWithEmailAndPassword(auth, email, 'Passw0rd!')
+      if (verified) await tapVerificationLink(user)
+      return user.uid
+    },
     call: (name, data) => httpsCallableFromURL(functions, `${base}/api/${name}`)(data).then((r) => r.data),
+    // As the app requests a booking (D22), under the rules, as the signed-in user: the booking, the time slot it takes and the
+    // patient's share with the doctor, in ONE write.
+    book: async (data) => {
+      const reference = doc(collection(clientDb, 'Bookings'))
+      const batch = writeBatch(clientDb)
+      batch.set(reference, data)
+      batch.set(doc(clientDb, 'Booked_Slots', `${data.provider_id}_${data.scheduled_at.toMillis()}`), { provider_id: data.provider_id, scheduled_at: data.scheduled_at, booking_id: reference.id, active: true })
+      batch.set(doc(clientDb, 'Care_Links', `${data.provider_id}_${data.patient_id}`), { provider_id: data.provider_id, patient_id: data.patient_id, booking_id: reference.id, updated_at: serverTimestamp() })
+      await batch.commit()
+      return reference
+    },
+    inDays: (days) => require('firebase/firestore').Timestamp.fromMillis(Date.now() + days * 86400000),
   }
 })
 
@@ -104,6 +138,67 @@ test('exercise through Vercel, then the Free plan refuses the third generation o
   const error = await failure(client.call('generateRecommendations', { kind: 'meal' }))
   assert.equal(error && error.code, 'functions/resource-exhausted')
   assert.match(error.message, /free AI suggestions/)
+  // The app tells the Free limit (offer Premium) from the limits Premium cannot lift by this, so the real Firebase
+  // client must hand over the server's details untouched (src/lib/ai-error.ts).
+  assert.deepEqual(error.details, { limit: 2, feature: 'ai', scope: 'free' })
+})
+
+const profile = { full_name: 'E2E', diabetes_type: 'Type 2', allergies: 'None', language_preference: 'English' }
+
+test('an account whose email is not confirmed is refused by every AI endpoint; nothing is asked, saved or counted (D21)', { skip }, async () => {
+  const uid = await client.signUp(`unverified${Date.now()}@test.com`, { verified: false })
+  await db.doc(`Users/${uid}`).set(profile)
+  const before = geminiCalls
+  const calls = [
+    ['generateRecommendations', { kind: 'exercise' }],
+    ['analyzeLabel', { imageBase64: 'aGVsbG8=', mimeType: 'image/png' }],
+    ['lookupProduct', { barcode: '4800016123456' }],
+  ]
+  for (const [name, data] of calls) {
+    const error = await failure(client.call(name, data))
+    assert.equal(error && error.code, 'functions/permission-denied', name)
+    assert.match(error.message, /verify your email/i, name)
+  }
+  assert.equal(geminiCalls, before, 'Gemini was never asked')
+  assert.equal((await db.collection('AI_Suggestions').where('user_id', '==', uid).get()).size, 0)
+  assert.equal((await db.collection('Nutrition_Scans').where('user_id', '==', uid).get()).size, 0)
+  assert.equal((await db.collection('Usage_Counters').get()).docs.filter((doc) => doc.id.endsWith(`_${uid}`)).length, 0, 'not counted either')
+})
+
+test('the same account works once its email is confirmed: link tapped, then the sign-in token renewed (D21)', { skip }, async () => {
+  const uid = await client.signUp(`later${Date.now()}@test.com`, { verified: false })
+  await db.doc(`Users/${uid}`).set(profile)
+  assert.equal((await failure(client.call('generateRecommendations', { kind: 'exercise' }))).code, 'functions/permission-denied')
+
+  // The link is tapped, but the phone still holds the sign-in token it was given BEFORE the email was confirmed. That token
+  // says "not confirmed" until it expires (up to an hour), so the server still refuses it ...
+  await client.tapVerificationLink(client.auth.currentUser, { refreshToken: false })
+  assert.equal((await failure(client.call('generateRecommendations', { kind: 'exercise' }))).code, 'functions/permission-denied', 'a stale token still says "not confirmed"')
+
+  // ... which is why the app renews the token (getIdToken(true)) the moment it sees the email is confirmed.
+  await client.auth.currentUser.getIdToken(true)
+  const result = await client.call('generateRecommendations', { kind: 'exercise' })
+  assert.equal(result.blocked, false)
+  assert.equal((await db.collection('AI_Suggestions').where('user_id', '==', uid).get()).size, 1)
+})
+
+test('booking needs a confirmed email, and Firestore\'s rules see the renewed token from the real client (D21)', { skip }, async () => {
+  await db.doc('Providers/doc-e2e').set({ full_name: 'Dr E2E', is_verified: true, is_active: true, consultation_fee: 500 })
+  const uid = await client.signUp(`booking${Date.now()}@test.com`, { verified: false })
+  // The booking rule also reads the patient's own profile (a pediatric account cannot book before its guardian is approved).
+  await db.doc(`Users/${uid}`).set({ full_name: 'Booker', role: 'patient', is_active: true })
+  const booking = { patient_id: uid, provider_id: 'doc-e2e', status: 'pending', payment_status: 'unpaid', fee: 500, platform_commission: 75, scheduled_at: client.inDays(3) }
+  const refused = async () => (await failure(client.book(booking)))?.code
+
+  assert.equal(await refused(), 'permission-denied', 'an account whose email is not confirmed cannot book')
+  // The link is tapped, but the signed-in client still holds its old token: the rules still say no ...
+  await client.tapVerificationLink(client.auth.currentUser, { refreshToken: false })
+  assert.equal(await refused(), 'permission-denied', 'a stale token still says "not confirmed"')
+  // ... until the app renews the token. The SAME Firestore client must then use it (nothing is rebuilt or reconnected).
+  await client.auth.currentUser.getIdToken(true)
+  const saved = await client.book(booking)
+  assert.ok(saved.id, 'the booking is saved once the renewed token reaches the rules')
+  assert.equal((await db.doc(`Bookings/${saved.id}`).get()).data().patient_id, uid)
 })
 
 test('a critical reading is blocked on the server: no Gemini call', { skip }, async () => {

@@ -7,8 +7,11 @@
 //   success : 200 { result }
 //   failure : the error's HTTP status and { error: { status, message, details } }
 // This file imports nothing from Firebase on purpose, so test/callable.test.js can check it without a project.
+// Only people whose email address is confirmed get through (lib/verified.js, DECISIONS.md D21).
 
 const { HttpsError } = require('firebase-functions/v2/https')
+
+const { requireVerifiedEmail } = require('../lib/verified')
 
 function send(res, status, body) {
   res.statusCode = status
@@ -26,8 +29,9 @@ async function readBody(req) {
 }
 
 /**
- * Wraps `run({ uid, data })` as a callable endpoint. `verifyToken(idToken)` must resolve to { uid } for a genuine
- * Firebase sign-in and reject otherwise. Only signed-in users ever reach `run`.
+ * Wraps `run({ uid, data })` as a callable endpoint. `verifyToken(idToken)` must resolve to the decoded token
+ * ({ uid, email_verified }) for a genuine Firebase sign-in and reject otherwise. Only signed-in users whose email
+ * address is confirmed ever reach `run`.
  */
 function makeCallable(run, { verifyToken, log = console.error }) {
   return async function handler(req, res) {
@@ -44,9 +48,9 @@ function makeCallable(run, { verifyToken, log = console.error }) {
 
       const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '')
       if (!match) throw new HttpsError('unauthenticated', 'Please sign in to use this feature.')
-      let uid
+      let decoded
       try {
-        uid = (await verifyToken(match[1])).uid
+        decoded = await verifyToken(match[1])
       } catch (error) {
         // Only a genuine sign-in problem (expired, forged, wrong project: Firebase codes "auth/...") means "sign in
         // again". Anything else, such as a missing service account on the server, is our fault and is logged below.
@@ -55,7 +59,10 @@ function makeCallable(run, { verifyToken, log = console.error }) {
         }
         throw error
       }
+      const uid = decoded && decoded.uid
       if (!uid) throw new HttpsError('unauthenticated', 'Please sign in again to use this feature.')
+      // Checked on the server because the app's screens can be bypassed (D21); a token with no claim at all counts as "no".
+      requireVerifiedEmail(decoded.email_verified)
 
       let body
       try {

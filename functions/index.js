@@ -14,6 +14,7 @@ const { defineSecret } = require('firebase-functions/params')
 
 const { callGemini } = require('./lib/gemini')
 const { analyzeLabel, generateRecommendations, lookupProduct } = require('./lib/handlers')
+const { requireVerifiedEmail } = require('./lib/verified')
 
 initializeApp()
 const geminiKey = defineSecret('GEMINI_API_KEY')
@@ -23,6 +24,8 @@ const options = { region: 'asia-southeast1', secrets: [geminiKey], timeoutSecond
 
 function requireUser(request) {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Please sign in to use this feature.')
+  // Only people whose email address is confirmed (DECISIONS.md D21): the claim comes from the signed token.
+  requireVerifiedEmail(request.auth.token && request.auth.token.email_verified)
   return request.auth.uid
 }
 

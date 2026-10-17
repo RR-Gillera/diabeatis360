@@ -6,6 +6,7 @@ const { test } = require('node:test')
 const { HttpsError } = require('firebase-functions/v2/https')
 
 const { makeCallable } = require('../server/callable')
+const { UNVERIFIED_MESSAGE } = require('../lib/verified')
 
 function fakeRes() {
   return {
@@ -18,9 +19,13 @@ function fakeRes() {
 const req = ({ method = 'POST', token = 'good', body = { data: {} } } = {}) => ({
   method, body, headers: token ? { authorization: `Bearer ${token}` } : {},
 })
-// A stand-in for Firebase's verifyIdToken: "good" is a valid sign-in; anything else is rejected the way firebase-admin does.
+// A stand-in for Firebase's verifyIdToken: "good" is a valid sign-in with a confirmed email; the others are valid sign-ins
+// that are NOT confirmed (email_verified false, or no claim at all); anything else is rejected the way firebase-admin does.
 async function verifyToken(token) {
-  if (token === 'good') return { uid: 'patient-1' }
+  if (token === 'good') return { uid: 'patient-1', email_verified: true }
+  if (token === 'unverified') return { uid: 'patient-2', email_verified: false }
+  if (token === 'no-claim') return { uid: 'patient-3' }
+  if (token === 'string-true') return { uid: 'patient-4', email_verified: 'true' }
   throw Object.assign(new Error('bad token'), { code: 'auth/argument-error' })
 }
 const quiet = () => {}
@@ -43,6 +48,19 @@ test('no token: 401 UNAUTHENTICATED and the handler never runs', async () => {
   assert.equal(res.statusCode, 401)
   assert.equal(res.json.error.status, 'UNAUTHENTICATED')
   assert.equal(ran, false)
+})
+
+test('a signed-in account whose email is not confirmed: 403 PERMISSION_DENIED with a "verify your email" message, handler never runs (D21)', async () => {
+  for (const token of ['unverified', 'no-claim', 'string-true']) {
+    let ran = false
+    const handler = makeCallable(async () => { ran = true }, { verifyToken })
+    const res = fakeRes()
+    await handler(req({ token }), res)
+    assert.equal(res.statusCode, 403, token)
+    assert.deepEqual(res.json.error, { status: 'PERMISSION_DENIED', message: UNVERIFIED_MESSAGE }, token)
+    assert.equal(ran, false, `${token}: the handler must not run`)
+  }
+  assert.match(UNVERIFIED_MESSAGE, /verify your email/i)
 })
 
 test('a forged or expired token: 401 UNAUTHENTICATED', async () => {

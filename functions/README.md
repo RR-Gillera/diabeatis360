@@ -55,3 +55,18 @@ For the emulator, put `GEMINI_API_KEY=your-key` in `functions/.secret.local` (gi
 ## Keep in sync
 `lib/glucose.js` is a copy of `diabeatis360-mobile/src/constants/glucose.ts` (the server cannot import from the app);
 `test/glucose-parity.test.js` fails if they ever disagree. The free limits in `lib/limits.js` mirror `src/constants/plans.ts`.
+
+## Only confirmed emails (DECISIONS.md D21)
+Every endpoint refuses a sign-in whose email address is not confirmed: HTTP 403 `PERMISSION_DENIED`, "Please verify your email
+address first." `lib/verified.js` holds the check; `server/callable.js` (Vercel) and `index.js` (Firebase Functions) both call it,
+reading the `email_verified` claim of the verified sign-in token. A token issued before the person tapped the link keeps saying
+"not confirmed" until it is renewed (`getIdToken(true)`, which the app does at once), and `test/vercel-e2e.test.js` pins that.
+
+## Daily limits (DECISIONS.md D20)
+Before every Gemini call `lib/usage.js` reserves a slot in the server-only `Usage_Counters` collection, inside one Firestore
+transaction, and gives it back if nothing useful came out. That is what stops simultaneous requests from going past a limit.
+Three limits apply, all in `lib/limits.js`: Free 2 AI + 3 scans a day, Premium fair use 30 + 30, and everyone together
+`GEMINI_DAILY_CAP` (default 200; set it from https://aistudio.google.com/rate-limit). The day is the Manila day. A refusal is HTTP 429
+with `details.scope` = `free`, `fair_use` or `project`, which the app uses to decide whether to offer an upgrade.
+Run the emulator tests one file at a time (they share one database, so running them together double-counts):
+`firebase emulators:exec --only firestore --project demo-diabeatis360 "node --test functions/test/handlers.test.js"`.
