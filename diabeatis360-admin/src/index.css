@@ -12,6 +12,18 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Tailwind 4 no longer gives buttons a pointer cursor, so links-styled-as-buttons ("Forgot password?") looked like
+   plain text. Everything clickable shows the hand cursor again; disabled buttons keep their not-allowed cursor. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 body {
   margin: 0;
   background: var(--color-page);
