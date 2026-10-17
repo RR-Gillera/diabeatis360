@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { initializeTestEnvironment, assertSucceeds, assertFails } = require('@firebase/rules-unit-testing');
-const { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, query, where, serverTimestamp } = require('firebase/firestore');
+const { doc, getDoc, setDoc, updateDoc, addDoc, collection, getDocs, query, where, serverTimestamp, Timestamp, writeBatch, deleteDoc } = require('firebase/firestore');
 
 let passed = 0;
 const failures = [];
@@ -26,6 +26,44 @@ const deny = (name, promise) => check(name, promise, false);
     firestore: { rules: fs.readFileSync(path.join(__dirname, '..', 'firestore.rules'), 'utf8'), host: '127.0.0.1', port: Number(process.env.FIRESTORE_EMULATOR_HOST.split(':')[1]) },
   });
 
+  // ---- booking helpers (D22: a booking, the time slot it holds and the patient's share with the doctor)
+  // Each booking below gets its own time, because each one holds its own slot (Booked_Slots/<doctor>_<epoch ms>).
+  const SLOT_START = Date.parse('2026-10-20T06:00:00Z');
+  const slotTime = (n) => Timestamp.fromMillis(SLOT_START + n * 30 * 60 * 1000);
+  const slotIdOf = (provider, when) => `${provider}_${when.toMillis()}`;
+  const isLive = (status) => ['pending', 'confirmed', 'completed'].includes(status);
+  // A booking as it looks in the database after the app wrote it, written with the rules OFF (test data only).
+  const seedBooking = async (db, id, data, n) => {
+    const when = slotTime(n);
+    await setDoc(doc(db, 'Bookings', id), { scheduled_at: when, ...data });
+    await setDoc(doc(db, 'Booked_Slots', slotIdOf(data.provider_id, when)), { provider_id: data.provider_id, scheduled_at: when, booking_id: id, active: isLive(data.status) });
+    if (isLive(data.status)) {
+      await setDoc(doc(db, 'Care_Links', `${data.provider_id}_${data.patient_id}`), { provider_id: data.provider_id, patient_id: data.patient_id, booking_id: id, updated_at: Timestamp.now() });
+    }
+  };
+  // What the app does when a patient requests a booking: the booking, the slot it takes and the share with the doctor in ONE
+  // write. A test can leave a part out (skip), change a part (booking / slot / link: an object to merge, or a function that
+  // receives the normal data and returns what to write) or give a part a different document id (slotId / linkId).
+  const book = (db, id, { patient = 'p1', provider = 'd1', n = 100, booking = {}, slot = {}, link = {}, skip = [], slotId, linkId } = {}) => {
+    const when = slotTime(n);
+    const shape = (base, change) => (typeof change === 'function' ? change(base) : { ...base, ...change });
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'Bookings', id), shape({ patient_id: patient, provider_id: provider, status: 'pending', payment_status: 'unpaid', fee: 500, platform_commission: 75, scheduled_at: when }, booking));
+    if (!skip.includes('slot')) batch.set(doc(db, 'Booked_Slots', slotId ?? slotIdOf(provider, when)), shape({ provider_id: provider, scheduled_at: when, booking_id: id, active: true }, slot));
+    if (!skip.includes('link')) batch.set(doc(db, 'Care_Links', linkId ?? `${provider}_${patient}`), shape({ provider_id: provider, patient_id: patient, booking_id: id, updated_at: serverTimestamp() }, link));
+    return batch.commit();
+  };
+  // What the doctor's app does on a decline: the booking, its slot and (when the patient has no other live booking with this
+  // doctor) the share, in ONE write.
+  const decline = (db, id, { provider = 'd1', patient = 'p1', n, dropLink = false, skip = [] } = {}) => {
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'Bookings', id), { status: 'declined', queue_number: null });
+    if (!skip.includes('slot')) batch.update(doc(db, 'Booked_Slots', slotIdOf(provider, slotTime(n))), { active: false });
+    if (dropLink) batch.delete(doc(db, 'Care_Links', `${provider}_${patient}`));
+    return batch.commit();
+  };
+  const note = (bookingId, patient, provider, over = {}) => ({ booking_id: bookingId, patient_id: patient, provider_id: provider, summary: 'Advised low-carb dinners.', updated_at: serverTimestamp(), ...over });
+
   // ---- seed data with rules disabled
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
@@ -44,26 +82,36 @@ const deny = (name, promise) => check(name, promise, false);
     await setDoc(doc(db, 'Users/pMinorRejected'), { full_name: 'Minor Rejected', role: 'patient', is_active: true, account_type: 'minor' });
     await setDoc(doc(db, 'Guardian_Verifications/pMinorRejected'), { user_id: 'pMinorRejected', guardian_full_name: 'Old Name', relationship_to_minor: 'parent', guardian_id_photo_url: 'https://x/old.jpg', verification_status: 'rejected', rejection_reason: 'Blurry photo' });
     await setDoc(doc(db, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 110, context: 'before_meal' });
-    await setDoc(doc(db, 'Bookings/bPending'), { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 });
-    await setDoc(doc(db, 'Bookings/bPendingB'), { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 });
-    await setDoc(doc(db, 'Bookings/bConfirmed'), { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'unpaid', fee: 500 });
-    await setDoc(doc(db, 'Bookings/bConfirmed2'), { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'paid', fee: 500 });
-    await setDoc(doc(db, 'Bookings/bDone'), { patient_id: 'p1', provider_id: 'd1', status: 'completed', consultation_status: 'ended', fee: 500 });
+    await setDoc(doc(db, 'Glucose_Logs/g9'), { patient_id: 'p9', reading_mgdl: 99, context: 'before_meal' });
+    // Each booking holds its own time slot and, while live, the patient's share with the doctor (D22).
+    await seedBooking(db, 'bPending', { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }, 1);
+    await seedBooking(db, 'bPendingB', { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }, 2);
+    await seedBooking(db, 'bConfirmed', { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'unpaid', fee: 500 }, 3);
+    await seedBooking(db, 'bConfirmed2', { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'paid', fee: 500 }, 4);
+    await seedBooking(db, 'bDone', { patient_id: 'p1', provider_id: 'd1', status: 'completed', consultation_status: 'ended', fee: 500 }, 5);
     await setDoc(doc(db, 'Messages/m1'), { booking_id: 'bConfirmed', sender_id: 'p1', sender_role: 'patient', message: 'hi' });
     await setDoc(doc(db, 'Notifications/n1'), { user_id: 'p1', message: 'x', is_read: false });
     await setDoc(doc(db, 'Subscriptions/s1'), { user_id: 'p1', plan_id: 'x', status: 'active' });
+    // Plans for the subscription rules (D20): two paid plans, the Free plan (price 0) and a paid plan with no length.
+    await setDoc(doc(db, 'Subscription_Plans/planMonthly'), { plan_name: 'Premium Monthly', price: 99, duration_days: 30 });
+    await setDoc(doc(db, 'Subscription_Plans/planAnnual'), { plan_name: 'Premium Annual', price: 899, duration_days: 365 });
+    await setDoc(doc(db, 'Subscription_Plans/planFree'), { plan_name: 'Free', price: 0, duration_days: 0 });
+    await setDoc(doc(db, 'Subscription_Plans/planNoLength'), { plan_name: 'Broken', price: 50 });
   });
 
-  const p1 = env.authenticatedContext('p1').firestore();
-  const p2 = env.authenticatedContext('p2').firestore();
-  const d1 = env.authenticatedContext('d1').firestore(); // verified doctor
-  const d2 = env.authenticatedContext('d2').firestore(); // unverified doctor
-  const a1 = env.authenticatedContext('a1').firestore(); // admin
-  const d5 = env.authenticatedContext('d5').firestore(); // never-verified doctor
+  // Every identity below is someone who has CONFIRMED their email address: the email_verified claim in the signed sign-in
+  // token (DECISIONS.md D21), which a person cannot fake. A test that wants an unconfirmed person says so with a claim.
+  const signedIn = (uid, claims = {}) => env.authenticatedContext(uid, { email_verified: true, ...claims });
+  const p1 = signedIn('p1').firestore();
+  const p2 = signedIn('p2').firestore();
+  const d1 = signedIn('d1').firestore(); // verified doctor
+  const d2 = signedIn('d2').firestore(); // unverified doctor
+  const a1 = signedIn('a1').firestore(); // admin
+  const d5 = signedIn('d5').firestore(); // never-verified doctor
   const anon = env.unauthenticatedContext().firestore();
-  const pMinorPending = env.authenticatedContext('pMinorPending').firestore();
-  const pMinorApproved = env.authenticatedContext('pMinorApproved').firestore();
-  const pMinorRejected = env.authenticatedContext('pMinorRejected').firestore();
+  const pMinorPending = signedIn('pMinorPending').firestore();
+  const pMinorApproved = signedIn('pMinorApproved').firestore();
+  const pMinorRejected = signedIn('pMinorRejected').firestore();
 
   // ---- Users
   await allow('p1 reads own Users doc', getDoc(doc(p1, 'Users/p1')));
@@ -76,13 +124,13 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('p1 deactivates self (is_active)', updateDoc(doc(p1, 'Users/p1'), { is_active: false }));
   await allow('admin sets is_active', updateDoc(doc(a1, 'Users/p1'), { is_active: false }));
   await deny('p2 edits p1 profile', updateDoc(doc(p2, 'Users/p1'), { full_name: 'hacked' }));
-  await allow('p1 creates own new Users doc', setDoc(doc(env.authenticatedContext('p3').firestore(), 'Users/p3'), { full_name: 'New', role: 'patient' }));
+  await allow('p1 creates own new Users doc', setDoc(doc(signedIn('p3').firestore(), 'Users/p3'), { full_name: 'New', role: 'patient' }));
   await deny('p1 creates Users doc for someone else', setDoc(doc(p1, 'Users/p9'), { full_name: 'x' }));
   await deny('delete Users doc', require('firebase/firestore').deleteDoc(doc(p1, 'Users/p1')));
 
   // ---- Users.account_type (D16)
-  await allow('new patient creates a Users doc with account_type self', setDoc(doc(env.authenticatedContext('pSelfNew').firestore(), 'Users/pSelfNew'), { full_name: 'Self New', role: 'patient', is_active: true, account_type: 'self' }));
-  await deny('a Users doc cannot be created with an invalid account_type', setDoc(doc(env.authenticatedContext('pBadType').firestore(), 'Users/pBadType'), { full_name: 'Bad', role: 'patient', is_active: true, account_type: 'adult' }));
+  await allow('new patient creates a Users doc with account_type self', setDoc(doc(signedIn('pSelfNew').firestore(), 'Users/pSelfNew'), { full_name: 'Self New', role: 'patient', is_active: true, account_type: 'self' }));
+  await deny('a Users doc cannot be created with an invalid account_type', setDoc(doc(signedIn('pBadType').firestore(), 'Users/pBadType'), { full_name: 'Bad', role: 'patient', is_active: true, account_type: 'adult' }));
   await allow('account_type can be set once after the account already exists (the account-for screen)', updateDoc(doc(p1, 'Users/p1'), { account_type: 'self' }));
   await deny('account_type cannot be changed once it is set', updateDoc(doc(p1, 'Users/p1'), { account_type: 'minor' }));
   await deny('a minor cannot relabel themselves self to dodge guardian approval', updateDoc(doc(pMinorPending, 'Users/pMinorPending'), { account_type: 'self' }));
@@ -94,18 +142,18 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('d2 self-verifies', updateDoc(doc(d2, 'Providers/d2'), { is_verified: true }));
   await deny('d2 sets verified_by', updateDoc(doc(d2, 'Providers/d2'), { verified_by: 'd2' }));
   await allow('admin verifies doctor', updateDoc(doc(a1, 'Providers/d2'), { is_verified: true, verified_by: 'a1' }));
-  await allow('doctor creates own Providers doc unverified', setDoc(doc(env.authenticatedContext('d3').firestore(), 'Providers/d3'), { full_name: 'New Dr', is_verified: false }));
-  await deny('doctor creates own Providers doc pre-verified', setDoc(doc(env.authenticatedContext('d4').firestore(), 'Providers/d4'), { full_name: 'Sneaky', is_verified: true }));
+  await allow('doctor creates own Providers doc unverified', setDoc(doc(signedIn('d3').firestore(), 'Providers/d3'), { full_name: 'New Dr', is_verified: false }));
+  await deny('doctor creates own Providers doc pre-verified', setDoc(doc(signedIn('d4').firestore(), 'Providers/d4'), { full_name: 'Sneaky', is_verified: true }));
   // ---- admin Figma pass: Providers reject-with-reason, created_by_admin one-shot (UT-A006)
   await allow('admin rejects with a reason and records the reviewer', updateDoc(doc(a1, 'Providers/d5'), { rejection_reason: 'License photo unreadable', reviewed_by: 'a1', reviewed_at: serverTimestamp() }));
-  await deny('doctor sets reviewed_by on themself', updateDoc(doc(env.authenticatedContext('d5').firestore(), 'Providers/d5'), { reviewed_by: 'd5' }));
-  await allow('doctor clears their own rejection_reason on resubmit', updateDoc(doc(env.authenticatedContext('d5').firestore(), 'Providers/d5'), { rejection_reason: '' }));
+  await deny('doctor sets reviewed_by on themself', updateDoc(doc(signedIn('d5').firestore(), 'Providers/d5'), { reviewed_by: 'd5' }));
+  await allow('doctor clears their own rejection_reason on resubmit', updateDoc(doc(signedIn('d5').firestore(), 'Providers/d5'), { rejection_reason: '' }));
   await allow('admin sets created_by_admin the first time', updateDoc(doc(a1, 'Providers/d2'), { created_by_admin: 'a1' }));
   await deny('admin changes created_by_admin a second time', updateDoc(doc(a1, 'Providers/d2'), { created_by_admin: 'someone-else' }));
-  await deny('doctor sets their own created_by_admin', updateDoc(doc(env.authenticatedContext('d2').firestore(), 'Providers/d2'), { created_by_admin: 'd2' }));
+  await deny('doctor sets their own created_by_admin', updateDoc(doc(signedIn('d2').firestore(), 'Providers/d2'), { created_by_admin: 'd2' }));
   // ---- Providers audit trail hardening: a self-created doc cannot carry ANY admin/review field, and the admin
   // fields must name the admin who wrote them (so created_by_admin proves WHICH admin account did it).
-  const asDoctor = (uid) => env.authenticatedContext(uid).firestore();
+  const asDoctor = (uid) => signedIn(uid).firestore();
   await deny('doctor self-creates with is_verified true', setDoc(doc(asDoctor('d11'), 'Providers/d11'), { full_name: 'Sneaky', is_verified: true }));
   await deny('doctor self-creates with is_verified as the string "true"', setDoc(doc(asDoctor('d12'), 'Providers/d12'), { full_name: 'Sneaky', is_verified: 'true' }));
   await deny('doctor self-creates already deactivated', setDoc(doc(asDoctor('d13'), 'Providers/d13'), { full_name: 'X', is_verified: false, is_active: false }));
@@ -157,9 +205,9 @@ const deny = (name, promise) => check(name, promise, false);
   const newGuardian = (uid, over = {}) => ({ user_id: uid, guardian_full_name: 'Maria Dela Cruz', relationship_to_minor: 'parent', guardian_id_photo_url: 'https://x/id.jpg', verification_status: 'pending', ...over });
   await allow('a minor submits their own guardian verification', setDoc(doc(pMinorPending, 'Guardian_Verifications/pMinorPending'), newGuardian('pMinorPending')));
   await deny('a stranger submits a guardian verification for someone else', setDoc(doc(p1, 'Guardian_Verifications/pMinorPending'), newGuardian('pMinorPending')));
-  await deny('a new guardian verification cannot start already approved', setDoc(doc(env.authenticatedContext('pMinorSneaky').firestore(), 'Guardian_Verifications/pMinorSneaky'), newGuardian('pMinorSneaky', { verification_status: 'approved' })));
-  await deny('guardian verification with an invalid relationship', setDoc(doc(env.authenticatedContext('pMinorBadRel').firestore(), 'Guardian_Verifications/pMinorBadRel'), newGuardian('pMinorBadRel', { relationship_to_minor: 'uncle' })));
-  await deny('guardian verification with no photo', setDoc(doc(env.authenticatedContext('pMinorNoPhoto').firestore(), 'Guardian_Verifications/pMinorNoPhoto'), newGuardian('pMinorNoPhoto', { guardian_id_photo_url: '' })));
+  await deny('a new guardian verification cannot start already approved', setDoc(doc(signedIn('pMinorSneaky').firestore(), 'Guardian_Verifications/pMinorSneaky'), newGuardian('pMinorSneaky', { verification_status: 'approved' })));
+  await deny('guardian verification with an invalid relationship', setDoc(doc(signedIn('pMinorBadRel').firestore(), 'Guardian_Verifications/pMinorBadRel'), newGuardian('pMinorBadRel', { relationship_to_minor: 'uncle' })));
+  await deny('guardian verification with no photo', setDoc(doc(signedIn('pMinorNoPhoto').firestore(), 'Guardian_Verifications/pMinorNoPhoto'), newGuardian('pMinorNoPhoto', { guardian_id_photo_url: '' })));
   await allow('the minor reads their own guardian verification', getDoc(doc(pMinorApproved, 'Guardian_Verifications/pMinorApproved')));
   await deny("a stranger reads someone else's guardian verification", getDoc(doc(p1, 'Guardian_Verifications/pMinorApproved')));
   await allow('an admin reads any guardian verification', getDoc(doc(a1, 'Guardian_Verifications/pMinorApproved')));
@@ -185,32 +233,45 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('p2 edits p1 log', updateDoc(doc(p2, 'Glucose_Logs/g1'), { reading_mgdl: 1 }));
   await deny('p2 deletes p1 log', require('firebase/firestore').deleteDoc(doc(p2, 'Glucose_Logs/g1')));
 
-  // ---- Bookings: create
-  const newBooking = (over = {}) => ({ patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500, platform_commission: 75, ...over });
-  await allow('p1 books d1 at listed fee', addDoc(collection(p1, 'Bookings'), newBooking()));
-  await deny('p1 books with a lower fee', addDoc(collection(p1, 'Bookings'), newBooking({ fee: 1 })));
-  await deny('p1 books as already confirmed', addDoc(collection(p1, 'Bookings'), newBooking({ status: 'confirmed' })));
-  await deny('p1 books as already paid', addDoc(collection(p1, 'Bookings'), newBooking({ payment_status: 'paid' })));
-  await deny('p1 books in the name of p2', addDoc(collection(p1, 'Bookings'), newBooking({ patient_id: 'p2' })));
-  await deny('booking without platform_commission', addDoc(collection(p1, 'Bookings'), { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }));
-  await deny('booking with a wrong commission', addDoc(collection(p1, 'Bookings'), newBooking({ platform_commission: 1 })));
-  await deny('booking with a non-numeric commission', addDoc(collection(p1, 'Bookings'), newBooking({ platform_commission: '75' })));
-  // double-booking: the doc id is <provider>_<slot>
-  await allow('p1 books a slot with a deterministic id', setDoc(doc(p1, 'Bookings/d1_202609281400'), newBooking()));
-  await deny('p2 books the SAME slot (double booking)', setDoc(doc(p2, 'Bookings/d1_202609281400'), newBooking({ patient_id: 'p2' })));
-  await deny('p1 overwrites own active booking', setDoc(doc(p1, 'Bookings/d1_202609281400'), newBooking()));
-  await allow('d1 declines that booking', updateDoc(doc(d1, 'Bookings/d1_202609281400'), { status: 'declined', queue_number: null }));
-  await allow('p2 re-books the freed slot', setDoc(doc(p2, 'Bookings/d1_202609281400'), newBooking({ patient_id: 'p2' })));
-  await deny('p2 overwrites someone else confirmed booking', setDoc(doc(p2, 'Bookings/bConfirmed'), newBooking({ patient_id: 'p2' })));
-  await deny('re-book a freed slot with a wrong commission', (async () => {
-    await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'Bookings/d1_202609281500'), { patient_id: 'p1', provider_id: 'd1', status: 'cancelled', fee: 500 }); });
-    return setDoc(doc(p2, 'Bookings/d1_202609281500'), newBooking({ patient_id: 'p2', platform_commission: 5 }));
-  })());
-  await allow('signed-in user reads bookings (slot greying)', getDocs(query(collection(p2, 'Bookings'), where('provider_id', '==', 'd1'))));
+  // ---- Bookings: create (D22: the same write takes the time slot and shares the profile with the doctor)
+  await allow('p1 books d1 at listed fee', book(p1, 'bk-fee', { n: 10 }));
+  await deny('p1 books with a lower fee', book(p1, 'bk-lowfee', { n: 11, booking: { fee: 1 } }));
+  await deny('p1 books as already confirmed', book(p1, 'bk-confirmed', { n: 12, booking: { status: 'confirmed' } }));
+  await deny('p1 books as already paid', book(p1, 'bk-paid', { n: 13, booking: { payment_status: 'paid' } }));
+  await deny('p1 books in the name of p2', book(p1, 'bk-name', { n: 14, booking: { patient_id: 'p2' } }));
+  await deny('booking without platform_commission', book(p1, 'bk-nocomm', { n: 15, booking: (base) => { delete base.platform_commission; return base; } }));
+  await deny('booking with a wrong commission', book(p1, 'bk-wrongcomm', { n: 16, booking: { platform_commission: 1 } }));
+  await deny('booking with a non-numeric commission', book(p1, 'bk-textcomm', { n: 17, booking: { platform_commission: '75' } }));
+  await deny('booking whose time is not a timestamp', book(p1, 'bk-text-time', { n: 18, booking: { scheduled_at: 'tomorrow' }, slot: { scheduled_at: 'tomorrow' }, slotId: 'd1_tomorrow' }));
+  // double-booking: one live booking per doctor and time, whatever the booking ids are
+  await allow('p1 books a slot with a deterministic id', book(p1, 'd1_202609281400', { n: 20 }));
+  await deny('p2 books the SAME slot with the same booking id (double booking)', book(p2, 'd1_202609281400', { patient: 'p2', n: 20 }));
+  await deny('p2 books the same doctor and time under a DIFFERENT booking id (the slot is taken)', book(p2, 'p2-picks-own-id', { patient: 'p2', n: 20 }));
+  await deny('p1 overwrites own active booking', book(p1, 'd1_202609281400', { n: 20 }));
+  await allow('d1 declines that booking (booking and slot in one write)', decline(d1, 'd1_202609281400', { n: 20 }));
+  await allow('p2 re-books the freed slot', book(p2, 'd1_202609281400', { patient: 'p2', n: 20 }));
+  await deny('p2 overwrites someone else confirmed booking', book(p2, 'bConfirmed', { patient: 'p2', n: 3 }));
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await seedBooking(ctx.firestore(), 'd1_202609281500', { patient_id: 'p1', provider_id: 'd1', status: 'cancelled', fee: 500 }, 30);
+    await seedBooking(ctx.firestore(), 'd1_202609281530', { patient_id: 'p1', provider_id: 'd1', status: 'cancelled', fee: 500 }, 31);
+  });
+  await deny('re-book a freed slot with a wrong commission', book(p2, 'd1_202609281500', { patient: 'p2', n: 30, booking: { platform_commission: 5 } }));
+  await allow('p2 re-books a freed (cancelled) slot with a correct commission', book(p2, 'd1_202609281530', { patient: 'p2', n: 31 }));
+  // a booking is private (D22): only its patient, its doctor and admins read it
+  await allow('p1 lists own bookings', getDocs(query(collection(p1, 'Bookings'), where('patient_id', '==', 'p1'))));
+  await allow('d1 lists own bookings', getDocs(query(collection(d1, 'Bookings'), where('provider_id', '==', 'd1'))));
+  await allow('p1 reads own booking by id', getDoc(doc(p1, 'Bookings/bConfirmed')));
+  await deny('p2 (another patient) lists a doctor\'s bookings (no more reading bookings to grey out times)', getDocs(query(collection(p2, 'Bookings'), where('provider_id', '==', 'd1'))));
+  await deny('p2 lists p1 bookings', getDocs(query(collection(p2, 'Bookings'), where('patient_id', '==', 'p1'))));
+  await deny('p2 reads a p1 booking by id', getDoc(doc(p2, 'Bookings/bConfirmed')));
+  await deny('another doctor lists d1 bookings', getDocs(query(collection(d2, 'Bookings'), where('provider_id', '==', 'd1'))));
+  await deny('a signed-in user lists the whole Bookings collection', getDocs(collection(p2, 'Bookings')));
+  await allow('admin lists all bookings (revenue and analytics)', getDocs(collection(a1, 'Bookings')));
+  await allow('a signed-in user reads the taken times of a doctor (Booked_Slots, no patient information)', getDocs(query(collection(p2, 'Booked_Slots'), where('provider_id', '==', 'd1'))));
 
   // ---- Bookings: a pediatric account cannot book until its guardian verification is approved (D16)
-  await deny('an unapproved minor cannot book a consultation', addDoc(collection(pMinorRejected, 'Bookings'), newBooking({ patient_id: 'pMinorRejected' })));
-  await allow('an approved minor can book a consultation', addDoc(collection(pMinorApproved, 'Bookings'), newBooking({ patient_id: 'pMinorApproved' })));
+  await deny('an unapproved minor cannot book a consultation', book(pMinorRejected, 'bk-minor-no', { patient: 'pMinorRejected', n: 40 }));
+  await allow('an approved minor can book a consultation', book(pMinorApproved, 'bk-minor-yes', { patient: 'pMinorApproved', n: 41 }));
   await deny('anonymous reads bookings', getDocs(collection(anon, 'Bookings')));
 
   // ---- Bookings: updates
@@ -219,19 +280,34 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('p2 (stranger) confirms booking', updateDoc(doc(p2, 'Bookings/bPending'), { status: 'confirmed' }));
   await deny('d2 (other doctor) confirms booking', updateDoc(doc(d2, 'Bookings/bPending'), { status: 'confirmed' }));
   await deny('d1 changes fee', updateDoc(doc(d1, 'Bookings/bPending'), { fee: 1 }));
+  await deny('d1 moves a booking to another time', updateDoc(doc(d1, 'Bookings/bPending'), { scheduled_at: slotTime(99) }));
   await allow('p1 pays a confirmed booking', updateDoc(doc(p1, 'Bookings/bConfirmed'), { payment_status: 'paid', payment_method: 'GCash' }));
   await deny('p1 pays a pending booking', updateDoc(doc(p1, 'Bookings/bPendingB'), { payment_status: 'paid', payment_method: 'GCash' }));
   await deny('p1 marks payment as unpaid->weird value', updateDoc(doc(p1, 'Bookings/bConfirmed'), { payment_status: 'free' }));
-  await allow('p1 ends own confirmed consultation (no summary)', updateDoc(doc(p1, 'Bookings/bConfirmed2'), { status: 'completed', consultation_status: 'ended', consultation_summary: '', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'patient' }));
-  await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'Bookings/bConfirmed3'), { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'paid', fee: 500 }); });
-  await deny('p1 ends consultation while writing a summary', updateDoc(doc(p1, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_summary: 'my own summary', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'patient' }));
-  await deny('p1 ends consultation pretending to be doctor', updateDoc(doc(p1, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_summary: '', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'doctor' }));
-  await deny('p2 (stranger) ends p1 consultation', updateDoc(doc(p2, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_summary: '', consultation_ended_by: 'patient' }));
-  await allow('d1 ends consultation with summary', updateDoc(doc(d1, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_summary: 'Advised low-carb dinners.', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'doctor' }));
-  await allow('d1 adds a summary afterwards', updateDoc(doc(d1, 'Bookings/bDone'), { consultation_summary: 'Late summary.' }));
-  await deny('p1 edits summary afterwards', updateDoc(doc(p1, 'Bookings/bDone'), { consultation_summary: 'I wrote this' }));
-  await allow('p1 cancels own pending booking', updateDoc(doc(p1, 'Bookings/bPending'), { status: 'cancelled', queue_number: null }));
-  await deny('delete booking', require('firebase/firestore').deleteDoc(doc(p1, 'Bookings/bDone')));
+  await allow('p1 ends own confirmed consultation', updateDoc(doc(p1, 'Bookings/bConfirmed2'), { status: 'completed', consultation_status: 'ended', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'patient' }));
+  await env.withSecurityRulesDisabled(async (ctx) => { await seedBooking(ctx.firestore(), 'bConfirmed3', { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'paid', fee: 500 }, 6); });
+  await deny('p1 ends consultation pretending to be doctor', updateDoc(doc(p1, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'doctor' }));
+  await deny('p2 (stranger) ends p1 consultation', updateDoc(doc(p2, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_ended_by: 'patient' }));
+  await deny('a summary can no longer be written onto the booking (it is a Consultation_Notes document)', updateDoc(doc(d1, 'Bookings/bConfirmed3'), { consultation_summary: 'on the booking' }));
+  await deny('p1 ends consultation while also writing a summary on the booking', updateDoc(doc(p1, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_summary: 'mine', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'patient' }));
+  // the doctor ends the consultation and writes the summary: the booking and the note in ONE write
+  await allow('d1 ends consultation with a written summary (booking + note in one write)', (async () => {
+    const batch = writeBatch(d1);
+    batch.update(doc(d1, 'Bookings/bConfirmed3'), { status: 'completed', consultation_status: 'ended', consultation_ended_at: serverTimestamp(), consultation_ended_by: 'doctor' });
+    batch.set(doc(d1, 'Consultation_Notes/bConfirmed3'), note('bConfirmed3', 'p1', 'd1'));
+    return batch.commit();
+  })());
+  await allow('d1 adds a summary afterwards', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 'Late summary.' })));
+  await deny('p1 writes a summary note', setDoc(doc(p1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'p1', { summary: 'I wrote this' })));
+  await allow('p1 cancels own pending booking (booking and slot in one write)', (async () => {
+    const batch = writeBatch(p1);
+    batch.update(doc(p1, 'Bookings/bPending'), { status: 'cancelled', queue_number: null });
+    batch.update(doc(p1, `Booked_Slots/${slotIdOf('d1', slotTime(1))}`), { active: false });
+    return batch.commit();
+  })());
+  await deny('p1 cancels a booking WITHOUT freeing its slot', updateDoc(doc(p1, 'Bookings/bPendingB'), { status: 'cancelled', queue_number: null }));
+  await deny('d1 declines a booking WITHOUT freeing its slot', decline(d1, 'bPendingB', { n: 2, skip: ['slot'] }));
+  await deny('delete booking', deleteDoc(doc(p1, 'Bookings/bDone')));
 
   // ---- Messages
   await allow('p1 sends into own confirmed booking', addDoc(collection(p1, 'Messages'), { booking_id: 'bConfirmed', sender_id: 'p1', sender_role: 'patient', message: 'hello' }));
@@ -262,10 +338,47 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('p2 marks p1 notification read', updateDoc(doc(p2, 'Notifications/n1'), { is_read: true }));
 
   // ---- Subscriptions, plans, gamification
-  await allow('p1 subscribes for self', addDoc(collection(p1, 'Subscriptions'), { user_id: 'p1', plan_id: 'x', status: 'active' }));
-  await deny('p1 subscribes for p2', addDoc(collection(p1, 'Subscriptions'), { user_id: 'p2', plan_id: 'x', status: 'active' }));
+  // A subscription's terms are the rules' business, not the app's (D20): a real paid plan, the server's start time, and
+  // an expiry of start + the plan's length. The AI server reads these documents to decide who is Premium.
+  const DAY = 24 * 60 * 60 * 1000;
+  const HOUR = 60 * 60 * 1000;
+  const inDays = (days, extraMs = 0) => Timestamp.fromMillis(Date.now() + days * DAY + extraMs);
+  const newSubscription = () => ({ user_id: 'p1', plan_id: 'planMonthly', status: 'active', started_at: serverTimestamp(), expires_at: inDays(30), created_at: serverTimestamp() });
+  const subscribe = (db, change = (data) => data) => addDoc(collection(db, 'Subscriptions'), change(newSubscription()));
+  const withField = (field, value) => (data) => ({ ...data, [field]: value });
+  const withoutField = (field) => (data) => { delete data[field]; return data; };
+  await allow('p1 subscribes to a paid plan for self, on its real terms', subscribe(p1));
+  await allow('p1 subscribes to the annual plan (365 days)', subscribe(p1, (data) => ({ ...data, plan_id: 'planAnnual', expires_at: inDays(365) })));
+  await allow('a phone clock a few hours fast is tolerated (within a day of the plan length)', subscribe(p1, withField('expires_at', inDays(30, 6 * HOUR))));
+  await allow('a phone clock a few hours slow is tolerated', subscribe(p1, withField('expires_at', inDays(30, -6 * HOUR))));
+  await deny('p1 subscribes for p2', subscribe(p1, withField('user_id', 'p2')));
+  await deny('anonymous subscribes', subscribe(anon));
+  await deny('forged expiry in the year 2099', subscribe(p1, withField('expires_at', Timestamp.fromDate(new Date('2099-01-01')))));
+  await deny('annual-length expiry on the monthly plan', subscribe(p1, withField('expires_at', inDays(365))));
+  await deny('expiry 40 days away on a 30-day plan', subscribe(p1, withField('expires_at', inDays(40))));
+  await deny('expiry only 10 days away on a 30-day plan (the plan sets the length, not the app)', subscribe(p1, withField('expires_at', inDays(10))));
+  await deny('no expires_at at all (the server would read that as Premium forever)', subscribe(p1, withoutField('expires_at')));
+  await deny('expires_at null', subscribe(p1, withField('expires_at', null)));
+  await deny('expires_at as text', subscribe(p1, withField('expires_at', '2030-01-01')));
+  await deny('a plan that does not exist', subscribe(p1, withField('plan_id', 'planNope')));
+  await deny('the Free plan (price 0) cannot be subscribed to', subscribe(p1, withField('plan_id', 'planFree')));
+  await deny('a plan with no duration', subscribe(p1, withField('plan_id', 'planNoLength')));
+  await deny('a plan_id with a slash pointing somewhere else', subscribe(p1, withField('plan_id', 'planMonthly/x')));
+  await deny('no plan_id', subscribe(p1, withoutField('plan_id')));
+  await deny('started_at from the phone clock instead of the server', subscribe(p1, withField('started_at', Timestamp.fromMillis(Date.now()))));
+  await deny('a backdated started_at', subscribe(p1, withField('started_at', inDays(-400))));
+  await deny('a subscription that starts cancelled', subscribe(p1, withField('status', 'cancelled')));
+  await deny('a subscription that starts expired', subscribe(p1, withField('status', 'expired')));
+  await deny('an extra field the rules do not know (discount)', subscribe(p1, withField('discount', 100)));
   await allow('p1 cancels own subscription', updateDoc(doc(p1, 'Subscriptions/s1'), { status: 'cancelled' }));
   await deny('p1 extends own subscription', updateDoc(doc(p1, 'Subscriptions/s1'), { expires_at: new Date('2030-01-01') }));
+  await deny('p1 deletes own subscription', require('firebase/firestore').deleteDoc(doc(p1, 'Subscriptions/s1')));
+  // The server's daily usage counters (D20) are closed to every app, so nobody can reset their own count.
+  await deny('p1 reads a Usage_Counters document', getDoc(doc(p1, 'Usage_Counters/2026-10-16_p1')));
+  await deny('p1 lists Usage_Counters', getDocs(collection(p1, 'Usage_Counters')));
+  await deny('p1 resets their own usage counter', setDoc(doc(p1, 'Usage_Counters/2026-10-16_p1'), { day: '2026-10-16', user_id: 'p1', ai: 0, scan: 0 }));
+  await deny('p1 resets the project-wide counter', setDoc(doc(p1, 'Usage_Counters/2026-10-16'), { day: '2026-10-16', gemini: 0 }));
+  await deny('even an admin cannot write a usage counter from the panel', setDoc(doc(a1, 'Usage_Counters/2026-10-16'), { day: '2026-10-16', gemini: 0 }));
   await allow('signed-in reads plans', getDocs(collection(p1, 'Subscription_Plans')));
   await deny('patient writes a plan', setDoc(doc(p1, 'Subscription_Plans/x'), { plan_name: 'Free forever', price: 0 }));
   await allow('admin writes a plan', setDoc(doc(a1, 'Subscription_Plans/x'), { plan_name: 'Monthly', price: 99 }));
@@ -331,6 +444,162 @@ const deny = (name, promise) => check(name, promise, false);
   await allow('admin verifies a product', updateDoc(doc(a1, 'Products/4800016123456'), { verified: true, verified_by: 'a1', verified_at: serverTimestamp() }));
   await deny('admin edits the nutrients', updateDoc(doc(a1, 'Products/4800016123456'), { nutrients: { sugar_g: 0 } }));
   await deny('admin deletes a product', dfs.deleteDoc(doc(a1, 'Products/4800016123456')));
+  // ---- email confirmation (D21): booking, chat, video calls and a doctor's access to patient data need the signed
+  // email_verified claim. Each case below differs from a known-good case ABOVE only in that claim.
+  const p1Unconfirmed = signedIn('p1', { email_verified: false }).firestore();
+  const p1NoClaim = env.authenticatedContext('p1').firestore(); // a token with no email_verified claim at all
+  const p1TextClaim = signedIn('p1', { email_verified: 'true' }).firestore(); // the TEXT "true" is not the real boolean
+  const p2Unconfirmed = signedIn('p2', { email_verified: false }).firestore();
+  const d1Unconfirmed = signedIn('d1', { email_verified: false }).firestore(); // admin-verified doctor, email not confirmed
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await seedBooking(db, 'bConfirmedEmail', { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'paid', fee: 500 }, 50);
+    await seedBooking(db, 'd1_202609291000', { patient_id: 'p1', provider_id: 'd1', status: 'cancelled', fee: 500 }, 51);
+  });
+  // The identical booking is refused for each unconfirmed token and then accepted for a confirmed one, so only the claim differs.
+  await deny('unconfirmed patient cannot book', book(p1Unconfirmed, 'bk-claim', { n: 60 }));
+  await deny('a token with no email_verified claim cannot book', book(p1NoClaim, 'bk-claim', { n: 60 }));
+  await deny('the text "true" instead of the real claim cannot book', book(p1TextClaim, 'bk-claim', { n: 60 }));
+  await allow('the same booking by a person with a confirmed email IS accepted', book(p1, 'bk-claim', { n: 60 }));
+  await deny('unconfirmed patient cannot re-book a freed slot', book(p2Unconfirmed, 'd1_202609291000', { patient: 'p2', n: 51 }));
+  await allow('the same person with a confirmed email CAN re-book it', book(p2, 'd1_202609291000', { patient: 'p2', n: 51 }));
+  await deny('unconfirmed patient cannot chat in their own confirmed booking', addDoc(collection(p1Unconfirmed, 'Messages'), { booking_id: 'bConfirmedEmail', sender_id: 'p1', sender_role: 'patient', message: 'hello' }));
+  await deny('unconfirmed doctor cannot reply in chat', addDoc(collection(d1Unconfirmed, 'Messages'), { booking_id: 'bConfirmedEmail', sender_id: 'd1', sender_role: 'doctor', message: 'hi' }));
+  await allow('confirmed patient CAN chat in that booking', addDoc(collection(p1, 'Messages'), { booking_id: 'bConfirmedEmail', sender_id: 'p1', sender_role: 'patient', message: 'hello' }));
+  await deny('unconfirmed patient cannot start a video call', setDoc(doc(p1Unconfirmed, 'Calls/bConfirmedEmail'), newCall({ booking_id: 'bConfirmedEmail' })));
+  await deny('unconfirmed doctor cannot start a video call', setDoc(doc(d1Unconfirmed, 'Calls/bConfirmedEmail'), newCall({ booking_id: 'bConfirmedEmail', caller_id: 'd1', callee_id: 'p1' })));
+  await allow('confirmed patient CAN start it', setDoc(doc(p1, 'Calls/bConfirmedEmail'), newCall({ booking_id: 'bConfirmedEmail' })));
+  await deny('an admin-verified doctor whose email is NOT confirmed cannot read a patient profile', getDoc(doc(d1Unconfirmed, 'Users/p1')));
+  await deny('...nor the patient\'s blood sugar logs', getDocs(query(collection(d1Unconfirmed, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
+  await allow('the same doctor with a confirmed email CAN read the patient profile', getDoc(doc(d1, 'Users/p1')));
+  // Nobody can mark themselves confirmed by writing to Firestore: the claim lives in the signed token, not in a document.
+  await allow('an unconfirmed person may write any field on their own profile, even a fake "verified" flag', updateDoc(doc(p1Unconfirmed, 'Users/p1'), { email_verified: true, emailVerified: true, is_email_verified: true }));
+  await deny('...but that flag is worthless: booking is still refused', book(p1Unconfirmed, 'bk-flag', { n: 61 }));
+  // What is deliberately NOT gated, pinned so a later tightening cannot silently break it: profile creation (the admin
+  // panel's "Add Provider" writes a new doctor's profile before that doctor can open any email), and the admin panel itself.
+  const dProvisioned = signedIn('dProvisioned', { email_verified: false }).firestore(); // the scratch session Add Provider uses
+  const a1Unconfirmed = signedIn('a1', { email_verified: false }).firestore();
+  await allow('an unconfirmed new account can create its own Users profile (Add Provider relies on this)', setDoc(doc(dProvisioned, 'Users/dProvisioned'), { full_name: 'New Dr', role: 'doctor', is_active: true }));
+  await allow('...and its own unverified Providers profile', setDoc(doc(dProvisioned, 'Providers/dProvisioned'), { full_name: 'New Dr', is_verified: false, is_active: true }));
+  await allow('an admin whose own email is not confirmed still reads their admin record (the panel is not gated)', getDoc(doc(a1Unconfirmed, 'Admins/a1')));
+  // ---- booking privacy (D22): doctor access to patients, taken time slots, shares and written summaries
+  // A doctor reads a patient's profile and readings ONLY if that patient shared them by booking that doctor (Care_Links).
+  const p9 = signedIn('p9').firestore(); // a patient with no bookings yet
+  const d9 = signedIn('d9').firestore(); // a second doctor, verified below, with no booking from anyone
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'Providers/d9'), { full_name: 'Dr Nine', is_verified: true, is_active: true, consultation_fee: 400 });
+  });
+  await allow('d1 reads the profile of p1, who shared it by booking d1', getDoc(doc(d1, 'Users/p1')));
+  await allow('d1 queries the readings of p1 (a list query that names the patient)', getDocs(query(collection(d1, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
+  await deny('d1 cannot read p9, who never booked d1 (profile)', getDoc(doc(d1, 'Users/p9')));
+  await deny('d1 cannot read p9, who never booked d1 (readings)', getDocs(query(collection(d1, 'Glucose_Logs'), where('patient_id', '==', 'p9'))));
+  await deny('d1 cannot list every patient\'s readings', getDocs(collection(d1, 'Glucose_Logs')));
+  await deny('d1 cannot list every patient profile', getDocs(collection(d1, 'Users')));
+  await deny('d9, a verified doctor nobody booked, cannot read p1 (profile)', getDoc(doc(d9, 'Users/p1')));
+  await deny('d9 cannot read p1 (readings)', getDocs(query(collection(d9, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
+  await deny('d9 cannot read p2 either, who booked only d1', getDoc(doc(d9, 'Users/p2')));
+  // the whole life of a share, with one patient (p9) who has no other bookings
+  await allow('p9 requests a booking with d1 (the share is made in the same write)', book(p9, 'bk-p9', { patient: 'p9', n: 70 }));
+  await allow('...and now d1 can read p9\'s profile', getDoc(doc(d1, 'Users/p9')));
+  await allow('...and p9\'s readings', getDocs(query(collection(d1, 'Glucose_Logs'), where('patient_id', '==', 'p9'))));
+  await deny('...but d9 still cannot', getDoc(doc(d9, 'Users/p9')));
+  await deny('d1 cannot remove the share while the booking is live', deleteDoc(doc(d1, 'Care_Links/d1_p9')));
+  await allow('d1 declines p9\'s request and drops the share in the same write', decline(d1, 'bk-p9', { patient: 'p9', n: 70, dropLink: true }));
+  await deny('after the decline d1 can no longer read p9 (profile)', getDoc(doc(d1, 'Users/p9')));
+  await deny('after the decline d1 can no longer read p9 (readings)', getDocs(query(collection(d1, 'Glucose_Logs'), where('patient_id', '==', 'p9'))));
+  await allow('p9 can still read their own data', getDocs(query(collection(p9, 'Glucose_Logs'), where('patient_id', '==', 'p9'))));
+  // a decline that drops the share while its booking is still live is refused
+  await deny('d1 cannot drop a share whose booking it did not decline (the booking stays live)', (async () => {
+    const batch = writeBatch(d1);
+    batch.update(doc(d1, 'Bookings/bPendingB'), { queue_number: 2 });
+    batch.delete(doc(d1, 'Care_Links/d1_p1'));
+    return batch.commit();
+  })());
+  // the patient can stop sharing at any time
+  await allow('p2 stops sharing with d1', deleteDoc(doc(p2, 'Care_Links/d1_p2')));
+  await deny('...and then d1 cannot read p2', getDoc(doc(d1, 'Users/p2')));
+
+  // ---- Care_Links: who may read and write one
+  await allow('the patient reads their own link', getDoc(doc(p1, 'Care_Links/d1_p1')));
+  await allow('the doctor reads a link that names them', getDoc(doc(d1, 'Care_Links/d1_p1')));
+  await allow('an admin reads a link', getDoc(doc(a1, 'Care_Links/d1_p1')));
+  await deny('another patient cannot read it', getDoc(doc(p2, 'Care_Links/d1_p1')));
+  await deny('another doctor cannot read it', getDoc(doc(d9, 'Care_Links/d1_p1')));
+  await deny('a doctor cannot make a share for themselves (nobody booked them)', setDoc(doc(d9, 'Care_Links/d9_p2'), { provider_id: 'd9', patient_id: 'p2', booking_id: 'bConfirmed', updated_at: serverTimestamp() }));
+  await deny('a patient cannot share without a booking in the same write', setDoc(doc(p2, 'Care_Links/d9_p2'), { provider_id: 'd9', patient_id: 'p2', booking_id: 'bConfirmed', updated_at: serverTimestamp() }));
+  await deny('a patient cannot share through someone else\'s booking', book(p2, 'bk-borrow', { patient: 'p2', n: 80, link: { booking_id: 'bConfirmed' } }));
+  await deny('a share with a made-up document id is refused', book(p2, 'bk-badlink', { patient: 'p2', n: 81, linkId: 'd1_p9' }));
+  await deny('a share naming a different doctor than the booking is refused', book(p2, 'bk-otherdoc', { patient: 'p2', n: 82, link: { provider_id: 'd9' }, linkId: 'd9_p2' }));
+  await deny('a share with an extra field is refused', book(p2, 'bk-extra', { patient: 'p2', n: 83, link: { can_edit: true } }));
+  await deny('a share whose fields name a different patient than the caller is refused', book(p2, 'bk-link-patient', { patient: 'p2', n: 95, link: { patient_id: 'p9' } }));
+  await deny('a share with a client-chosen timestamp is refused', book(p2, 'bk-clock', { patient: 'p2', n: 84, link: { updated_at: Timestamp.fromMillis(1) } }));
+  await deny('no booking can exist without its share', book(p2, 'bk-nolink', { patient: 'p2', n: 85, skip: ['link'] }));
+
+  // ---- Booked_Slots: only the times, only through a booking
+  await deny('anonymous cannot read taken times', getDocs(collection(anon, 'Booked_Slots')));
+  await allow('a patient lists a doctor\'s taken times', getDocs(query(collection(p2, 'Booked_Slots'), where('provider_id', '==', 'd1'))));
+  await deny('no booking can exist without its time slot', book(p2, 'bk-noslot', { patient: 'p2', n: 86, skip: ['slot'] }));
+  await deny('a slot that names another booking is refused', book(p2, 'bk-slot-other', { patient: 'p2', n: 87, slot: { booking_id: 'bConfirmed' } }));
+  await deny('a slot with a time different from the booking is refused', book(p2, 'bk-slot-time', { patient: 'p2', n: 88, slot: { scheduled_at: slotTime(89) }, slotId: slotIdOf('d1', slotTime(89)) }));
+  await deny('a slot with a document id the rules would not build is refused', book(p2, 'bk-slot-id', { patient: 'p2', n: 90, slotId: 'my-own-slot-id' }));
+  await deny('a slot for another doctor than the booking is refused', book(p2, 'bk-slot-doc', { patient: 'p2', n: 91, slot: { provider_id: 'd9' }, slotId: slotIdOf('d9', slotTime(91)) }));
+  await deny('a slot created already free for a new booking is refused', book(p2, 'bk-slot-free', { patient: 'p2', n: 92, slot: { active: false } }));
+  await deny('a slot with an extra field is refused', book(p2, 'bk-slot-extra', { patient: 'p2', n: 93, slot: { patient_name: 'Pat Two' } }));
+  await deny('a stranger cannot take a slot on their own (no booking of theirs in the write)', setDoc(doc(p9, `Booked_Slots/${slotIdOf('d1', slotTime(94))}`), { provider_id: 'd1', scheduled_at: slotTime(94), booking_id: 'bConfirmed', active: true }));
+  await deny('a patient cannot free the slot of a booking that is still live', updateDoc(doc(p1, `Booked_Slots/${slotIdOf('d1', slotTime(2))}`), { active: false }));
+  await deny('a doctor cannot free the slot of a booking that is still live', updateDoc(doc(d1, `Booked_Slots/${slotIdOf('d1', slotTime(3))}`), { active: false }));
+  await deny('nobody deletes a slot', deleteDoc(doc(p1, `Booked_Slots/${slotIdOf('d1', slotTime(3))}`)));
+
+  // ---- Consultation_Notes: what the doctor wrote, for the two people on the booking only
+  await allow('the patient reads the note of their consultation', getDoc(doc(p1, 'Consultation_Notes/bDone')));
+  await allow('the doctor reads their own note', getDoc(doc(d1, 'Consultation_Notes/bDone')));
+  await deny('another patient cannot read it', getDoc(doc(p2, 'Consultation_Notes/bDone')));
+  await deny('another doctor cannot read it', getDoc(doc(d9, 'Consultation_Notes/bDone')));
+  await deny('not even an admin can read it', getDoc(doc(a1, 'Consultation_Notes/bDone')));
+  await deny('anonymous cannot read it', getDoc(doc(anon, 'Consultation_Notes/bDone')));
+  await allow('the doctor edits their note', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 'Edited.' })));
+  await deny('the patient cannot edit it', setDoc(doc(p1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 'Edited by patient.' })));
+  await deny('another doctor cannot write a note on d1\'s booking', setDoc(doc(d9, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd9')));
+  await deny('no note for a booking still waiting for the doctor', setDoc(doc(d1, 'Consultation_Notes/bPendingB'), note('bPendingB', 'p1', 'd1')));
+  await deny('a note that names a different patient is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p2', 'd1')));
+  await deny('a note that names a different booking is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bConfirmed', 'p1', 'd1')));
+  await deny('a note over 5,000 characters is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 'a'.repeat(5001) })));
+  await deny('a note that is not text is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 42 })));
+  await deny('a note with an extra field is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { visible_to_admin: true })));
+  await deny('a note with a client-chosen timestamp is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { updated_at: Timestamp.fromMillis(1) })));
+  await deny('a doctor whose email is not confirmed cannot write a note', setDoc(doc(d1Unconfirmed, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1')));
+  await deny('nobody deletes a note', deleteDoc(doc(d1, 'Consultation_Notes/bDone')));
+
+  // ---- D24: the patient's concern, the decline reason, and the split doctor notes
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await seedBooking(db, 'bD24a', { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }, 201);
+    await seedBooking(db, 'bD24b', { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }, 202);
+    await seedBooking(db, 'bD24c', { patient_id: 'p1', provider_id: 'd1', status: 'confirmed', payment_status: 'paid', fee: 500 }, 203);
+  });
+  const declineWith = (db, id, n, reason) => {
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'Bookings', id), { status: 'declined', queue_number: null, decline_reason: reason });
+    batch.update(doc(db, 'Booked_Slots', slotIdOf('d1', slotTime(n))), { active: false });
+    return batch.commit();
+  };
+  await allow('a booking may carry the patient\'s short concern', book(p1, 'bk-d24-concern', { n: 210, booking: { concern: 'Spikes after breakfast.' } }));
+  await deny('a concern over 300 characters is refused', book(p1, 'bk-d24-long', { n: 211, booking: { concern: 'a'.repeat(301) } }));
+  await deny('a concern that is not text is refused', book(p1, 'bk-d24-num', { n: 212, booking: { concern: 42 } }));
+  await deny('a patient cannot put a decline reason on a new booking', book(p1, 'bk-d24-fake', { n: 213, booking: { decline_reason: 'fake' } }));
+  await deny('a new booking with any unknown field is refused', book(p1, 'bk-d24-extra', { n: 214, booking: { priority: 'urgent' } }));
+  await deny('a decline reason over 500 characters is refused', declineWith(d1, 'bD24b', 202, 'a'.repeat(501)));
+  await deny('a decline reason that is not text is refused', declineWith(d1, 'bD24b', 202, 42));
+  await allow('the doctor declines with a reason, freeing the slot in the same write', declineWith(d1, 'bD24a', 201, 'Fully booked that week, please pick another day.'));
+  await allow('the patient reads the reason on their booking', getDoc(doc(p1, 'Bookings/bD24a')));
+  await deny('a reason without a decline is refused', updateDoc(doc(d1, 'Bookings/bD24c'), { decline_reason: 'not declining' }));
+  await deny('the patient cannot write a decline reason', updateDoc(doc(p1, 'Bookings/bD24c'), { decline_reason: 'I declined myself' }));
+  await allow('a note with advice and a follow-up date', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: 'Keep logging bedtime readings.', follow_up_at: Timestamp.fromMillis(SLOT_START + 14 * 86400000) })));
+  await allow('a note whose follow-up is cleared (null)', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: '', follow_up_at: null })));
+  await deny('advice over 2,000 characters is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: 'a'.repeat(2001) })));
+  await deny('advice that is not text is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: 7 })));
+  await deny('a follow-up that is not a date is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { follow_up_at: 'next week' })));
+  await deny('the patient still cannot write advice', setDoc(doc(p1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: 'Eat cake.' })));
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));
   await deny('unknown collection write', setDoc(doc(a1, 'Secrets/x'), { a: 1 }));

@@ -10,17 +10,25 @@ rules_version = '2';
 // (a user can edit their own doc). Authority comes from documents only an admin can create or change:
 //   Admins/{uid}                 -> admin
 //   Providers/{uid}.is_verified  -> a doctor whose PRC credentials an admin verified
+// Email confirmation (D21) is NOT a document either: it is the email_verified claim inside the signed sign-in token,
+// so nobody can mark themselves confirmed. Booking, chat, video calls and a doctor's access to patient data all
+// need it. Creating a profile document does not (the admin panel's "Add Provider" creates a doctor's profile before
+// that doctor has had any chance to open an email), and an admin still approves every doctor's credentials.
+//
+// Booking privacy (D22): a booking can be read only by its patient, its doctor and admins. The booking screen greys out
+// taken times from Booked_Slots (a doctor, a time, taken or not; no patient information). A doctor reads a patient's
+// profile and blood sugar readings only through Care_Links, a share the patient makes by booking that doctor. The doctor's
+// written summary lives in Consultation_Notes, readable by the two people on the booking only.
 //
 // KNOWN LIMITATIONS (be upfront about these in the defense):
-//   1. Bookings are readable by any signed-in user, because patients query a doctor's bookings to grey
-//      out taken time slots. Fix later: a separate Booked_Slots collection holding only times.
-//   2. A verified doctor can read ANY patient's profile and glucose logs, not only their own patients':
-//      rules cannot search the Bookings collection (Firestore rules cannot run queries). Fix later:
-//      deterministic booking IDs or a per-doctor patient list.
-//   3. Doctors must be verified (Providers/{uid}.is_verified == true) to read patient data. Until the admin
-//      panel exists, set is_verified to true by hand in the Firebase console for test doctors.
-//   4. Behaviour was checked with 101 allow/deny cases in the Firestore emulator (2026-09-26, all passing). After
-//      deploying, still try one flow per role in the Rules Playground and in the app.
+//   1. A doctor keeps seeing a patient's profile and readings after a CONSULTATION ENDS, until the patient removes the
+//      share (the rules allow it; the app has no button for it yet). A declined or cancelled booking removes it at once.
+//   2. Points, streaks and badges are written by the app, so a patient could award themselves points (no health data at
+//      risk; the AI limits and Premium are enforced elsewhere, D20).
+//   3. Doctors must be verified (Providers/{uid}.is_verified == true) to read patient data. The admin panel's Verify
+//      Credentials action sets it.
+//   4. Every rule is covered by the Firestore emulator suite (npm run test:rules, all passing). After deploying, still
+//      try one flow per role in the Rules Playground and in the app.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -42,9 +50,17 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/Admins/$(request.auth.uid));
     }
 
-    // A doctor whose credentials an admin verified and who is still active.
+    // True when the caller has CONFIRMED their email address (DECISIONS.md D21). Firebase puts email_verified inside the
+    // signed sign-in token, so neither the app nor a person editing a Firestore field can fake it. The token is renewed
+    // when the app sees the person tapped the link in their email; until then it can say "no" for up to an hour.
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    // A doctor whose credentials an admin verified, who is still active, and whose own email address is confirmed
+    // (so patient health data is never readable by a doctor nobody could reach by email).
     function isVerifiedDoctor() {
-      return signedIn()
+      return verifiedEmail()
         && exists(/databases/$(database)/documents/Providers/$(request.auth.uid))
         && get(/databases/$(database)/documents/Providers/$(request.auth.uid)).data.get('is_verified', false) == true
         && get(/databases/$(database)/documents/Providers/$(request.auth.uid)).data.get('is_active', true) == true;
@@ -60,6 +76,32 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/Bookings/$(bookingId)).data;
     }
 
+    // ---- booking privacy (DECISIONS.md D22)
+
+    // A booking that still holds its time slot and still lets its doctor see the patient: waiting for the doctor,
+    // accepted, or finished. A declined or cancelled booking holds nothing.
+    function isLiveBooking(status) {
+      return status in ['pending', 'confirmed', 'completed'];
+    }
+
+    // The Booked_Slots document for a booking's doctor and time. Its id is built from the booking's data by these rules
+    // (the app does not get to choose it), so two bookings for the same doctor and time always meet at the same document,
+    // whatever ids those bookings have.
+    function slotPathFor(data) {
+      return /databases/$(database)/documents/Booked_Slots/$(data.provider_id + '_' + string(data.scheduled_at.toMillis()));
+    }
+
+    // The Care_Links document through which one patient lets one doctor see their profile and blood sugar readings.
+    function careLinkPath(providerId, patientId) {
+      return /databases/$(database)/documents/Care_Links/$(providerId + '_' + patientId);
+    }
+
+    // True when the caller is a doctor who may see this patient's profile and readings: admin-verified, active, with a
+    // confirmed email, AND the patient shared them with this doctor (a Care_Links document, made when the patient booked).
+    function canSeePatient(patientId) {
+      return isVerifiedDoctor() && exists(careLinkPath(request.auth.uid, patientId));
+    }
+
     // A pediatric account (D16): the account's own Users doc says so, and its Guardian_Verifications doc
     // (same id as the account) must have been approved by an admin. exists() first because a brand-new
     // 'self' account never gets a Guardian_Verifications document at all.
@@ -71,16 +113,39 @@ service cloud.firestore {
 
     // A well-formed new booking (also used to re-book a slot freed by a decline/cancel): by the caller for
     // themselves, pending and unpaid, fee copied from the doctor's profile, commission = fee x 0.15 (D3).
-    // A pediatric account (D16) may not book until its guardian verification is approved.
-    function validNewBooking() {
-      return signedIn()
+    // A pediatric account (D16) may not book until its guardian verification is approved, and nobody books before
+    // confirming their email address (D21).
+    // The same write must also take the time slot and share the patient's profile with the doctor (D22): a booking cannot
+    // exist without its Booked_Slots and Care_Links documents, which have their own rules below.
+    function validNewBooking(bookingId) {
+      return verifiedEmail()
         && request.resource.data.patient_id == request.auth.uid
         && !isUnapprovedMinor()
         && request.resource.data.status == 'pending'
         && request.resource.data.payment_status == 'unpaid'
         && request.resource.data.fee == get(/databases/$(database)/documents/Providers/$(request.resource.data.provider_id)).data.get('consultation_fee', 0)
         && request.resource.data.platform_commission is number
-        && math.abs(request.resource.data.platform_commission - request.resource.data.fee * 0.15) < 0.01;
+        && math.abs(request.resource.data.platform_commission - request.resource.data.fee * 0.15) < 0.01
+        && request.resource.data.scheduled_at is timestamp
+        // Only the fields the app writes (D24 added the patient's optional "concern", at most 300 characters). Without
+        // this list a patient could add any field, for example a fake decline reason.
+        && request.resource.data.keys().hasOnly(['patient_id', 'provider_id', 'status', 'scheduled_at', 'fee', 'platform_commission',
+                                                 'payment_status', 'payment_method', 'queue_number', 'created_at', 'concern'])
+        && request.resource.data.get('concern', '') is string
+        && request.resource.data.get('concern', '').size() <= 300
+        && existsAfter(slotPathFor(request.resource.data))
+        && getAfter(slotPathFor(request.resource.data)).data.booking_id == bookingId
+        && getAfter(slotPathFor(request.resource.data)).data.active == true
+        && existsAfter(careLinkPath(request.resource.data.provider_id, request.auth.uid))
+        && getAfter(careLinkPath(request.resource.data.provider_id, request.auth.uid)).data.booking_id == bookingId;
+    }
+
+    // After a change to an EXISTING booking, its Booked_Slots document must say "taken" exactly while the booking is live
+    // (D22): a decline or cancellation frees the slot in the same write, and nothing can free a live booking's slot.
+    function slotInStep(bookingId) {
+      return existsAfter(slotPathFor(request.resource.data))
+        && getAfter(slotPathFor(request.resource.data)).data.booking_id == bookingId
+        && getAfter(slotPathFor(request.resource.data)).data.active == isLiveBooking(request.resource.data.status);
     }
 
     // True when the caller is the patient or the doctor of the given booking.
@@ -90,9 +155,11 @@ service cloud.firestore {
             || bookingData(bookingId).provider_id == request.auth.uid);
     }
 
-    // A well-formed new video call (D11): started by a person in a CONFIRMED booking, ringing the OTHER person on it.
+    // A well-formed new video call (D11): started by a person in a CONFIRMED booking, ringing the OTHER person on it,
+    // who has confirmed their own email address (D21).
     function validNewCall(bookingId) {
-      return inBooking(bookingId)
+      return verifiedEmail()
+        && inBooking(bookingId)
         && request.resource.data.booking_id == bookingId
         && request.resource.data.caller_id == request.auth.uid
         && request.resource.data.callee_id != request.auth.uid
@@ -103,11 +170,38 @@ service cloud.firestore {
         && bookingData(bookingId).status == 'confirmed';
     }
 
+    // A well-formed new subscription (module 12, DECISIONS.md D20). Premium is a demo purchase (payment is mocked, D5), but
+    // its TERMS are not the app's to choose, because the AI server reads these documents to decide who is Premium:
+    //  - a real PAID plan from Subscription_Plans (no Free plan, no made-up plan id, no "/" to point somewhere else);
+    //  - started_at is the SERVER's clock (the app sends serverTimestamp()), so a start date cannot be backdated;
+    //  - expires_at is start + that plan's length, give or take one day for a phone clock that is a little off, so a
+    //    year-2099 expiry means no unlimited Premium;
+    //  - expires_at must exist: the server treats a missing expiry as "Premium forever";
+    //  - exactly these fields and nothing else, and it starts 'active' (cancelling is a separate update below).
+    function validNewSubscription() {
+      let data = request.resource.data;
+      let plan = get(/databases/$(database)/documents/Subscription_Plans/$(data.plan_id)).data;
+      let planLength = duration.value(int(plan.get('duration_days', 0)), 'd');
+      return signedIn()
+        && data.keys().hasOnly(['user_id', 'plan_id', 'status', 'started_at', 'expires_at', 'created_at'])
+        && data.keys().hasAll(['user_id', 'plan_id', 'status', 'started_at', 'expires_at'])
+        && data.user_id == request.auth.uid
+        && data.status == 'active'
+        && data.plan_id is string && data.plan_id.size() > 0 && !data.plan_id.matches('.*/.*')
+        && plan.get('price', 0) > 0
+        && plan.get('duration_days', 0) > 0
+        && data.started_at == request.time
+        && data.expires_at is timestamp
+        && data.expires_at >= request.time + planLength - duration.value(1, 'd')
+        && data.expires_at <= request.time + planLength + duration.value(1, 'd');
+    }
+
     // ------------------------------------------------------------------ accounts
 
     match /Users/{userId} {
-      // A person reads their own profile; admins manage users; verified doctors read patient health profiles (limitation 2).
-      allow read: if isUser(userId) || isAdmin() || isVerifiedDoctor();
+      // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
+      // them by booking that doctor (Care_Links, D22), not every patient's.
+      allow read: if isUser(userId) || isAdmin() || canSeePatient(userId);
       // You can only create your own profile, and cannot create it already deactivated. account_type (D16),
       // if present, must be 'self' or 'minor' — anything else is rejected outright, not silently ignored.
       allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
@@ -191,8 +285,9 @@ service cloud.firestore {
     // ------------------------------------------------------------------ blood sugar
 
     match /Glucose_Logs/{logId} {
-      // Readings are private health data: the patient, admins, and verified doctors (limitation 2) only.
-      allow read: if signedIn() && (resource.data.patient_id == request.auth.uid || isAdmin() || isVerifiedDoctor());
+      // Readings are private health data: the patient, admins, and a doctor the patient shared them with by booking
+      // that doctor (Care_Links, D22) only. A doctor's list query must name the patient (where patient_id ==).
+      allow read: if signedIn() && (resource.data.patient_id == request.auth.uid || isAdmin() || canSeePatient(resource.data.patient_id));
       // You can only log readings for yourself, and the value must be a number.
       allow create: if signedIn() && request.resource.data.patient_id == request.auth.uid
                     && request.resource.data.reading_mgdl is number;
@@ -206,30 +301,40 @@ service cloud.firestore {
     // ------------------------------------------------------------------ appointments and chat
 
     match /Bookings/{bookingId} {
-      // Any signed-in user may read bookings so the booking screen can grey out taken slots (limitation 1).
-      allow read: if signedIn();
+      // A booking is private (D22): only its patient, its doctor and admins can read it. Patients and doctors list their own
+      // with where patient_id == / where provider_id ==. The booking screen no longer reads bookings to grey out taken
+      // times: it reads Booked_Slots, which holds no patient information.
+      allow read: if signedIn() && (resource.data.patient_id == request.auth.uid
+                                    || resource.data.provider_id == request.auth.uid
+                                    || isAdmin());
 
       // A patient creates a booking only for themselves, starting as pending and unpaid, the fee must equal the
       // doctor's listed fee (the patient cannot name their own price), and the platform commission must be 15%
-      // of that fee (DECISIONS.md D3; a cent of rounding is tolerated). The app uses the doc id
-      // <providerId>_<slot> so a second booking for the same slot is an overwrite, which the update rule refuses.
-      allow create: if validNewBooking();
+      // of that fee (DECISIONS.md D3; a cent of rounding is tolerated). The same write takes the time slot
+      // (Booked_Slots) and shares the profile with the doctor (Care_Links), see validNewBooking.
+      allow create: if validNewBooking(bookingId);
 
       allow update: if signedIn() && (
         // A slot whose earlier booking was declined or cancelled can be booked again, by anyone, as a fresh
         // pending booking. An active booking (pending/confirmed/completed) can never be overwritten this way.
-        (resource.data.status in ['declined', 'cancelled'] && validNewBooking())
+        (resource.data.status in ['declined', 'cancelled'] && validNewBooking(bookingId))
         // The booked doctor decides the request, orders the queue, and records the consultation outcome, nothing else.
+        // (The written summary is its own document, Consultation_Notes.) A decline frees the slot in the same write.
         || (resource.data.provider_id == request.auth.uid
-          && changedKeys().hasOnly(['status', 'queue_number', 'consultation_status', 'consultation_summary', 'consultation_ended_at', 'consultation_ended_by']))
-        // The patient may end their own confirmed consultation (booking becomes completed, no summary written by them;
-        // the doctor can add the summary afterwards, which the doctor branch above allows).
+          && changedKeys().hasOnly(['status', 'queue_number', 'consultation_status', 'consultation_ended_at', 'consultation_ended_by', 'decline_reason'])
+          // D24: a decline may carry the doctor's reason (shown to the patient), only with the decline, at most 500 characters.
+          && (!changedKeys().hasAny(['decline_reason'])
+              || (request.resource.data.status == 'declined'
+                  && request.resource.data.decline_reason is string
+                  && request.resource.data.decline_reason.size() <= 500))
+          && slotInStep(bookingId))
+        // The patient may end their own confirmed consultation (booking becomes completed; the doctor can add the
+        // written summary afterwards in Consultation_Notes).
         || (resource.data.patient_id == request.auth.uid
           && resource.data.status == 'confirmed'
-          && changedKeys().hasOnly(['status', 'consultation_status', 'consultation_summary', 'consultation_ended_at', 'consultation_ended_by'])
+          && changedKeys().hasOnly(['status', 'consultation_status', 'consultation_ended_at', 'consultation_ended_by'])
           && request.resource.data.status == 'completed'
           && request.resource.data.consultation_status == 'ended'
-          && request.resource.data.get('consultation_summary', '') == ''
           && request.resource.data.get('consultation_ended_by', '') == 'patient')
         // The patient may only pay, and only after the doctor confirmed and while still unpaid.
         || (resource.data.patient_id == request.auth.uid
@@ -241,22 +346,105 @@ service cloud.firestore {
         || (inBooking(bookingId)
           && changedKeys().hasOnly(['consultation_status'])
           && request.resource.data.consultation_status == 'active')
-        // The patient may cancel their own booking while it is still pending or confirmed.
+        // The patient may cancel their own booking while it is still pending or confirmed; the slot is freed in the same write.
         || (resource.data.patient_id == request.auth.uid
           && resource.data.status in ['pending', 'confirmed']
           && changedKeys().hasOnly(['status', 'queue_number'])
-          && request.resource.data.status == 'cancelled')
+          && request.resource.data.status == 'cancelled'
+          && slotInStep(bookingId))
       );
 
       // Bookings are history (and revenue), so they are never deleted; cancel/decline instead.
       allow delete: if false;
     }
 
+    // ------------------------------------------------------------------ booked time slots (DECISIONS.md D22)
+    // One document per doctor and time, id "<providerId>_<epoch milliseconds>", so the booking screen can grey out taken
+    // times without anyone reading other people's bookings. It holds NO patient information: a doctor, a time and
+    // whether it is taken. It is written only in the same write as the booking it belongs to, by that booking's patient or
+    // doctor, and "taken" always matches the booking's status. A time that is taken can be freed by its own booking but
+    // never taken over by another booking, so a slot cannot be double-booked even by an app that picks its own booking ids.
+    match /Booked_Slots/{slotId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['provider_id', 'scheduled_at', 'booking_id', 'active'])
+        && request.resource.data.keys().hasAll(['provider_id', 'scheduled_at', 'booking_id', 'active'])
+        && request.resource.data.scheduled_at is timestamp
+        && request.resource.data.provider_id is string
+        && slotId == request.resource.data.provider_id + '_' + string(request.resource.data.scheduled_at.toMillis())
+        && request.resource.data.booking_id is string
+        && existsAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id))
+        && getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.provider_id == request.resource.data.provider_id
+        && getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.scheduled_at == request.resource.data.scheduled_at
+        && (getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.patient_id == request.auth.uid
+            || getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.provider_id == request.auth.uid)
+        && request.resource.data.active == isLiveBooking(getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.status)
+        && (
+          // taking the time: it must be free (never booked, or freed by a decline or cancellation) ...
+          (request.resource.data.active == true
+            && (resource == null || resource.data.active == false || resource.data.booking_id == request.resource.data.booking_id))
+          // ... freeing it: only by the booking that holds it
+          || (request.resource.data.active == false && resource != null && resource.data.booking_id == request.resource.data.booking_id));
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------ doctor access to a patient (DECISIONS.md D22)
+    // "Care_Links/{providerId}_{patientId}": a patient shares their health profile and blood sugar readings with ONE doctor.
+    // It is made by the patient in the same write as a booking request with that doctor (UT-023: a doctor sees only patients
+    // who have a booking with them), and holds only ids. The patient can remove it at any time; the doctor can remove it once
+    // the booking it points to has been declined or cancelled (the app does that in the same write as the decline).
+    match /Care_Links/{linkId} {
+      allow read: if signedIn() && (resource.data.patient_id == request.auth.uid
+                                    || resource.data.provider_id == request.auth.uid
+                                    || isAdmin());
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasOnly(['provider_id', 'patient_id', 'booking_id', 'updated_at'])
+        && request.resource.data.keys().hasAll(['provider_id', 'patient_id', 'booking_id', 'updated_at'])
+        && request.resource.data.patient_id == request.auth.uid
+        && request.resource.data.provider_id is string
+        && linkId == request.resource.data.provider_id + '_' + request.auth.uid
+        && request.resource.data.updated_at == request.time
+        && request.resource.data.booking_id is string
+        && existsAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id))
+        && getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.patient_id == request.auth.uid
+        && getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.provider_id == request.resource.data.provider_id
+        && isLiveBooking(getAfter(/databases/$(database)/documents/Bookings/$(request.resource.data.booking_id)).data.status);
+      allow delete: if signedIn() && (
+        resource.data.patient_id == request.auth.uid
+        || (resource.data.provider_id == request.auth.uid
+            && existsAfter(/databases/$(database)/documents/Bookings/$(resource.data.booking_id))
+            && !isLiveBooking(getAfter(/databases/$(database)/documents/Bookings/$(resource.data.booking_id)).data.status)));
+    }
+
+    // ------------------------------------------------------------------ the doctor's written summary (DECISIONS.md D22)
+    // "Consultation_Notes/{bookingId}": what the doctor wrote when ending the consultation. It used to sit on the booking,
+    // which many people could read; now only the two people on that booking can (not even an admin).
+    match /Consultation_Notes/{bookingId} {
+      allow read: if signedIn() && inBooking(bookingId);
+      allow create, update: if verifiedEmail()
+        && bookingData(bookingId).provider_id == request.auth.uid
+        && bookingData(bookingId).status in ['confirmed', 'completed']
+        // D24: the notes are "summary" (the Diagnosis notes), plus optional "advice" and a "follow_up_at" date (or null).
+        && request.resource.data.keys().hasOnly(['booking_id', 'patient_id', 'provider_id', 'summary', 'advice', 'follow_up_at', 'updated_at'])
+        && request.resource.data.keys().hasAll(['booking_id', 'patient_id', 'provider_id', 'summary', 'updated_at'])
+        && request.resource.data.booking_id == bookingId
+        && request.resource.data.patient_id == bookingData(bookingId).patient_id
+        && request.resource.data.provider_id == request.auth.uid
+        && request.resource.data.summary is string
+        && request.resource.data.summary.size() <= 5000
+        && request.resource.data.get('advice', '') is string
+        && request.resource.data.get('advice', '').size() <= 2000
+        && (request.resource.data.get('follow_up_at', null) == null || request.resource.data.follow_up_at is timestamp)
+        && request.resource.data.updated_at == request.time;
+      allow delete: if false;
+    }
+
     match /Messages/{messageId} {
       // Chat is private: only the patient and doctor of the booking the message belongs to can read it (D8).
       allow read: if signedIn() && inBooking(resource.data.booking_id);
-      // You can send a message only as yourself, into your own booking, while it is confirmed (read-only once completed).
-      allow create: if signedIn()
+      // You can send a message only as yourself, into your own booking, while it is confirmed (read-only once completed),
+      // and only once your own email address is confirmed (D21).
+      allow create: if verifiedEmail()
                     && request.resource.data.sender_id == request.auth.uid
                     && inBooking(request.resource.data.booking_id)
                     && bookingData(request.resource.data.booking_id).status == 'confirmed'
@@ -375,9 +563,9 @@ service cloud.firestore {
     match /Subscriptions/{subscriptionId} {
       // You see your own subscription; admins see all (premium subscribers list).
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
-      // You subscribe only for yourself (payment is mocked in the prototype, so it starts active).
-      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid
-                    && request.resource.data.status == 'active';
+      // You subscribe only for yourself, to a real paid plan, on the plan's real terms (see validNewSubscription above).
+      // Payment is mocked in the prototype, so it starts active.
+      allow create: if validNewSubscription();
       // The only change an owner can make is cancelling.
       allow update: if signedIn() && resource.data.user_id == request.auth.uid
                     && changedKeys().hasOnly(['status'])
@@ -388,6 +576,13 @@ service cloud.firestore {
     // ------------------------------------------------------------------ AI data (written ONLY by the Cloud Functions)
     // The functions use the Admin SDK, which bypasses these rules. Clients can read their own results but can never
     // write them, so nobody can forge suggestions or scans to get around the Free plan's daily limits (D1).
+
+    // The server's daily usage counters (D20): how many AI suggestions and label scans each person, and everyone together,
+    // used today. Nobody can touch them from an app, not even an admin, so a person cannot reset their own count. (This
+    // block is only here to say so out loud: anything not matched in this file is denied anyway.)
+    match /Usage_Counters/{counterId} {
+      allow read, write: if false;
+    }
 
     match /Food_Database/{foodId} {
       // The Filipino food/GI list grounds the AI prompts and is readable by signed-in users.
