@@ -219,6 +219,21 @@ The Google and Facebook buttons on Login and Sign Up now sign people in. They us
 
 Tested locally on 2026-10-17 (no phone, no real Google or Facebook account): the Firebase half against the Auth emulator, 6/6 (`npm run test:social-login`); the real Login and Sign Up screens in a headless browser, 13/13; the generated Android manifest for the Facebook settings; and that the three native packages are picked up for Android. The Google account picker, Facebook's login screen and the EAS build itself are the parts only you can try.
 
+## A11. Video calls: a Daily.co key on Vercel (DECISIONS D27)
+Ringing, Accept and Decline already work. The video itself needs a Daily.co key on the Vercel server. Until it is set, Accept shows "Couldn't open the video room · Video calls are not set up yet. Please use the chat for now." with **Try again** and **Message instead**. Nothing breaks. The key goes **only** into Vercel: never into a file, the app, EAS or a chat.
+1. **Daily account [PERSON]:** sign up at https://dashboard.daily.co/u/signup with diabeatis360@gmail.com and stay on the free plan (10,000 participant-minutes a month; a 30-minute call between two people uses 60). Read what the sign-up asks for and tell me if it wants a card before you enter one.
+2. **API key [PERSON]:** in the Daily dashboard, **Developers** > **API keys** > copy the key.
+3. **Vercel variable [PERSON]:** vercel.com > project `diabeatis360-ai` > Settings > Environment Variables > add `DAILY_API_KEY` = the key. Tick Production and Preview and mark it **Sensitive**. Do **not** add `DAILY_API_BASE` (it exists only for tests with a fake Daily).
+4. **Redeploy (Claude, after your "go"):** `npx vercel --prod` from `functions/`. Check: a signed-out POST to `https://diabeatis360-ai.vercel.app/api/joinCall` answers **401**. The same deploy also carries the D25 allergy check for the AI.
+5. **The app:** the new call screen is in the app's code, so it reaches the installed app only with the **next APK** (A5). It already works in Expo Go and the web build.
+6. **Two-phone test [PERSON, two teammates, fake test accounts only]:** a confirmed booking between a test patient and a test doctor > chat > **Video call**. Both phones ask for camera and microphone the first time: allow. The other phone rings > **Accept** > both show "Connecting…", then each other's video and sound. Then check the following, and record each line in `docs/TEST_LOG.md`:
+   - **End** on one phone ends the call on both.
+   - Refusing the camera shows "Allow camera and microphone in Settings to use video calls." and the call does not ring.
+   - In the Daily dashboard, **Rooms** shows a room named `d360-…` marked **private**, and **no recordings**.
+7. **If it fails:** "The video service is busy right now" means Daily refused the request. Vercel > the project > **Logs** shows the reason, but Hobby keeps logs for only one hour, so look right away. A picture with no sound on Android usually means the microphone was refused: allow it in Android Settings > Apps > Diabeatis360 (or Expo Go) > Permissions.
+
+Tested locally on 2026-10-18 against a **fake** Daily (no account, no key, no real video): `functions/test/video.test.js` 4/4, `calls.test.js` 3/3 on the Firestore emulator, `vercel-e2e.test.js` 12/12 including joinCall through the real Firebase client SDK, and the call screen in a browser (QA report section 9). A real two-person call can only be tried after steps 1–4.
+
 ---
 
 # Part B: needs Blaze (later)

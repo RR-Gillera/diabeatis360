@@ -15,6 +15,7 @@ import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
 import { isChatAvailable } from '@/constants/enums';
 import { startCall } from '@/features/calls/call-service';
+import { ensureCallPermissions } from '@/features/calls/video-room';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 function dayLabel(date: Date | null) {
@@ -120,11 +121,13 @@ export default function ConsultationScreen() {
     }
   };
 
-  // Rings the other person in the app, then opens the call screen (DECISIONS.md D11). It never opens a raw link.
+  // Rings the other person in the app, then opens the call screen (DECISIONS.md D11, D27). It never opens a raw link.
+  // The camera and microphone are asked for first, so nobody answers a call that cannot show a picture.
   const startVideoCall = async () => {
     if (!id || !uid) return;
     setError('');
     try {
+      await ensureCallPermissions();
       await startCall(id, uid);
       router.push({ pathname: '/video-call/[id]', params: { id } } as never);
     } catch (value) {

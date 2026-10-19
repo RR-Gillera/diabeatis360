@@ -208,10 +208,12 @@ export default function ScannerScreen() {
     return (
       <View style={[styles.light, styles.center]}>
         <SymbolView name={{ ios: 'exclamationmark.circle', android: 'error', web: 'error' }} size={40} tintColor={Brand.colors.warning} />
-        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? FEATURE_UNAVAILABLE_TITLE : error?.code === 'limit' || capped ? 'Daily scan limit reached' : 'Let\'s try that again'}</AppText>
+        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? FEATURE_UNAVAILABLE_TITLE : error?.code === 'limit' || capped ? 'Daily scan limit reached' : error?.code === 'allergies-missing' ? 'Add your allergies first' : 'Let\'s try that again'}</AppText>
         <AppText style={styles.retryText}>{unavailable ? FEATURE_UNAVAILABLE_DETAIL : error ? error.message : message}</AppText>
         {error?.code === 'limit' ? (
           <PrimaryButton title="Upgrade to Premium" onPress={() => router.push('/subscription')} style={styles.retryButton} />
+        ) : error?.code === 'allergies-missing' ? (
+          <PrimaryButton title="Add my allergies" onPress={() => router.push('/profile')} style={styles.retryButton} />
         ) : unavailable || capped ? null : (
           <PrimaryButton title="Scan Again" onPress={scanAgain} style={styles.retryButton} />
         )}

@@ -20,6 +20,14 @@ const CRITICAL_MESSAGE =
   'Your latest blood sugar reading is in a dangerous range. Please contact your doctor or go to the nearest hospital now. ' +
   'Suggestions are paused until your reading is back in range.'
 
+// DECISIONS.md D25: suggestions, label scans and barcode ratings all avoid the person's allergens, so they need an
+// answer to the allergy question first ("None" is an answer). Without one: no Gemini call and nothing counted.
+const ALLERGIES_MESSAGE = 'Add your allergies first (or choose None if you have none) in Profile > Health Profile, so suggestions and scans can avoid them.'
+const allergiesDeclared = (value) => (Array.isArray(value) ? value.some((item) => String(item).trim()) : String(value ?? '').trim().length > 0)
+function requireAllergies(profile) {
+  if (!allergiesDeclared(profile.allergies)) throw new HttpsError('failed-precondition', ALLERGIES_MESSAGE)
+}
+
 async function loadContext(db, uid) {
   const [userSnap, logs, subs] = await Promise.all([
     db.doc(`Users/${uid}`).get(),
@@ -53,6 +61,7 @@ async function generateRecommendations({ db, uid, kind, callAi, now = new Date()
   if (reading && reading.interpretation === 'critical') {
     return { blocked: true, reason: 'critical', message: CRITICAL_MESSAGE, items: [], remaining: null }
   }
+  requireAllergies(profile)
 
   // Take a slot before anything else is done (refused with 429 at the limit); it is given back unless a suggestion is saved.
   const slot = await reserveSlot({ db, uid, feature: 'ai', premium, now })
@@ -109,6 +118,7 @@ async function analyzeLabel({ db, uid, image, barcode, callAi, now = new Date() 
   if (image.base64.length > MAX_BASE64_LENGTH) throw new HttpsError('invalid-argument', 'That photo is too large. Try a smaller one.')
 
   const { profile, premium } = await loadContext(db, uid)
+  requireAllergies(profile)
   // Take a slot before the Gemini call (refused with 429 at the limit); it is given back unless a scan is saved.
   const slot = await reserveSlot({ db, uid, feature: 'scan', premium, now })
   let keepSlot = false
@@ -165,6 +175,7 @@ async function lookupProduct({ db, uid, barcode, now = new Date() }) {
   if (!snapshot.exists) return { found: false }
   const product = snapshot.data()
   const { profile, premium } = await loadContext(db, uid)
+  requireAllergies(profile)
 
   const nutrients = product.nutrients ?? {}
   const allergens = parseAllergens(profile.allergies)
@@ -216,4 +227,4 @@ async function lookupProduct({ db, uid, barcode, now = new Date() }) {
   }
 }
 
-module.exports = { generateRecommendations, analyzeLabel, lookupProduct, CRITICAL_MESSAGE, containsAllergen }
+module.exports = { generateRecommendations, analyzeLabel, lookupProduct, CRITICAL_MESSAGE, ALLERGIES_MESSAGE, containsAllergen }

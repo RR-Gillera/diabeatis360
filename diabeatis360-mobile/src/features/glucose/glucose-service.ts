@@ -1,12 +1,19 @@
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
-import { interpretGlucose } from '@/constants/glucose';
+import { checkReading, interpretGlucose } from '@/constants/glucose';
 import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
 
 import type { GlucoseLogEntry, GlucoseLogRecord, MealContext } from './types';
 
+// Impossible values (outside 20-600 mg/dL, or decimals) never reach Firestore (DECISIONS.md D25); the rules refuse them too.
+function assertPossibleReading(readingMgdl: number) {
+  const check = checkReading(readingMgdl);
+  if (!check.ok) throw new Error(check.message);
+}
+
 export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date) {
+  assertPossibleReading(readingMgdl);
   const record: GlucoseLogRecord = {
     patient_id: patientId,
     reading_mgdl: readingMgdl,
@@ -37,6 +44,7 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
 // is correcting a typo they are already looking at, and re-notifying them about
 // their own edit would be noise.
 export async function updateGlucoseLog(logId: string, readingMgdl: number, context: MealContext, notes: string) {
+  assertPossibleReading(readingMgdl);
   await updateDoc(doc(db, 'Glucose_Logs', logId), {
     reading_mgdl: readingMgdl,
     context,

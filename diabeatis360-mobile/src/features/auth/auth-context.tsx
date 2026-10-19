@@ -13,7 +13,7 @@ import {
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { auth, db } from '@/firebase';
-import { hasCompletedOnboarding } from './onboarding';
+import { hasCompletedOnboarding, onboardingStartPath } from './onboarding';
 import { clearSocialSessions, getSocialToken } from './social-login';
 import { signInWithSocialToken } from './social-service';
 import type { SocialProvider } from './social-types';
@@ -40,6 +40,11 @@ type AuthContextValue = {
    * "Check your email" screen: `role` stays 'guest' until they have tapped the link in the email Firebase sent.
    */
   needsEmailVerification: boolean;
+  /**
+   * False until Firebase has finished restoring the saved sign-in after the app opens (DECISIONS.md D26). The landing
+   * page waits for it, then sends a signed-in person straight to their Home instead of asking for the password again.
+   */
+  sessionReady: boolean;
   signIn: (email: string, password: string) => Promise<DemoRole>;
   /**
    * Signs in with a Google or Facebook account (DECISIONS.md D23). The first time, Firebase creates the login, so this is
@@ -60,6 +65,8 @@ type AuthContextValue = {
   signOut: () => void;
   email: string | null;
   hasCompletedOnboarding: (email: string) => Promise<boolean>;
+  /** The first unanswered onboarding screen for someone who has not finished (DECISIONS.md D25). */
+  onboardingStartPath: (email: string) => Promise<string>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -152,6 +159,7 @@ async function sessionFor(user: User): Promise<Session | 'deactivated'> {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session>(SIGNED_OUT);
+  const [sessionReady, setSessionReady] = useState(false);
 
   // Keeps app state in sync with Firebase's own persisted session, so a
   // relaunch restores a signed-in (and verified) user instead of always
@@ -162,13 +170,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
   // reads it synchronously would silently see null forever.
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) { setSession(SIGNED_OUT); return; }
+      if (!user) { setSession(SIGNED_OUT); setSessionReady(true); return; }
       try {
         const next = await sessionFor(user);
         // Ignore the answer if the person signed out (or someone else signed in) while it was being worked out.
         if (next !== 'deactivated' && auth.currentUser?.uid === user.uid) setSession(next);
       } catch {
         // Offline or a permission problem: stay out of the app until the next sign-in rather than guessing.
+      } finally {
+        setSessionReady(true);
       }
     });
     return unsubscribe;
@@ -250,6 +260,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     email: session.email,
     displayName: session.displayName,
     needsEmailVerification: session.needsEmailVerification,
+    sessionReady,
     signIn,
     signInWithProvider,
     signUp,
@@ -259,6 +270,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     updateDisplayName,
     // uid is supplied here so every caller checks Firestore, not just local storage.
     hasCompletedOnboarding: (value: string) => hasCompletedOnboarding(value, auth.currentUser?.uid ?? null),
+    onboardingStartPath: (value: string) => onboardingStartPath(value, auth.currentUser?.uid ?? null),
     signOut: () => {
       // Also forget the Google/Facebook login the phone kept (read before Firebase signs out), so the next person is not
       // offered the previous one's account.

@@ -9,7 +9,9 @@
 // 'feature-unavailable' = the function is not deployed at all (the Firebase project is not on the Blaze plan yet);
 //                         lib/ai.ts recognises that case itself, before calling toAiError.
 // 'unavailable'         = it exists but could not be reached or is busy right now, so trying again can work.
-export type AiErrorCode = 'limit' | 'daily-cap' | 'unverified' | 'unavailable' | 'feature-unavailable' | 'signed-out' | 'invalid' | 'unknown';
+// 'allergies-missing'   = the person has not answered the allergy question yet (DECISIONS.md D25); the screens
+//                         send them to Profile, where "None" is a valid answer.
+export type AiErrorCode = 'limit' | 'daily-cap' | 'unverified' | 'unavailable' | 'feature-unavailable' | 'allergies-missing' | 'signed-out' | 'invalid' | 'unknown';
 
 export class AiError extends Error {
   code: AiErrorCode;
@@ -33,6 +35,7 @@ export function toAiError(error: unknown): AiError {
   }
   if (code === 'functions/unauthenticated') return new AiError('signed-out', 'Please sign in again to use this feature.');
   if (code === 'functions/permission-denied') return new AiError('unverified', message || 'Please verify your email address first.');
+  if (code === 'functions/failed-precondition') return new AiError('allergies-missing', message || 'Add your allergies first (or choose None) in Profile > Health Profile.');
   if (code === 'functions/invalid-argument') return new AiError('invalid', message || 'That request was not valid.');
   if (code === 'functions/unavailable' || code === 'functions/not-found' || code === 'functions/internal' || code === 'functions/deadline-exceeded') {
     return new AiError('unavailable', 'The AI service is not reachable right now. Please try again in a moment.');

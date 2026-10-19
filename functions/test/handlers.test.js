@@ -376,3 +376,27 @@ test('the allowance starts again on the next Manila day, not at midnight UTC', {
   assert.equal(await code(generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: new Date('2026-10-12T15:59:00Z') })), 'resource-exhausted')
   assert.equal(await code(generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: new Date('2026-10-12T16:00:00Z') })), 'ok')
 })
+
+// DECISIONS.md D25: no suggestions, label scans or barcode ratings until the allergy question is answered.
+test('without an allergy answer every AI feature is refused: no Gemini call, nothing saved or counted', { skip }, async () => {
+  await reset()
+  const { ALLERGIES_MESSAGE } = require('../lib/handlers')
+  await addUser('uNoAllergies', { allergies: '' })
+  await db.doc('Products/4800000000017').set({ barcode: '4800000000017', product_name: 'Test Crackers', ingredients_text: 'wheat', nutrients: { calories: 100, carbs_g: 10, sugar_g: 1, fiber_g: 1, protein_g: 2, sodium_mg: 50 }, alternatives: [], verified: true })
+  const ai = fakeAi(mealsAnswer)
+  for (const call of [
+    generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai }),
+    analyzeLabel({ db, uid: 'uNoAllergies', image: png, callAi: fakeAi(labelAnswer) }),
+    lookupProduct({ db, uid: 'uNoAllergies', barcode: '4800000000017' }),
+  ]) {
+    await assert.rejects(call, (error) => error.code === 'failed-precondition' && error.message === ALLERGIES_MESSAGE)
+  }
+  assert.equal(ai.calls, 0)
+  assert.equal((await db.collection('AI_Suggestions').get()).size, 0)
+  assert.equal((await db.collection('Nutrition_Scans').get()).size, 0)
+  assert.equal((await db.collection('Usage_Counters').get()).size, 0)
+  // "None" is an answer: the same person may now generate.
+  await db.doc('Users/uNoAllergies').update({ allergies: 'None' })
+  const result = await generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai })
+  assert.ok(result.items.length > 0)
+})

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
 import { RoundBackButton } from '@/components/ui/round-back-button';
 import { FREE_LIMITS } from '@/constants/plans';
 import { Fonts } from '@/constants/theme';
@@ -175,10 +176,7 @@ export default function SubscriptionScreen() {
               </Pressable>
             ))}
           </View>
-          <View style={styles.demo}>
-            <View style={styles.demoBadge}><Text style={styles.demoBadgeText}>Demo payment</Text></View>
-            <Text style={styles.demoText}>No real money is charged.</Text>
-          </View>
+          <DemoPaymentNote />
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
         <Pressable accessibilityRole="button" style={[styles.primary, paying && styles.disabled]} onPress={pay} disabled={paying}>
@@ -291,10 +289,6 @@ const styles = StyleSheet.create({
   methodOn: { backgroundColor: '#F1F8E8', borderColor: homeColors.green },
   methodIcon: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   methodText: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700' },
-  demo: { alignItems: 'center', backgroundColor: '#FFF7E8', borderColor: '#F5C46B', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, padding: 12 },
-  demoBadge: { backgroundColor: '#F59E0B', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  demoBadgeText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800' },
-  demoText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13 },
   hero: { backgroundColor: homeColors.green, borderRadius: 28, gap: 6, padding: 20 },
   heroTop: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 6 },
   crownCircle: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },

@@ -127,6 +127,9 @@ service cloud.firestore {
         && request.resource.data.platform_commission is number
         && math.abs(request.resource.data.platform_commission - request.resource.data.fee * 0.15) < 0.01
         && request.resource.data.scheduled_at is timestamp
+        // D26: only a time that has not started yet, by the SERVER's clock (request.time), so a wrong phone clock cannot
+        // book the past. Philippine time does not matter here: both sides are exact moments.
+        && request.resource.data.scheduled_at > request.time
         // Only the fields the app writes (D24 added the patient's optional "concern", at most 300 characters). Without
         // this list a patient could add any field, for example a fake decline reason.
         && request.resource.data.keys().hasOnly(['patient_id', 'provider_id', 'status', 'scheduled_at', 'fee', 'platform_commission',
@@ -199,13 +202,24 @@ service cloud.firestore {
     // ------------------------------------------------------------------ accounts
 
     match /Users/{userId} {
+      // Health fields (DECISIONS.md D25): when one is written it must be a value the app itself offers, so a stray
+      // 'Pre-Diabetic', an empty allergy list or a birthdate saved as text can never land in a profile again.
+      // allergies is free text from the person; 'None' is how someone says they have none, so it cannot be empty.
+      function okHealth(data, keys) {
+        return (!keys.hasAny(['diabetes_type']) || data.diabetes_type in ['Type 1', 'Type 2', 'Prediabetes'])
+          && (!keys.hasAny(['allergies']) || (data.allergies is string && data.allergies.size() >= 1 && data.allergies.size() <= 500))
+          && (!keys.hasAny(['birthdate']) || data.birthdate is timestamp)
+          && (!keys.hasAny(['activity_level']) || data.activity_level in ['Sedentary', 'Light', 'Active', 'Very Active'])
+          && (!keys.hasAny(['dietary_preference']) || data.dietary_preference in ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet']);
+      }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.
       allow read: if isUser(userId) || isAdmin() || canSeePatient(userId);
       // You can only create your own profile, and cannot create it already deactivated. account_type (D16),
       // if present, must be 'self' or 'minor' — anything else is rejected outright, not silently ignored.
       allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
-                    && request.resource.data.get('account_type', 'self') in ['self', 'minor'];
+                    && request.resource.data.get('account_type', 'self') in ['self', 'minor']
+                    && okHealth(request.resource.data, request.resource.data.keys());
       // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
       // account_type (D16) is set once — the Users doc already exists by the time onboarding chooses "For me" /
       // "For my child" (it is created earlier, at email verification), so this has to be an update, not a
@@ -213,6 +227,7 @@ service cloud.firestore {
       // cannot relabel itself 'self' later to dodge guardian approval.
       allow update: if isAdmin() && changedKeys().hasOnly(['is_active'])
                     || (isUser(userId) && !changedKeys().hasAny(['is_active'])
+                        && okHealth(request.resource.data, changedKeys())
                         && (!changedKeys().hasAny(['account_type'])
                             || (!('account_type' in resource.data) && request.resource.data.account_type in ['self', 'minor'])));
       // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
@@ -285,15 +300,20 @@ service cloud.firestore {
     // ------------------------------------------------------------------ blood sugar
 
     match /Glucose_Logs/{logId} {
+      // A whole number a home meter can show, 20-600 mg/dL (DECISIONS.md D25, constants/glucose.ts READING_LIMITS).
+      function possibleReading(data) {
+        return data.reading_mgdl is int && data.reading_mgdl >= 20 && data.reading_mgdl <= 600;
+      }
       // Readings are private health data: the patient, admins, and a doctor the patient shared them with by booking
       // that doctor (Care_Links, D22) only. A doctor's list query must name the patient (where patient_id ==).
       allow read: if signedIn() && (resource.data.patient_id == request.auth.uid || isAdmin() || canSeePatient(resource.data.patient_id));
-      // You can only log readings for yourself, and the value must be a number.
+      // You can only log readings for yourself, and only a possible value.
       allow create: if signedIn() && request.resource.data.patient_id == request.auth.uid
-                    && request.resource.data.reading_mgdl is number;
+                    && possibleReading(request.resource.data);
       // You can edit only your own readings, and cannot reassign one to another patient.
       allow update: if signedIn() && resource.data.patient_id == request.auth.uid
-                    && request.resource.data.patient_id == request.auth.uid;
+                    && request.resource.data.patient_id == request.auth.uid
+                    && possibleReading(request.resource.data);
       // You can delete only your own readings (the app offers delete-with-confirmation).
       allow delete: if signedIn() && resource.data.patient_id == request.auth.uid;
     }

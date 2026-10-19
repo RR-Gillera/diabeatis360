@@ -67,7 +67,9 @@ name. Built in batch 1 (patient):
 | [P-25] Consultation Summary (and None Yet) | `app/consultation/summary/[id].tsx` (Doctor's notes, Advice and Follow-up, batch 3) |
 | [P-26] to [P-29] Video call | `app/video-call/[id].tsx` |
 | [P-30] to [P-32] Subscription | `app/subscription.tsx` ("Premium until", never "renews": payments are a demo) |
-Already matching in earlier work: P-04 to P-06, P-08 to P-12. Built in batch 2 (doctor and admin):
+Already matching in earlier work: P-04 to P-06, P-08 to P-12 (P-10 Interpretation - Critical got its Call 911 button in D25; P-11/P-12 Health Profile is still one editable form, not the read-only cards + Edit of the frame: QA 2026-10-18 D-26). Built in batch 2 (doctor and admin):
+
+D26 (2026-10-18): "Payment Success" now reads "Demo payment recorded" with a Demo payment note, and Consultation Fee says "DEMO CHECKOUT" / "Pay ₱… (demo)" instead of "SECURE CHECKOUT" / "Pay Now": a deliberate difference from the frames, so respondents are not misled.
 | Frame | Screen in the app |
 |---|---|
 | Dashboard Earnings and Notifications | `app/doctor/index.tsx` (no 24/7 card) |

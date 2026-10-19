@@ -1,27 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { doc, getDoc } from 'firebase/firestore';
 
+import { db } from '@/firebase';
 import { authColors, authStyles, AuthButton, Section } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { getOnboardingValue, saveOnboardingValue } from '@/features/auth/onboarding';
 import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
 import { BirthdateField } from '@/features/auth/birthdate-picker';
-import { enumLabel } from '@/constants/enums';
+import { DIABETES_TYPES, enumLabel } from '@/constants/enums';
+import { changedHealthFields, EMPTY_HEALTH_FORM, healthFormProblem, profileToForm, type HealthForm } from '@/features/auth/health-profile';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { BottomNav } from '@/features/home/home-ui';
 
 type HealthField =
-  | { key: string; label: string; type: 'date' }
-  | { key: string; label: string; type: 'text'; placeholder?: string }
-  | { key: string; label: string; type: 'options'; options: string[] };
+  | { key: keyof HealthForm; label: string; type: 'date' }
+  | { key: keyof HealthForm; label: string; type: 'text'; placeholder?: string }
+  | { key: keyof HealthForm; label: string; type: 'options'; options: readonly string[] };
 
 // Option lists mirror the onboarding screens exactly — the doctor's patient
 // view shows these values verbatim, so free text would fragment them.
 const healthFields: HealthField[] = [
   { key: 'dateOfBirth', label: 'Date of Birth', type: 'date' },
-  { key: 'condition', label: 'Condition', type: 'options', options: ['Type 1', 'Type 2', 'Pre-Diabetic'] },
-  { key: 'allergy', label: 'Allergies', type: 'text', placeholder: 'e.g. Nuts, Dairy, Seafood' },
+  { key: 'condition', label: 'Condition', type: 'options', options: DIABETES_TYPES },
+  { key: 'allergy', label: 'Allergies', type: 'text', placeholder: 'e.g. Nuts, Dairy, Seafood, or None' },
   { key: 'activity', label: 'Activity Level', type: 'options', options: ['Sedentary', 'Light', 'Active', 'Very Active'] },
   { key: 'diet', label: 'Dietary Preference', type: 'options', options: ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet'] },
 ];
@@ -37,7 +40,10 @@ export default function ProfileScreen() {
   const [savingName, setSavingName] = useState(false);
   const [nameSaved, setNameSaved] = useState(false);
 
-  const [health, setHealth] = useState<Record<string, string>>({});
+  // health is the form; loaded is what Firestore held when the screen opened, so Save can write only real changes.
+  const [health, setHealth] = useState<HealthForm>(EMPTY_HEALTH_FORM);
+  const [loaded, setLoaded] = useState<HealthForm>(EMPTY_HEALTH_FORM);
+  const [healthError, setHealthError] = useState('');
   const [savingHealth, setSavingHealth] = useState(false);
   const [healthSaved, setHealthSaved] = useState(false);
   const [loadingHealth, setLoadingHealth] = useState(true);
@@ -51,15 +57,21 @@ export default function ProfileScreen() {
     return subscribeToGuardianVerification(uid, setGuardianVerification, () => {});
   }, [uid]);
 
+  // The profile comes from the Users document (DECISIONS.md D25), so it is the same on every phone. The phone's
+  // own copy only fills a field Firestore does not have (e.g. offline), and is never written back by itself.
   useEffect(() => {
     if (!email) { setLoadingHealth(false); return; }
     let cancelled = false;
     (async () => {
-      const entries = await Promise.all(healthFields.map(async (field) => [field.key, (await getOnboardingValue(email, field.key)) ?? ''] as const));
-      if (!cancelled) { setHealth(Object.fromEntries(entries)); setLoadingHealth(false); }
+      let form = { ...EMPTY_HEALTH_FORM };
+      try { if (uid) form = profileToForm((await getDoc(doc(db, 'Users', uid))).data()); } catch { /* offline: fall back below */ }
+      for (const field of healthFields) {
+        if (!form[field.key]) form = { ...form, [field.key]: (await getOnboardingValue(email, field.key)) ?? '' };
+      }
+      if (!cancelled) { setHealth(form); setLoaded(form); setLoadingHealth(false); }
     })();
     return () => { cancelled = true; };
-  }, [email]);
+  }, [email, uid]);
 
   const saveName = async () => {
     if (!name.trim()) return;
@@ -67,12 +79,19 @@ export default function ProfileScreen() {
     try { await updateDisplayName(name); setNameSaved(true); } finally { setSavingName(false); }
   };
 
+  // Only the fields the person changed, never a blank (a blank used to wipe the stored profile, QA 2026-10-18 HP-03b).
   const saveHealth = async () => {
     if (!email) return;
-    setSavingHealth(true); setHealthSaved(false);
+    const problem = healthFormProblem(health);
+    if (problem) { setHealthError(problem); return; }
+    setSavingHealth(true); setHealthSaved(false); setHealthError('');
     try {
-      await Promise.all(healthFields.map((field) => saveOnboardingValue(email, field.key, health[field.key] ?? '', uid)));
+      const changes = changedHealthFields(loaded, health);
+      for (const [key, value] of Object.entries(changes)) await saveOnboardingValue(email, key, value as string, uid);
+      setLoaded(health);
       setHealthSaved(true);
+    } catch (value) {
+      setHealthError(value instanceof Error ? value.message : 'Your health profile could not be saved. Please try again.');
     } finally { setSavingHealth(false); }
   };
 
@@ -105,7 +124,7 @@ export default function ProfileScreen() {
         <Section title="Health Profile">
           {loadingHealth ? <ActivityIndicator color={authColors.green} /> : <>
             {healthFields.map((field) => {
-              const update = (value: string) => { setHealth((current) => ({ ...current, [field.key]: value })); setHealthSaved(false); };
+              const update = (value: string) => { setHealth((current) => ({ ...current, [field.key]: value })); setHealthSaved(false); setHealthError(''); };
               return (
                 <View key={field.key} style={styles.fieldRow}>
                   <Text style={styles.fieldLabel}>{field.label.toUpperCase()}</Text>
@@ -128,6 +147,7 @@ export default function ProfileScreen() {
                 </View>
               );
             })}
+            {healthError ? <Text style={styles.healthError}>{healthError}</Text> : null}
             <AuthButton title={savingHealth ? 'Saving...' : healthSaved ? 'Saved ✓' : 'Save Health Profile'} onPress={saveHealth} disabled={savingHealth} />
           </>}
         </Section>
@@ -157,6 +177,7 @@ const styles = StyleSheet.create({
   guardianTitle: { color: authColors.navy, fontSize: 13, fontWeight: '800' },
   guardianStatus: { color: authColors.muted, fontSize: 12, fontWeight: '700' },
   guardianStatusRejected: { color: '#D9364F' },
+  healthError: { color: '#D9364F', fontSize: 13, lineHeight: 18 },
   input: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, color: authColors.navy, fontSize: 15, minHeight: 46, paddingHorizontal: 14 },
   fieldRow: { gap: 6 },
   fieldLabel: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },

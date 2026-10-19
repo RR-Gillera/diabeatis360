@@ -56,6 +56,17 @@ export type GuardianRelationship = (typeof GUARDIAN_RELATIONSHIPS)[number];
 export const ACTIVITY_LEVELS = ['Sedentary', 'Light', 'Active', 'Very Active'] as const;
 export const DIETARY_PREFERENCES = ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet'] as const;
 export const DIABETES_TYPES = ['Type 1', 'Type 2', 'Prediabetes'] as const;
+export type DiabetesType = (typeof DIABETES_TYPES)[number];
+
+/**
+ * Reads a stored diabetes type, including the label older app versions saved ('Pre-Diabetic', DECISIONS.md D25).
+ * Returns '' when nothing usable is stored. scripts/migrate-diabetes-type.cjs rewrites the old label in Firestore.
+ */
+export function normalizeDiabetesType(value: unknown): DiabetesType | '' {
+  const text = String(value ?? '').trim();
+  if (/^pre-?diabet(ic|es)$/i.test(text)) return 'Prediabetes';
+  return (DIABETES_TYPES as readonly string[]).includes(text) ? (text as DiabetesType) : '';
+}
 export const LANGUAGE_PREFERENCES = ['English', 'Filipino'] as const;
 
 export const ENUM_LABELS = {

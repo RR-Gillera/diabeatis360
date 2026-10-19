@@ -6,6 +6,8 @@ import { MoreMenu } from '@/components/ui/more-menu';
 import { Brand, Fonts, Spacing } from '@/constants/theme';
 import { NotificationBell } from '@/features/notifications/notification-bell';
 
+import { slotInstant } from './manila-time';
+
 export const bookingColors = {
   navy: '#10182D',
   green: Brand.colors.primary,
@@ -73,16 +75,10 @@ export function formatDate(value: Date) {
 
 // Merges a calendar day (from the date picker, time defaults to midnight)
 // with a "09:30 AM"-style slot label into one real Date — the value actually
-// persisted as a booking's scheduled_at.
+// persisted as a booking's scheduled_at. The time is Philippine time (DECISIONS.md D26), so a phone set to another
+// time zone still books the clinic's 09:30 AM.
 export function combineDateAndTime(date: Date, time: string): Date {
-  const match = /^(\d{1,2}):(\d{2})\s?(AM|PM)$/i.exec(time.trim());
-  if (!match) return date;
-  const [, hourText, minuteText, meridiem] = match;
-  let hour = Number(hourText) % 12;
-  if (meridiem.toUpperCase() === 'PM') hour += 12;
-  const combined = new Date(date);
-  combined.setHours(hour, Number(minuteText), 0, 0);
-  return combined;
+  return slotInstant(date, time) ?? date;
 }
 
 export const styles = StyleSheet.create({

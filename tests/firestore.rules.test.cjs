@@ -28,7 +28,8 @@ const deny = (name, promise) => check(name, promise, false);
 
   // ---- booking helpers (D22: a booking, the time slot it holds and the patient's share with the doctor)
   // Each booking below gets its own time, because each one holds its own slot (Booked_Slots/<doctor>_<epoch ms>).
-  const SLOT_START = Date.parse('2026-10-20T06:00:00Z');
+  // Bookings must be in the future (D26), so test slots start 30 days from now, on the hour, instead of a fixed date.
+  const SLOT_START = Math.ceil((Date.now() + 30 * 24 * 60 * 60 * 1000) / 3600000) * 3600000;
   const slotTime = (n) => Timestamp.fromMillis(SLOT_START + n * 30 * 60 * 1000);
   const slotIdOf = (provider, when) => `${provider}_${when.toMillis()}`;
   const isLive = (status) => ['pending', 'confirmed', 'completed'].includes(status);
@@ -82,6 +83,8 @@ const deny = (name, promise) => check(name, promise, false);
     await setDoc(doc(db, 'Users/pMinorRejected'), { full_name: 'Minor Rejected', role: 'patient', is_active: true, account_type: 'minor' });
     await setDoc(doc(db, 'Guardian_Verifications/pMinorRejected'), { user_id: 'pMinorRejected', guardian_full_name: 'Old Name', relationship_to_minor: 'parent', guardian_id_photo_url: 'https://x/old.jpg', verification_status: 'rejected', rejection_reason: 'Blurry photo' });
     await setDoc(doc(db, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 110, context: 'before_meal' });
+    // D25: a profile saved by an older app version, with the old condition label and no allergies.
+    await setDoc(doc(db, 'Users/pLegacy'), { full_name: 'Legacy', role: 'patient', is_active: true, diabetes_type: 'Pre-Diabetic', allergies: '' });
     await setDoc(doc(db, 'Glucose_Logs/g9'), { patient_id: 'p9', reading_mgdl: 99, context: 'before_meal' });
     // Each booking holds its own time slot and, while live, the patient's share with the doctor (D22).
     await seedBooking(db, 'bPending', { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }, 1);
@@ -600,6 +603,34 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('advice that is not text is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: 7 })));
   await deny('a follow-up that is not a date is refused', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { follow_up_at: 'next week' })));
   await deny('the patient still cannot write advice', setDoc(doc(p1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { advice: 'Eat cake.' })));
+  // ---- D25: health-profile values and reading limits
+  const pLegacy = signedIn('pLegacy').firestore();
+  await allow('D25: a profile may store Prediabetes', updateDoc(doc(p1, 'Users/p1'), { diabetes_type: 'Prediabetes' }));
+  await deny('D25: the old label Pre-Diabetic is refused', updateDoc(doc(p1, 'Users/p1'), { diabetes_type: 'Pre-Diabetic' }));
+  await deny('D25: an unknown diabetes type is refused', updateDoc(doc(p1, 'Users/p1'), { diabetes_type: 'Type 3' }));
+  await allow('D25: allergies may be None', updateDoc(doc(p1, 'Users/p1'), { allergies: 'None' }));
+  await allow('D25: allergies may be a list', updateDoc(doc(p1, 'Users/p1'), { allergies: 'Peanuts, Shellfish' }));
+  await deny('D25: allergies cannot be cleared to an empty string', updateDoc(doc(p1, 'Users/p1'), { allergies: '' }));
+  await deny('D25: allergies over 500 characters are refused', updateDoc(doc(p1, 'Users/p1'), { allergies: 'a'.repeat(501) }));
+  await allow('D25: birthdate as a date', updateDoc(doc(p1, 'Users/p1'), { birthdate: Timestamp.fromDate(new Date('1985-03-15')) }));
+  await deny('D25: birthdate saved as text (the old blank-save bug) is refused', updateDoc(doc(p1, 'Users/p1'), { birthdate: '' }));
+  await deny('D25: activity level outside the list is refused', updateDoc(doc(p1, 'Users/p1'), { activity_level: '' }));
+  await deny('D25: dietary preference outside the list is refused', updateDoc(doc(p1, 'Users/p1'), { dietary_preference: 'Keto' }));
+  await allow('D25: an old profile can still change other fields', updateDoc(doc(pLegacy, 'Users/pLegacy'), { full_name: 'Legacy Renamed' }));
+  await allow('D25: an old profile can move to Prediabetes', updateDoc(doc(pLegacy, 'Users/pLegacy'), { diabetes_type: 'Prediabetes' }));
+  await deny('D25: a new profile cannot be created with an empty allergy list', setDoc(doc(signedIn('pNew').firestore(), 'Users/pNew'), { full_name: 'New', role: 'patient', allergies: '' }));
+  for (const [value, ok] of [[20, true], [600, true], [19, false], [601, false], [9999, false], [1.5, false], [120.5, false]]) {
+    await check(`D25: a reading of ${value} mg/dL is ${ok ? 'saved' : 'refused'}`, addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: value, context: 'before_meal' }), ok);
+  }
+  await deny('D25: editing a reading to an impossible value is refused', updateDoc(doc(p1, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 0 }));
+  await allow('D25: editing a reading to a possible value', updateDoc(doc(p1, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 145 }));
+
+  // ---- D26: a booking must be in the future by the server's clock. SLOT_START is 30 days ahead (on the hour), so
+  // slot -1442 is about an hour ago, -1438 about an hour from now.
+  await deny('D26: a booking for a time that has already passed is refused', book(p1, 'bk-d26-past', { n: -1442 }));
+  await deny('D26: a booking 30 days in the past is refused', book(p1, 'bk-d26-old', { n: -2880 }));
+  await allow('D26: a booking an hour from now is allowed', book(p1, 'bk-d26-soon', { n: -1438 }));
+
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));
   await deny('unknown collection write', setDoc(doc(a1, 'Secrets/x'), { a: 1 }));

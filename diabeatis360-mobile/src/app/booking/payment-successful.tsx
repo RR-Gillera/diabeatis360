@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
 import { bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
@@ -31,8 +32,8 @@ export default function PaymentSuccessfulScreen() {
           <View style={styles.icon}>
             <SymbolView name={{ ios: 'checkmark.seal.fill', android: 'verified', web: 'verified' }} size={34} tintColor={bookingColors.green} />
           </View>
-          <Text style={styles.title}>{onsite ? 'Booking Confirmed!' : 'Payment Successful!'}</Text>
-          <Text style={styles.subtitle}>{onsite ? 'Pay the consultation fee at the clinic on the day.' : 'Your appointment has been confirmed.'}</Text>
+          <Text style={styles.title}>{onsite ? 'Booking Confirmed!' : 'Demo payment recorded'}</Text>
+          <Text style={styles.subtitle}>{onsite ? 'Pay the consultation fee at the clinic on the day.' : 'Your appointment is confirmed. No money was charged.'}</Text>
         </View>
 
         {provider && selectedDate && selectedTime ? (
@@ -43,7 +44,7 @@ export default function PaymentSuccessfulScreen() {
             </View>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>CONSULTATION</Text>
-              <View style={styles.statusBadge}><Text style={styles.statusText}>{onsite ? 'On-site' : 'Paid'}</Text></View>
+              <View style={styles.statusBadge}><Text style={styles.statusText}>{onsite ? 'On-site' : 'Paid (demo)'}</Text></View>
             </View>
             {bookingId ? (
               <View style={styles.receiptRow}>
@@ -56,11 +57,12 @@ export default function PaymentSuccessfulScreen() {
               <Text style={styles.receiptValue}>{formatDate(selectedDate)} • {selectedTime}</Text>
             </View>
             <View style={[styles.receiptRow, styles.receiptTotalRow]}>
-              <Text style={styles.receiptTotalLabel}>{onsite ? 'PAY ON-SITE' : 'AMOUNT PAID'}</Text>
+              <Text style={styles.receiptTotalLabel}>{onsite ? 'PAY ON-SITE' : 'AMOUNT (DEMO)'}</Text>
               <Text style={styles.receiptTotalValue}>{formatFee(fee)}</Text>
             </View>
           </View>
         ) : null}
+        {onsite ? null : <DemoPaymentNote />}
         {bookingId ? <Text style={styles.hint}>Show this Booking ID to your doctor to confirm your appointment.</Text> : null}
       </ScrollView>
       <View style={styles.button}>

@@ -22,7 +22,7 @@ import {
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { sent } = useLocalSearchParams<{ sent?: string }>();
-  const { uid, email, checkEmailVerified, resendVerificationEmail, hasCompletedOnboarding, signOut } = useAuth();
+  const { uid, email, checkEmailVerified, resendVerificationEmail, hasCompletedOnboarding, onboardingStartPath, signOut } = useAuth();
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false); // the button's own spinner: quiet background checks do not use it
@@ -33,8 +33,8 @@ export default function VerifyEmailScreen() {
   const leaving = useRef(false); // the person chose to leave: do not also bounce them to Login
   // The functions from useAuth() get a new identity whenever the provider re-renders. Reading them through a ref keeps
   // check() (and so the timer below) stable instead of restarting the timer each time.
-  const latest = useRef({ checkEmailVerified, hasCompletedOnboarding, email });
-  useEffect(() => { latest.current = { checkEmailVerified, hasCompletedOnboarding, email }; });
+  const latest = useRef({ checkEmailVerified, hasCompletedOnboarding, onboardingStartPath, email });
+  useEffect(() => { latest.current = { checkEmailVerified, hasCompletedOnboarding, onboardingStartPath, email }; });
 
   // Nobody is signed in (the session ended, or Firebase is still restoring it after a restart): nothing to verify here.
   // The restore takes a moment, so wait a few seconds before sending the person to Login.
@@ -63,13 +63,13 @@ export default function VerifyEmailScreen() {
     working.current = true;
     if (byTap) { setChecking(true); setError(''); setMessage(''); }
     try {
-      const { checkEmailVerified: confirm, hasCompletedOnboarding: onboardingDone, email: address } = latest.current;
+      const { checkEmailVerified: confirm, hasCompletedOnboarding: onboardingDone, onboardingStartPath: startPath, email: address } = latest.current;
       const role = await confirm();
       if (role) {
         const finished = address ? await onboardingDone(address) : false;
         setError('');
         setMessage('Email verified! Taking you to the next step...');
-        setConfirmed(finished ? (role === 'doctor' ? '/doctor' : '/user-home') : '/onboarding/language');
+        setConfirmed(finished ? (role === 'doctor' ? '/doctor' : '/user-home') : address ? await startPath(address) : '/onboarding/language');
       } else if (byTap) {
         setError('We cannot see your confirmation yet. Open the link in the email we sent you, then tap this button again.');
       }

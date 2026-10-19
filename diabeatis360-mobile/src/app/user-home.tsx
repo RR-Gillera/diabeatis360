@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { CallEmergencyButton } from '@/components/ui/call-emergency-button';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
@@ -136,6 +137,7 @@ export default function UserHomeScreen() {
           </View>
           <Text style={[styles.bannerText, { color: banner.color }]}>{banner.text}</Text>
         </View>
+        {latest?.interpretation === 'critical' ? <View style={styles.emergency}><CallEmergencyButton /></View> : null}
 
         <View style={styles.card}>
           <Text style={styles.cardLabel}>LATEST READING</Text>
@@ -272,6 +274,7 @@ const styles = StyleSheet.create({
   bellDotText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 9, fontWeight: '800' },
   avatar: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.avatarRing, borderRadius: 24, borderWidth: 2, height: 48, justifyContent: 'center', width: 48 },
   avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
+  emergency: { marginHorizontal: 24, marginTop: 12 },
   banner: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 24, paddingHorizontal: 16, paddingVertical: 12 },
   bannerIconWrap: { alignItems: 'center', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
   bannerText: { flex: 1, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600' },

@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { CallEmergencyButton } from '@/components/ui/call-emergency-button';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
@@ -87,6 +88,7 @@ export default function GlucoseResultScreen() {
             <SymbolView name={{ ios: 'stethoscope', android: 'medical_services', web: 'medical_services' }} size={15} tintColor="#FFF" />
             <Text style={styles.alertButtonText}>See a Doctor</Text>
           </Pressable>
+          {alert.severity === 'critical' ? <CallEmergencyButton /> : null}
         </View>
       ) : null}
 

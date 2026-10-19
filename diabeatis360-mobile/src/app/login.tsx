@@ -8,7 +8,7 @@ import { useSocialSignIn } from '@/features/auth/use-social-sign-in';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, hasCompletedOnboarding } = useAuth();
+  const { signIn, hasCompletedOnboarding, onboardingStartPath } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [secure, setSecure] = useState(true);
@@ -21,7 +21,7 @@ export default function LoginScreen() {
     try {
       const role = await signIn(email, password);
       if (await hasCompletedOnboarding(email)) router.replace(role === 'doctor' ? '/doctor' : '/user-home');
-      else router.replace('/onboarding/language');
+      else router.replace(await onboardingStartPath(email) as never);
     } catch (value) {
       // Signed in, but the email address is not confirmed yet: "Check your email" takes over (DECISIONS.md D21).
       if (typeof value === 'object' && value && 'code' in value && value.code === 'app/email-not-verified') {

@@ -18,3 +18,8 @@ node_modules/
 functions/.secret.local
 functions/.env
 functions/.env.*
+
+# QA evidence recordings (screen videos are large; screenshots and reports stay in git)
+docs/reports/qa-*/**/video/
+docs/reports/qa-*/**/*.mp4
+docs/reports/qa-*/**/*.mkv

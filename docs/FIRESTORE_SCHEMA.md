@@ -43,9 +43,11 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 
 | Need (module) | Proposal |
 |---|---|
-| Allergies (Health Profile, AI, Scanner) — objectives mention them, Users has no field | `users.food_allergies: string[]` |
+| Allergies (Health Profile, AI, Scanner) — objectives mention them, Users has no field | **As built:** `users.allergies` (text, 1–500 characters, comma-separated). **"None" means the person has no allergies; empty or missing means not answered yet**, and the AI features refuse until it is answered (DECISIONS.md D25). The rules refuse an empty value. |
 | Notification toggles from onboarding | `users.notification_prefs: { glucose, meals, medication, exercise, hydration, appointment }` |
 | Role routing / onboarding state | `users.onboarding_complete: boolean` (role is implied by which collection has the uid) |
+| Booking time (Appointment, D26) | `bookings.scheduled_at` is the exact moment of a Philippine-time slot (UTC+8); a new booking must be later than the server's time (`request.time`), so the past cannot be booked. |
+| Reading range (Blood Sugar, D25) | `glucose_logs.reading_mgdl` is a whole number from **20 to 600** (refused otherwise by the app and the rules; 20–39 and 401–600 ask for a check first). `users.diabetes_type` is one of `Type 1`, `Type 2`, `Prediabetes` (the old 'Pre-Diabetic' is refused; `functions/scripts/migrate-diabetes-type.js` fixes old documents). `users.birthdate` is always a timestamp. |
 | Interpretation result (Blood Sugar) | `glucose_logs.interpretation: "low" \| "normal" \| "high" \| "critical"` (the app derives it on read today; `critical` is added with the D4 work) |
 | Doctor schedule (Manage Schedule) | `providers.availability: [{ day: 0-6, start: "09:00", end: "12:00" }]`, `providers.slot_minutes: 30` |
 | Doctor profile extras shown in Figma | `providers.years_experience`, `providers.photo_url` (optional) |
@@ -63,13 +65,13 @@ Collections for DECISIONS.md D11 (closed; `Calls` is built) and D12 (`Products`,
 
 | Collection | Doc ID | Fields |
 |---|---|---|
-| Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), room (random token, 16+ chars, names the Jitsi room), created_at, ended_at |
+| Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), room (random token, 16+ chars; the server names the private Daily room `d360-<room>` after it, D27), created_at, ended_at |
 | Products | barcode | barcode, product_name, brand, serving_size, nutrients (map: calories, carbs_g, sugar_g, fiber_g, protein_g, sodium_mg), ingredients_text, alternatives (list of instead_of/try), source (`gemini_label`), created_by, verified (bool), verified_by, verified_at, created_at |
 
 Rules intent:
 - **Calls:** read/update only when `request.auth.uid` is the caller or callee AND they are that booking's
   `patient_id` / `provider_id`; create only as the caller, with `status == 'ringing'`, on a `confirmed` booking;
-  no delete. A missed call is set by the caller's app after ~30 s. The `room` token is random per call, so the video room cannot be guessed from the booking id; only the two participants can read it. Calling again after a finished call reuses the same doc (a new token).
+  no delete. A missed call is set by the caller's app after ~30 s. The `room` token is random per call, so the video room cannot be guessed from the booking id; only the two participants can read it. Calling again after a finished call reuses the same doc (a new token). Since D27 the room is also **private** on Daily's side: knowing its name is not enough, because `/api/joinCall` hands a one-person pass only to the caller or callee of an accepted call on a confirmed booking. The pass is never written to Firestore, so the `Calls` fields and rules did not change.
 - **Products:** signed-in read; signed-in create with `verified == false` and `created_by == request.auth.uid`;
   only admins update, and only `verified` / `verified_by` / `verified_at`; no delete. The document id must be 6 to 14 digits and equal the `barcode` field. Health ratings are never stored here (computed per user by the `lookupProduct` function from the nutrients and that user's allergies).
 - **Nutrition_Scans** gained `product_id` (the barcode, or null) and `source` (`gemini_label` or `product_memory`). A scan answered from Products makes no Gemini call and does not count toward the Free plan's 3 scans a day.

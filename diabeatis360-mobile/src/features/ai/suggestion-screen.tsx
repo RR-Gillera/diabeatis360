@@ -140,6 +140,8 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
                 <AppText style={styles.errorText}>{error.message}</AppText>
                 {error.code === 'limit' ? (
                   <PrimaryButton title="Upgrade to Premium" variant="outline" onPress={() => router.push('/subscription')} style={styles.upgrade} />
+                ) : error.code === 'allergies-missing' ? (
+                  <PrimaryButton title="Add my allergies" variant="outline" onPress={() => router.push('/profile')} style={styles.upgrade} />
                 ) : null}
               </View>
             ) : null}

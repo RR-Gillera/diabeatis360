@@ -12,7 +12,7 @@ import { isCancelled, socialErrorMessage, type SocialProvider } from './social-t
  */
 export function useSocialSignIn(showError: (message: string) => void) {
   const router = useRouter();
-  const { signInWithProvider, hasCompletedOnboarding } = useAuth();
+  const { signInWithProvider, hasCompletedOnboarding, onboardingStartPath } = useAuth();
   const [busy, setBusy] = useState<SocialProvider | null>(null);
 
   const start = async (provider: SocialProvider) => {
@@ -28,7 +28,7 @@ export function useSocialSignIn(showError: (message: string) => void) {
       } else if (await hasCompletedOnboarding(result.email)) {
         router.replace(result.role === 'doctor' ? '/doctor' : '/user-home');
       } else {
-        router.replace('/onboarding/language');
+        router.replace(await onboardingStartPath(result.email) as never);
       }
     } catch (value) {
       // Closing Google's or Facebook's window is the person's choice, not an error.

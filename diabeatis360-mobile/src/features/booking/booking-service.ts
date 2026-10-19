@@ -5,6 +5,7 @@ import { db } from '@/firebase';
 import { platformCommission } from '@/constants/commission';
 import { createNotification } from '@/features/notifications/notification-service';
 
+import { isSameManilaDay, manilaSlotLabel } from './manila-time';
 import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, PaymentMethod, PaymentStatus, Provider, ProviderBookingEntry } from './types';
 
 // Shared Firestore-doc-to-Provider mapping, used by both subscribeToProviders
@@ -74,6 +75,9 @@ const careLinkIdFor = (providerId: string, patientId: string) => `${providerId}_
 export const CONCERN_LIMIT = 300;
 
 export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number, concern = '') {
+  // A time that has already started cannot be booked (DECISIONS.md D26). firestore.rules checks the same thing against
+  // the server's clock; this is the friendly message for a phone whose clock is right.
+  if (selectedDate.getTime() <= Date.now()) throw new Error('That time has already passed. Please pick a later time.');
   // A pediatric account (DECISIONS.md D16) may not book a consultation until an admin approves the guardian
   // verification. firestore.rules enforces the same rule; this is only the friendly message before that.
   const patientSnapshot = await getDoc(doc(db, 'Users', patientId));
@@ -391,9 +395,9 @@ export function subscribeToBookedTimes(
         const data = document.data();
         if (data.active !== true) continue;
         const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
-        if (!scheduledAt || scheduledAt.toDateString() !== date.toDateString()) continue;
-        // hour: '2-digit' zero-pads to match the "09:30 AM"-style labels in the time picker.
-        bookedTimes.add(scheduledAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+        // Compared in Philippine time (D26), the same way the picker builds its slots; labels are 09:30 AM-style.
+        if (!scheduledAt || !isSameManilaDay(scheduledAt, date)) continue;
+        bookedTimes.add(manilaSlotLabel(scheduledAt));
       }
       onChange(bookedTimes);
     },

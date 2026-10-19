@@ -26,7 +26,8 @@ const label = {
   alternatives: [{ instead_of: 'Energy bar', try: 'Fresh guava' }],
 }
 
-let gemini, host, base, geminiCalls = 0, db, Timestamp, client
+let gemini, daily, host, base, geminiCalls = 0, db, Timestamp, client
+const dailyRequests = []
 const listen = (server) => new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server.address().port)))
 
 before(async () => {
@@ -44,11 +45,25 @@ before(async () => {
   })
   process.env.GEMINI_BASE_URL = `http://127.0.0.1:${await listen(gemini)}`
 
+  // A fake Daily.co (D27): makes rooms and passes like the REST API, and remembers what it was asked.
+  daily = http.createServer((req, res) => {
+    let body = ''
+    req.on('data', (c) => { body += c })
+    req.on('end', () => {
+      const json = body ? JSON.parse(body) : {}
+      dailyRequests.push({ path: req.url, auth: req.headers.authorization, json })
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(req.url === '/rooms' ? { name: json.name, url: `https://qa.daily.co/${json.name}` } : { token: `pass-${json.properties.user_id}` }))
+    })
+  })
+  process.env.DAILY_API_BASE = `http://127.0.0.1:${await listen(daily)}`
+
   // A local stand-in for Vercel: /api/<name> runs api/<name>.js, anything else is 404 (like an endpoint not deployed).
   const endpoints = {
     generateRecommendations: require('../api/generateRecommendations'),
     analyzeLabel: require('../api/analyzeLabel'),
     lookupProduct: require('../api/lookupProduct'),
+    joinCall: require('../api/joinCall'),
   }
   host = http.createServer((req, res) => {
     const name = (req.url || '').replace(/^\/api\//, '').split('?')[0]
@@ -111,7 +126,7 @@ before(async () => {
   }
 })
 
-after(() => { gemini?.close(); host?.close() })
+after(() => { gemini?.close(); daily?.close(); host?.close() })
 
 const failure = async (promise) => { try { await promise; return null } catch (error) { return error } }
 let n = 0
@@ -236,6 +251,44 @@ test('an endpoint that is not deployed is "not-found" (the app then says "This f
   await patient()
   const error = await failure(client.call('noSuchFunction', {}))
   assert.equal(error && error.code, 'functions/not-found')
+})
+
+test('video room through Vercel (D27): the patient on an accepted call gets a private room with their own pass; others and calls not set up are refused', { skip }, async () => {
+  const uid = await patient()
+  const room = `room${Date.now()}abcdefghijkl`
+  const bookingId = `e2e-call-${Date.now()}`
+  await db.doc(`Bookings/${bookingId}`).set({ patient_id: uid, provider_id: 'e2e-doctor', status: 'confirmed' })
+  await db.doc(`Calls/${bookingId}`).set({ booking_id: bookingId, caller_id: uid, callee_id: 'e2e-doctor', status: 'accepted', room })
+
+  process.env.DAILY_API_KEY = 'fake-daily-key'
+  try {
+    const { url } = await client.call('joinCall', { bookingId })
+    assert.equal(url, `https://qa.daily.co/d360-${room}?t=pass-${uid}`)
+    const [roomRequest, passRequest] = dailyRequests.slice(-2)
+    assert.equal(roomRequest.auth, 'Bearer fake-daily-key', 'the key goes from the server to Daily, never to the app')
+    assert.equal(roomRequest.json.privacy, 'private')
+    assert.equal(passRequest.json.properties.user_id, uid)
+
+    // Someone who is not on this call.
+    await patient()
+    const stranger = await failure(client.call('joinCall', { bookingId }))
+    assert.equal(stranger && stranger.code, 'functions/permission-denied')
+  } finally {
+    delete process.env.DAILY_API_KEY
+  }
+  // No Daily key on the server yet: a plain "not set up" message, and Daily is not asked.
+  const asked = dailyRequests.length
+  const notSetUp = await failure(client.call('joinCall', { bookingId: 'any-booking' }))
+  assert.equal(notSetUp && notSetUp.code, 'functions/not-found', 'an unknown booking is refused before the key matters')
+  await client.signOut(client.auth)
+  await client.signUp(`e2e${Date.now()}x@test.com`)
+  const signedInUid = client.auth.currentUser.uid
+  await db.doc(`Bookings/${bookingId}`).update({ patient_id: signedInUid })
+  await db.doc(`Calls/${bookingId}`).update({ caller_id: signedInUid })
+  const missingKey = await failure(client.call('joinCall', { bookingId }))
+  assert.equal(missingKey && missingKey.code, 'functions/unavailable')
+  assert.match(missingKey.message, /Video calls are not set up yet/)
+  assert.equal(dailyRequests.length, asked)
 })
 
 test('signed out: refused with 401, the handler never runs', { skip }, async () => {

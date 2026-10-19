@@ -46,7 +46,7 @@ export default function DateOfBirthScreen() {
     <Progress />
     <Text style={styles.back} onPress={() => router.back()}>‹  Back</Text>
     <Text style={styles.title}>When were{`\n`}you born?</Text>
-    <Text style={styles.subtitle}>This helps us calculate dosages and health benchmarks accurately.</Text>
+    <Text style={styles.subtitle}>Your age helps us tailor your health targets and suggestions.</Text>
 
     <View style={styles.wheels}><BirthdateWheels value={formatted} onChange={setFormatted} /></View>
 

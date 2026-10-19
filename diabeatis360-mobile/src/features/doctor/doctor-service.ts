@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { normalizeDiabetesType } from '@/constants/enums';
 import { parseBirthdate } from '@/features/auth/birthdate';
 
 import { slotsFromRanges, type TimeRange } from './time-slots';
@@ -86,7 +87,7 @@ export function subscribeToPatientProfile(
         // Tolerates both the Timestamp written now and the plain strings that
         // earlier records were saved with, so existing patients still show an age.
         birthdate: parseBirthdate(data.birthdate),
-        diabetesType: String(data.diabetes_type ?? ''),
+        diabetesType: normalizeDiabetesType(data.diabetes_type),
         activityLevel: String(data.activity_level ?? ''),
         dietaryPreference: String(data.dietary_preference ?? ''),
         allergies: String(data.allergies ?? ''),

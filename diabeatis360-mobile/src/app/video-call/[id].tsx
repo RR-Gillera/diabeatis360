@@ -8,15 +8,16 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
-import { answerCall, endCall, fetchDisplayName, markMissed, RING_TIMEOUT_MS, startCall, subscribeToCall, videoRoomUrl, type CallRecord } from '@/features/calls/call-service';
+import { answerCall, endCall, fetchDisplayName, markMissed, RING_TIMEOUT_MS, startCall, subscribeToCall, type CallRecord } from '@/features/calls/call-service';
 import { CallFrame } from '@/features/calls/call-frame';
+import { ensureCallPermissions, requestCallUrl } from '@/features/calls/video-room';
 import { callClock } from '@/features/consultation/consultation-format';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 // The video call screen (DECISIONS.md D11; Figma P-26 to P-29, D-08 to D-10). Both people are here once the call is
 // accepted. What is shown depends only on the Calls/{bookingId} document, so both phones always agree:
 //   ringing  -> caller: "Calling..." (30 s, then missed)   callee: Accept / Decline
-//   accepted -> the Jitsi call, with the elapsed time and an End button
+//   accepted -> "Connecting...", then the private Daily room (D27), with the elapsed time and an End button
 //   declined / missed / ended -> what happened, and where to go next (chat, summary, call back)
 export default function VideoCallScreen() {
   const router = useRouter();
@@ -32,6 +33,10 @@ export default function VideoCallScreen() {
   const connectedAt = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [lasted, setLasted] = useState<number | null>(null);
+  // The room address (with this person's pass) for the accepted call, fetched from the server. Kept with the call's
+  // room token, so a new call never reuses an old address. `attempt` lets "Try again" ask once more.
+  const [joined, setJoined] = useState<{ room: string; url?: string; error?: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -41,6 +46,18 @@ export default function VideoCallScreen() {
   const isCaller = Boolean(call && call.callerId === uid);
   const otherId = call ? (isCaller ? call.calleeId : call.callerId) : '';
   const status = call?.status;
+  const activeRoom = status === 'accepted' ? call?.room ?? '' : '';
+
+  useEffect(() => {
+    if (!id || !activeRoom) return;
+    let cancelled = false;
+    requestCallUrl(id).then(
+      (url) => { if (!cancelled) setJoined({ room: activeRoom, url }); },
+      (value) => { if (!cancelled) setJoined({ room: activeRoom, error: value instanceof Error ? value.message : 'We could not open the video room.' }); },
+    );
+    return () => { cancelled = true; };
+  }, [id, activeRoom, attempt]);
+  const room = joined && joined.room === activeRoom ? joined : null;
 
   useEffect(() => {
     if (!otherId) return;
@@ -80,21 +97,35 @@ export default function VideoCallScreen() {
 
   const respond = async (accept: boolean) => {
     if (!id) return;
+    setError('');
     try {
+      if (accept) await ensureCallPermissions(); // before answering: the call frame needs them (video-room.ts)
       await answerCall(id, accept);
       if (!accept) goBack();
-    } catch {
-      setError('We could not answer the call.');
+    } catch (value) {
+      setError(accept && value instanceof Error ? value.message : 'We could not answer the call.');
     }
   };
 
   const callBack = async () => {
     if (!id || !uid) return;
     setError(''); setLasted(null);
-    try { await startCall(id, uid); } catch (value) { setError(value instanceof Error ? value.message : 'We could not start the call.'); }
+    try {
+      await ensureCallPermissions();
+      await startCall(id, uid);
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'We could not start the call.');
+    }
   };
 
+  const retryJoin = () => { setJoined(null); setAttempt((value) => value + 1); };
+
   const openChat = () => { if (id) router.replace({ pathname: '/consultation/[id]', params: { id } }); };
+  // The room could not be opened: end the call so the other person is not left waiting, then go to the chat.
+  const messageInstead = async () => {
+    if (id) await endCall(id).catch(() => {});
+    openChat();
+  };
   const openSummary = () => { if (id) router.replace({ pathname: '/consultation/summary/[id]', params: { id } } as never); };
 
   if (call === undefined) {
@@ -114,7 +145,27 @@ export default function VideoCallScreen() {
   if (call.status === 'accepted') {
     return (
       <View style={styles.dark}>
-        <CallFrame url={videoRoomUrl(call.room, displayName ?? undefined)} />
+        {room?.url ? (
+          <CallFrame url={room.url} />
+        ) : room?.error ? (
+          <View style={[styles.center, styles.fill]}>
+            <AppText weight="extraBold" style={styles.title}>Couldn&apos;t open the video room</AppText>
+            <AppText style={styles.text}>{room.error}</AppText>
+            <View style={styles.stackWide}>
+              <Pressable accessibilityRole="button" style={[styles.bigButton, styles.green]} onPress={retryJoin}>
+                <AppText weight="bold" style={styles.bigButtonText}>Try again</AppText>
+              </Pressable>
+              <Pressable accessibilityRole="button" style={[styles.bigButton, styles.white]} onPress={messageInstead}>
+                <AppText weight="bold" style={styles.whiteText}>Message instead</AppText>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.center, styles.fill]} accessibilityLiveRegion="polite">
+            <ActivityIndicator color="#FFF" />
+            <AppText style={styles.text}>Connecting…</AppText>
+          </View>
+        )}
         <View style={styles.topBar} pointerEvents="box-none">
           <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{otherName || 'Video call'}</AppText></View>
           <View style={styles.timer}><View style={styles.timerDot} /><AppText weight="bold" style={styles.pillText}>{callClock(elapsed)}</AppText></View>
@@ -212,6 +263,8 @@ const styles = StyleSheet.create({
   dark: { backgroundColor: '#172030', flex: 1 },
   light: { backgroundColor: '#F5F5F5', flex: 1 },
   center: { alignItems: 'center', gap: 14, justifyContent: 'center', padding: 32 },
+  fill: { flex: 1 },
+  stackWide: { alignSelf: 'stretch', gap: 14, marginTop: 12 },
   ringing: { justifyContent: 'space-between', padding: 24, paddingBottom: 40, paddingTop: 80 },
   ringBody: { alignItems: 'center', flex: 1, gap: 12, justifyContent: 'center' },
   ringOuter: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 125, height: 250, justifyContent: 'center', marginBottom: 8, width: 250 },

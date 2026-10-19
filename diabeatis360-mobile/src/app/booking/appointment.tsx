@@ -18,7 +18,7 @@ const statusCopy: Record<BookingStatus, { label: string; color: string; backgrou
 
 const paymentCopy: Record<PaymentStatus, { label: string; color: string }> = {
   unpaid: { label: 'Not paid yet', color: '#B45309' },
-  paid: { label: 'Paid online', color: bookingColors.green },
+  paid: { label: 'Paid online (demo)', color: bookingColors.green },
   onsite: { label: 'Paying on-site', color: bookingColors.green },
 };
 
