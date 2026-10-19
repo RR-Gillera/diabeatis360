@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
@@ -29,6 +29,9 @@ const explanation: Record<Interpretation, string> = {
 export default function GlucoseResultScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  // How many doctors were sent this critical reading (D28). Only said when it actually happened.
+  const { doctors } = useLocalSearchParams<{ doctors?: string }>();
+  const doctorsNotified = Number(doctors) || 0;
   const [latest, setLatest] = useState<GlucoseLogEntry | null>(null);
 
   useEffect(() => {
@@ -84,6 +87,11 @@ export default function GlucoseResultScreen() {
             </Text>
           </View>
           <Text style={styles.alertText}>{alert.message}</Text>
+          {alert.severity === 'critical' && doctorsNotified > 0 ? (
+            <Text style={[styles.alertText, styles.doctorNotified]} accessibilityLiveRegion="polite">
+              {doctorsNotified === 1 ? 'Your doctor was' : `Your ${doctorsNotified} doctors were`} also notified in the app. If you feel unwell, call 911 now.
+            </Text>
+          ) : null}
           <Pressable style={[styles.alertButton, { backgroundColor: alert.severity === 'critical' ? homeColors.red : homeColors.orange }]} onPress={() => router.push('/booking/find-doctor')}>
             <SymbolView name={{ ios: 'stethoscope', android: 'medical_services', web: 'medical_services' }} size={15} tintColor="#FFF" />
             <Text style={styles.alertButtonText}>See a Doctor</Text>
@@ -127,6 +135,7 @@ const styles = StyleSheet.create({
   alertHeader: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   alertTitle: { fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   alertText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
+  doctorNotified: { color: '#111827', fontWeight: '600' },
   alertButton: { alignItems: 'center', borderRadius: 12, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46 },
   alertButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   recommendations: { marginTop: 32 },

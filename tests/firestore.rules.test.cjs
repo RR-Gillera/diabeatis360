@@ -339,6 +339,14 @@ const deny = (name, promise) => check(name, promise, false);
   await allow('p1 marks notification read', updateDoc(doc(p1, 'Notifications/n1'), { is_read: true }));
   await deny('p1 rewrites notification text', updateDoc(doc(p1, 'Notifications/n1'), { message: 'edited' }));
   await deny('p2 marks p1 notification read', updateDoc(doc(p2, 'Notifications/n1'), { is_read: true }));
+  // D28: a critical reading is sent to every doctor the patient shares readings with (their Care_Links), tagged with the
+  // booking behind the share. No new rule: these lock in that the existing ones allow exactly that and nothing more.
+  const criticalAlert = (userId, relatedId) => ({ user_id: userId, notification_type: 'glucose_alert', severity: 'critical', message: 'Critical reading: 262 mg/dL', is_read: false, related_id: relatedId, sent_at: serverTimestamp() });
+  await allow('D28: p1 lists their own shares to find their doctors', getDocs(query(collection(p1, 'Care_Links'), where('patient_id', '==', 'p1'))));
+  await deny('D28: p2 cannot list p1\'s doctors', getDocs(query(collection(p2, 'Care_Links'), where('patient_id', '==', 'p1'))));
+  await allow('D28: p1 sends a critical-reading alert to d1, tagged with their finished consultation', addDoc(collection(p1, 'Notifications'), criticalAlert('d1', 'bDone')));
+  await deny('D28: p1 cannot send it to a doctor they never booked (d9), even citing their own booking', addDoc(collection(p1, 'Notifications'), criticalAlert('d9', 'bConfirmed')));
+  await deny('D28: p1 cannot send it untagged to a doctor', addDoc(collection(p1, 'Notifications'), criticalAlert('d1', '')));
 
   // ---- Subscriptions, plans, gamification
   // A subscription's terms are the rules' business, not the app's (D20): a real paid plan, the server's start time, and

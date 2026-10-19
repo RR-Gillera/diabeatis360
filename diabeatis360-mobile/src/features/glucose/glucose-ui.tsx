@@ -27,7 +27,8 @@ const livePreviewCopy: Record<Interpretation, { label: string; color: string; ba
 // Shared "Add a Reading" bottom sheet — used from the Log tab's FAB and from
 // the Home dashboard's "Log Blood Sugar" button, so the flow is identical
 // (and only written once) no matter where a reading gets logged from.
-export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: () => void; entry?: GlucoseLogEntry | null }) {
+// `onSaved` receives how many doctors were sent a critical-reading alert for a NEW reading (D28); 0 for an edit or delete.
+export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: (doctorsNotified: number) => void; entry?: GlucoseLogEntry | null }) {
   const editing = Boolean(entry);
   const { uid } = useAuth();
   const [reading, setReading] = useState('');
@@ -64,10 +65,11 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
     if (check.needsConfirmation && !confirming) { setConfirming(true); return; }
     setSaving(true); setError('');
     try {
+      let doctorsNotified = 0;
       if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
-      else await addGlucoseLog(uid, readingValue, context, notes, new Date());
+      else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date())).doctorsNotified;
       reset();
-      onSaved();
+      onSaved(doctorsNotified);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save this reading.');
     } finally {
@@ -81,7 +83,7 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
     try {
       await deleteGlucoseLog(entry.id);
       reset();
-      onSaved();
+      onSaved(0);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to delete this reading.');
     } finally {

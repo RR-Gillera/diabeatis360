@@ -87,11 +87,12 @@ export default function GlucoseLogScreen() {
 
   // Editing an existing reading just closes the sheet — the interpretation
   // screen is for a reading the patient has only just taken.
-  const onReadingSaved = () => {
+  // `doctors` tells the result screen whether the patient's doctors were sent a critical-reading alert (D28).
+  const onReadingSaved = (doctorsNotified: number) => {
     const wasEditing = Boolean(editing);
     setModalVisible(false);
     setEditing(null);
-    if (!wasEditing) router.push('/glucose-result');
+    if (!wasEditing) router.push({ pathname: '/glucose-result', params: { doctors: String(doctorsNotified) } });
   };
 
   return (
