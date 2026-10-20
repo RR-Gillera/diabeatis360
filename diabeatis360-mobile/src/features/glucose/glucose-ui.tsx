@@ -7,7 +7,7 @@ import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
-import { interpretGlucose } from '@/constants/glucose';
+import { checkReading, interpretGlucose, READING_LIMITS } from '@/constants/glucose';
 import { addGlucoseLog, deleteGlucoseLog, updateGlucoseLog } from './glucose-service';
 import { enumLabel } from '@/constants/enums';
 import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
@@ -27,7 +27,8 @@ const livePreviewCopy: Record<Interpretation, { label: string; color: string; ba
 // Shared "Add a Reading" bottom sheet — used from the Log tab's FAB and from
 // the Home dashboard's "Log Blood Sugar" button, so the flow is identical
 // (and only written once) no matter where a reading gets logged from.
-export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: () => void; entry?: GlucoseLogEntry | null }) {
+// `onSaved` receives how many doctors were sent a critical-reading alert for a NEW reading (D28); 0 for an edit or delete.
+export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: (doctorsNotified: number) => void; entry?: GlucoseLogEntry | null }) {
   const editing = Boolean(entry);
   const { uid } = useAuth();
   const [reading, setReading] = useState('');
@@ -36,6 +37,8 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  // Set after the first tap on Save for a rare value (20-39 or 401-600 mg/dL): the second tap saves it (D25).
+  const [confirming, setConfirming] = useState(false);
 
   // Seed the fields from the entry being edited. Adjusting state during render
   // rather than in an effect, so the sheet never flashes empty inputs first.
@@ -49,20 +52,24 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   }
 
   const readingValue = Number(reading);
-  const isValidReading = reading.trim() !== '' && Number.isFinite(readingValue) && readingValue > 0;
+  // Impossible values are refused with the reason shown under the field; rare ones ask for a check first (D25).
+  const check = reading.trim() !== '' ? checkReading(readingValue) : null;
+  const isValidReading = check?.ok === true;
   const livePreview = isValidReading ? livePreviewCopy[interpretGlucose(readingValue, context)] : null;
 
-  const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); };
+  const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); setConfirming(false); };
   const close = () => { reset(); onClose(); };
 
   const save = async () => {
-    if (!uid || !isValidReading) return;
+    if (!uid || !check?.ok) return;
+    if (check.needsConfirmation && !confirming) { setConfirming(true); return; }
     setSaving(true); setError('');
     try {
+      let doctorsNotified = 0;
       if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
-      else await addGlucoseLog(uid, readingValue, context, notes, new Date());
+      else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date())).doctorsNotified;
       reset();
-      onSaved();
+      onSaved(doctorsNotified);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to save this reading.');
     } finally {
@@ -76,7 +83,7 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
     try {
       await deleteGlucoseLog(entry.id);
       reset();
-      onSaved();
+      onSaved(0);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to delete this reading.');
     } finally {
@@ -93,10 +100,11 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
             <Pressable onPress={close} hitSlop={10}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" /></Pressable>
           </View>
           <View style={styles.readingRow}>
-            <TextInput value={reading} onChangeText={setReading} placeholder="0" keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
+            <TextInput value={reading} onChangeText={(value) => { setReading(value); setConfirming(false); }} placeholder="0" accessibilityLabel="Blood sugar reading in mg/dL" keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
             <Text style={styles.readingUnit}>mg/dL</Text>
             {livePreview ? <View style={[styles.previewBadge, { backgroundColor: livePreview.background }]}><Text style={[styles.previewBadgeText, { color: livePreview.color }]}>{livePreview.label}</Text></View> : null}
           </View>
+          {check && !check.ok ? <Text style={styles.hint}>{check.message}</Text> : null}
           <View style={styles.contextRow}>
             {contexts.map((item) => (
               <Pressable key={item.value} onPress={() => setContext(item.value)} style={[styles.contextPill, context === item.value && styles.contextPillActive]}>
@@ -106,8 +114,16 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
           </View>
           <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional)" style={styles.notesInput} multiline />
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {confirming ? (
+            <View style={styles.confirmBox}>
+              <Text style={styles.confirmTitle}>Is {readingValue} mg/dL right?</Text>
+              <Text style={styles.confirmText}>
+                {readingValue < READING_LIMITS.confirmBelow ? 'Readings this low are rare.' : 'Readings this high are rare.'} Please check the number on your meter before saving.
+              </Text>
+            </View>
+          ) : null}
           <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
-            <Text style={styles.saveButtonText}>{saving ? 'Saving...' : editing ? 'Save Changes' : 'Save Reading'}</Text>
+            <Text style={styles.saveButtonText}>{saving ? 'Saving...' : confirming ? `Yes, save ${readingValue} mg/dL` : editing ? 'Save Changes' : 'Save Reading'}</Text>
           </Pressable>
           {editing ? (
             <Pressable style={styles.deleteButton} onPress={remove} disabled={deleting}>
@@ -196,6 +212,10 @@ const styles = StyleSheet.create({
   contextTextActive: { color: '#FFF' },
   notesInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, marginTop: 16, minHeight: 60, padding: 14, textAlignVertical: 'top' },
   error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginTop: 14 },
+  hint: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginTop: 8 },
+  confirmBox: { backgroundColor: '#FEF3C7', borderRadius: 14, gap: 4, marginTop: 14, padding: 12 },
+  confirmTitle: { color: '#92400E', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  confirmText: { color: '#92400E', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
   saveButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 56 },
   saveButtonDisabled: { opacity: 0.55 },
   saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },

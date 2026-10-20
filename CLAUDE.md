@@ -30,7 +30,7 @@ the data model or scope must also be reflected back into the manuscript by the t
 
 ## Stack (confirmed)
 - Firebase project `diabeatis360-b2ab8`: Authentication + Cloud Firestore (asia-southeast1).
-- AI: Google Gemini API, called only from Firebase Cloud Functions (DECISIONS.md D1, closed 2026-09-26). The key never goes in either app.
+- AI: Google Gemini API, called only from server-side functions (DECISIONS.md D1). The project stays on the free Spark plan, so the same `functions/lib` code is hosted on Vercel (`functions/api`, D19, 2026-10-15) instead of Firebase Cloud Functions. The key never goes in either app.
 - Mobile: Expo + React Native + TypeScript; styling per manuscript is NativeWind (verify in package.json).
 - Admin: React + Vite + Tailwind CSS + Recharts.
 

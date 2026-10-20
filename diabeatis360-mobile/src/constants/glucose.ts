@@ -38,3 +38,32 @@ export function glucoseDirection(readingMgdl: number, context: MealContext): 'lo
   if (readingMgdl > GLUCOSE_THRESHOLDS.normalMax[context]) return 'high';
   return 'normal';
 }
+
+// Which numbers a person may log at all (DECISIONS.md D25). Home meters measure roughly 20-600 mg/dL and show
+// "LO"/"HI" outside that, so a value outside it is a typing mistake, not a reading: it is refused here, in the
+// service, and in firestore.rules (Glucose_Logs). Values near the ends are possible but rare, so the person is asked
+// to check their meter before saving. These limits do not change the D4 classes above.
+export const READING_LIMITS = {
+  /** Lowest value that can be saved. */
+  min: 20,
+  /** Highest value that can be saved. */
+  max: 600,
+  /** Below this (and from min up), ask "Is this right?" before saving. */
+  confirmBelow: 40,
+  /** Above this (and up to max), ask "Is this right?" before saving. */
+  confirmAbove: 400,
+} as const;
+
+export type ReadingCheck =
+  | { ok: false; message: string }
+  | { ok: true; needsConfirmation: boolean };
+
+/** Checks a typed reading before it is saved. Whole numbers only: meters show mg/dL without decimals. */
+export function checkReading(value: number): ReadingCheck {
+  if (!Number.isFinite(value)) return { ok: false, message: 'Enter your reading as a number.' };
+  if (!Number.isInteger(value)) return { ok: false, message: 'Enter a whole number (meters show mg/dL without decimals).' };
+  if (value < READING_LIMITS.min || value > READING_LIMITS.max) {
+    return { ok: false, message: `Enter a reading from ${READING_LIMITS.min} to ${READING_LIMITS.max} mg/dL. Check the number on your meter.` };
+  }
+  return { ok: true, needsConfirmation: value < READING_LIMITS.confirmBelow || value > READING_LIMITS.confirmAbove };
+}

@@ -55,6 +55,8 @@ export default function RevenuePage() {
         )}
       />
       {loadError ? <div className="mb-4"><Notice>{loadError}</Notice></div> : null}
+      {/* D26: online payments are simulated, so every amount here is a recorded demo amount, not money received. */}
+      <div className="mb-4"><Notice tone="warning">Demo payments: the amounts below are recorded by the app, but no real money was charged or received.</Notice></div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total revenue" value={formatPeso(totals.total)} hint="Commission + plans" />

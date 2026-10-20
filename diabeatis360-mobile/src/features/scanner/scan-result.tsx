@@ -55,10 +55,11 @@ function DailyRing({ percent }: { percent: number }) {
 }
 
 /**
- * After a label scan of a product with a barcode, asks the person to confirm the name and brand, then shares the
- * product with all patients (DECISIONS.md D12). Not part of the Figma frame; it is the adviser-requested addition.
+ * "We don't know this product yet" (Figma P-18): after a label scan of a product with an unknown barcode, the person
+ * checks the name and brand read from the label, then shares the product with all patients (DECISIONS.md D12).
+ * "From scan" marks a value nobody has changed yet.
  */
-function ShareProduct({ analysis, onSave }: { analysis: Readable; onSave: (name: string, brand: string) => Promise<void> }) {
+function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barcode?: string; onSave: (name: string, brand: string) => Promise<void> }) {
   const [name, setName] = useState(analysis.product_name);
   const [brand, setBrand] = useState(analysis.brand);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
@@ -74,21 +75,47 @@ function ShareProduct({ analysis, onSave }: { analysis: Readable; onSave: (name:
       setState('failed');
     }
   };
+  const field = (label: string, value: string, original: string, onChange: (text: string) => void, maxLength: number) => (
+    <View style={styles.fieldGroup}>
+      <AppText style={styles.fieldLabel}>{label}</AppText>
+      <View style={styles.fieldBox}>
+        <TextInput accessibilityLabel={label} style={styles.fieldInput} value={value} onChangeText={onChange} placeholder={label} placeholderTextColor={Brand.colors.textFaint} maxLength={maxLength} />
+        {value && value === original ? <View style={styles.fromScan}><AppText weight="bold" style={styles.fromScanText}>From scan</AppText></View> : null}
+      </View>
+    </View>
+  );
   return (
-    <Card style={styles.share}>
-      <AppText weight="bold" style={styles.insightTitle}>Share this product?</AppText>
-      <AppText style={styles.insightText}>Check the name and brand below. Other patients who scan this barcode will see these values without needing a photo.</AppText>
-      <TextInput accessibilityLabel="Product name" style={styles.input} value={name} onChangeText={setName} placeholder="Product name" placeholderTextColor={Brand.colors.textFaint} maxLength={100} />
-      <TextInput accessibilityLabel="Brand" style={styles.input} value={brand} onChangeText={setBrand} placeholder="Brand" placeholderTextColor={Brand.colors.textFaint} maxLength={80} />
+    <View style={styles.share}>
+      <View style={styles.shareHead}>
+        <View style={styles.shareIcon}><SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={26} tintColor={Brand.colors.primary} /></View>
+        <View style={styles.shareHeadText}>
+          <AppText weight="bold" style={styles.shareTitle}>We don&apos;t know this product yet</AppText>
+          <AppText style={styles.shareSub}>Add it so others can scan it too.</AppText>
+        </View>
+      </View>
+      <Card style={styles.shareCard}>
+        {field('Product name', name, analysis.product_name, setName, 100)}
+        {field('Brand', brand, analysis.brand, setBrand, 80)}
+        {barcode ? (
+          <View style={styles.fieldGroup}>
+            <AppText style={styles.fieldLabel}>Barcode</AppText>
+            <View style={[styles.fieldBox, styles.fieldLocked]}>
+              <SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={16} tintColor={Brand.colors.textMuted} />
+              <AppText style={styles.lockedText}>{barcode}</AppText>
+            </View>
+          </View>
+        ) : null}
+      </Card>
       {state === 'failed' ? <AppText style={styles.shareError}>We could not share it. Someone may have shared it already.</AppText> : null}
-      <PrimaryButton title="Share with other patients" loading={state === 'saving'} disabled={!name.trim()} onPress={save} />
-    </Card>
+      <PrimaryButton title="Save and share with others" loading={state === 'saving'} disabled={!name.trim()} onPress={save} />
+      <AppText style={styles.shareNote}>Shared products are reviewed by an admin.</AppText>
+    </View>
   );
 }
 
 /** The analysis of one scanned label (Figma 195:2908). onShare is set only for a new product that has a barcode. */
-export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare }: {
-  analysis: Readable; onAlternatives: () => void; onScanAgain: () => void; onShare?: (name: string, brand: string) => Promise<void>;
+export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, barcode }: {
+  analysis: Readable; onAlternatives: () => void; onScanAgain: () => void; onShare?: (name: string, brand: string) => Promise<void>; barcode?: string;
 }) {
   const percent = (analysis.calories / DAILY_CALORIE_REFERENCE) * 100;
   return (
@@ -141,7 +168,7 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare }: {
         </Card>
       ) : null}
 
-      {onShare ? <ShareProduct analysis={analysis} onSave={onShare} /> : null}
+      {onShare ? <ShareProduct analysis={analysis} barcode={barcode} onSave={onShare} /> : null}
 
       {analysis.alternatives.length ? <PrimaryButton title="View Healthier Alternatives" onPress={onAlternatives} style={styles.button} /> : null}
       <PrimaryButton title="Scan Another Product" variant="outline" onPress={onScanAgain} style={styles.button} />
@@ -180,8 +207,22 @@ const styles = StyleSheet.create({
   insightText: { color: Brand.colors.textMuted, fontSize: 15, lineHeight: 23 },
   button: { marginTop: 16 },
   memory: { color: Brand.colors.primary, fontSize: 12, marginTop: 6 },
-  share: { gap: 10, marginTop: 16 },
-  input: { backgroundColor: Brand.colors.background, borderColor: Brand.colors.neutralTint, borderRadius: 14, borderWidth: 1, color: Brand.colors.text, fontSize: 16, paddingHorizontal: 14, paddingVertical: 12 },
+  share: { gap: 14, marginTop: 24 },
+  shareHead: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  shareIcon: { alignItems: 'center', backgroundColor: '#DCF2A9', borderRadius: 18, height: 56, justifyContent: 'center', width: 56 },
+  shareHeadText: { flex: 1, gap: 2 },
+  shareTitle: { fontSize: 16 },
+  shareSub: { color: Brand.colors.textMuted, fontSize: 13 },
+  shareCard: { gap: 14 },
+  fieldGroup: { gap: 6 },
+  fieldLabel: { color: Brand.colors.textMuted, fontSize: 13 },
+  fieldBox: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E5E7EB', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 54, paddingHorizontal: 14 },
+  fieldInput: { color: Brand.colors.text, flex: 1, fontSize: 16, paddingVertical: 12 },
+  fieldLocked: { backgroundColor: '#F3F4F6' },
+  lockedText: { color: Brand.colors.textMuted, fontSize: 16 },
+  fromScan: { backgroundColor: 'rgba(220, 242, 169, 0.6)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  fromScanText: { color: Brand.colors.primary, fontSize: 11 },
+  shareNote: { color: Brand.colors.textMuted, fontSize: 12, textAlign: 'center' },
   shareError: { color: Brand.colors.danger, fontSize: 13 },
   shareDone: { color: Brand.colors.primary, fontSize: 14, lineHeight: 20, marginTop: 16, textAlign: 'center' },
 });

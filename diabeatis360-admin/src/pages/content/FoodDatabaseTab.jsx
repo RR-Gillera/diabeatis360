@@ -67,8 +67,19 @@ export default function FoodDatabaseTab() {
     }
   }
 
+  // One food at a time: the button is disabled until the change is saved, so a double click cannot hide and then
+  // immediately unhide the same food.
+  const [togglingId, setTogglingId] = useState(null)
   const toggleHidden = async (food) => {
-    try { await setFoodStatus(food.id, food.status === 'hidden' ? 'active' : 'hidden') } catch (value) { setError(value.message) }
+    if (togglingId) return
+    setTogglingId(food.id)
+    try {
+      await setFoodStatus(food.id, food.status === 'hidden' ? 'active' : 'hidden')
+    } catch (value) {
+      setError(value.message)
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   const remove = async () => {
@@ -93,7 +104,7 @@ export default function FoodDatabaseTab() {
       key: 'actions', header: '', align: 'right',
       render: (f) => (
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" className="!px-3 !py-2 !text-xs" onClick={() => toggleHidden(f)}>{f.status === 'hidden' ? 'Unhide' : 'Hide'}</Button>
+          <Button variant="ghost" className="!px-3 !py-2 !text-xs" disabled={togglingId === f.id} onClick={() => toggleHidden(f)}>{togglingId === f.id ? 'Saving…' : f.status === 'hidden' ? 'Unhide' : 'Hide'}</Button>
           <Button variant="outline" className="!px-3 !py-2 !text-xs" onClick={() => openEdit(f)}>Edit</Button>
           <Button variant="dangerOutline" className="!px-3 !py-2 !text-xs" onClick={() => setConfirmDelete(f)}>Delete</Button>
         </div>

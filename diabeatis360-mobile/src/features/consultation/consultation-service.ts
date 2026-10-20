@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Timestamp, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Timestamp, where, writeBatch } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 import type { ConsultationStatus } from '@/constants/enums';
@@ -17,16 +17,23 @@ export type ChatMessage = {
   sentAt: Date | null;
 };
 
-export type ConsultationState = {
-  status: ConsultationStatus;
+/** What the doctor writes when ending (Figma D-07, DECISIONS D24): Diagnosis notes (stored as "summary"), Advice, Follow-up. */
+export type ConsultationNotes = {
   summary: string;
+  advice: string;
+  followUpAt: Date | null;
+};
+
+export type ConsultationState = ConsultationNotes & {
+  status: ConsultationStatus;
   endedAt: Date | null;
 };
 
 // Messages live in their own flat collection keyed by booking_id, matching the
 // ERD's convention of plain-string foreign keys rather than subcollections.
-// Consultation state (active/ended + summary) lives on the Bookings doc itself,
-// since the booking IS the consultation — no extra collection needed for it.
+// Consultation state (active/ended) lives on the Bookings doc itself, since the booking IS the consultation. The
+// doctor's WRITTEN summary is its own document, Consultation_Notes/{bookingId} (DECISIONS.md D22): it used to sit on the
+// booking, which many people could read; now only the two people on that booking can.
 export async function sendMessage(bookingId: string, senderId: string, senderRole: SenderRole, text: string) {
   const trimmed = text.trim();
   if (!trimmed) return;
@@ -92,43 +99,83 @@ export function subscribeToMessages(
   );
 }
 
+// The consultation's state comes from two documents: the booking (active / ended and when) and the doctor's written
+// note (Consultation_Notes). Each is watched separately and the screen gets one combined state.
 export function subscribeToConsultation(
   bookingId: string,
   onChange: (state: ConsultationState) => void,
   onError: (error: Error) => void,
 ) {
-  return onSnapshot(
+  let state: ConsultationState = { status: 'not_started', summary: '', advice: '', followUpAt: null, endedAt: null };
+  const unsubscribeBooking = onSnapshot(
     doc(db, 'Bookings', bookingId),
     (snapshot) => {
       const data = snapshot.data() ?? {};
-      onChange({
+      state = {
+        ...state,
         status: (data.consultation_status ?? 'not_started') as ConsultationStatus,
-        summary: String(data.consultation_summary ?? ''),
         endedAt: (data.consultation_ended_at as Timestamp | undefined)?.toDate?.() ?? null,
-      });
+      };
+      onChange(state);
     },
     (error) => onError(error),
   );
+  const unsubscribeNote = onSnapshot(
+    doc(db, 'Consultation_Notes', bookingId),
+    (snapshot) => {
+      const data = snapshot.data();
+      state = {
+        ...state,
+        summary: String(data?.summary ?? ''),
+        advice: String(data?.advice ?? ''),
+        followUpAt: (data?.follow_up_at as Timestamp | null | undefined)?.toDate?.() ?? null,
+      };
+      onChange(state);
+    },
+    (error) => onError(error),
+  );
+  return () => { unsubscribeBooking(); unsubscribeNote(); };
+}
+
+// The written note for a booking, as the rules require it (firestore.rules, Consultation_Notes): the booking's ids, the
+// Diagnosis notes (summary), the Advice, the Follow-up date or null, and the server's clock. Only the booking's doctor
+// can write it.
+function noteRecord(bookingId: string, patientId: string, providerId: string, notes: ConsultationNotes) {
+  return {
+    booking_id: bookingId,
+    patient_id: patientId,
+    provider_id: providerId,
+    summary: notes.summary.trim(),
+    advice: notes.advice.trim(),
+    follow_up_at: notes.followUpAt ? Timestamp.fromDate(notes.followUpAt) : null,
+    updated_at: serverTimestamp(),
+  };
 }
 
 /**
  * Ends the consultation: the booking becomes `completed` and the chat turns read-only.
- * Either side can end it. The doctor writes the summary while ending; when the PATIENT ends it the summary
- * is empty and the doctor can add one afterwards with saveConsultationSummary.
+ * Either side can end it. The doctor writes the notes while ending (the booking and the note are saved in ONE write);
+ * when the PATIENT ends it there are no notes (pass null) and the doctor can add them afterwards.
  */
-export async function endConsultation(bookingId: string, summary: string, endedBy: SenderRole) {
-  await setDoc(doc(db, 'Bookings', bookingId), {
+export async function endConsultation(bookingId: string, notes: ConsultationNotes | null, endedBy: SenderRole) {
+  const reference = doc(db, 'Bookings', bookingId);
+  const booking = await getDoc(reference);
+  const data = booking.data();
+  const batch = writeBatch(db);
+  batch.update(reference, {
     status: 'completed',
     consultation_status: 'ended',
-    consultation_summary: endedBy === 'doctor' ? summary.trim() : '',
     consultation_ended_at: serverTimestamp(),
     consultation_ended_by: endedBy,
-  }, { merge: true });
+  });
+  const hasNotes = Boolean(notes && (notes.summary.trim() || notes.advice.trim() || notes.followUpAt));
+  if (endedBy === 'doctor' && data && notes && hasNotes) {
+    batch.set(doc(db, 'Consultation_Notes', bookingId), noteRecord(bookingId, String(data.patient_id ?? ''), String(data.provider_id ?? ''), notes));
+  }
+  await batch.commit();
 
   // Tell the other party. Failing to notify must never undo the end itself.
   try {
-    const booking = await getDoc(doc(db, 'Bookings', bookingId));
-    const data = booking.data();
     if (!data) return;
     const recipientId = endedBy === 'doctor' ? String(data.patient_id ?? '') : String(data.provider_id ?? '');
     if (!recipientId) return;
@@ -139,7 +186,9 @@ export async function endConsultation(bookingId: string, summary: string, endedB
   }
 }
 
-/** Lets the doctor add or change the written summary after the consultation ended (e.g. the patient ended it). */
-export async function saveConsultationSummary(bookingId: string, summary: string) {
-  await setDoc(doc(db, 'Bookings', bookingId), { consultation_summary: summary.trim() }, { merge: true });
+/** Lets the doctor write or change the notes after the consultation ended (e.g. the patient ended it). */
+export async function saveConsultationNotes(bookingId: string, notes: ConsultationNotes) {
+  const data = (await getDoc(doc(db, 'Bookings', bookingId))).data();
+  if (!data) throw new Error('This appointment no longer exists.');
+  await setDoc(doc(db, 'Consultation_Notes', bookingId), noteRecord(bookingId, String(data.patient_id ?? ''), String(data.provider_id ?? ''), notes));
 }

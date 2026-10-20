@@ -3,15 +3,19 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { MoreMenu } from '@/components/ui/more-menu';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
+import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { endConsultation, saveConsultationSummary, sendMessage, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
+import { endConsultation, saveConsultationNotes, sendMessage, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
+import { DoctorNotesForm } from '@/features/consultation/doctor-notes-form';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
 import { isChatAvailable } from '@/constants/enums';
 import { startCall } from '@/features/calls/call-service';
+import { ensureCallPermissions } from '@/features/calls/video-room';
 import { useSafeBack } from '@/hooks/use-safe-back';
 
 function dayLabel(date: Date | null) {
@@ -33,16 +37,16 @@ export default function ConsultationScreen() {
 
   const [booking, setBooking] = useState<AppointmentHistoryEntry | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [consultation, setConsultation] = useState<ConsultationState>({ status: 'not_started', summary: '', endedAt: null });
+  const [consultation, setConsultation] = useState<ConsultationState>({ status: 'not_started', summary: '', advice: '', followUpAt: null, endedAt: null });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [endModal, setEndModal] = useState(false);
-  const [summaryDraft, setSummaryDraft] = useState('');
+  const [confirmEnd, setConfirmEnd] = useState(false); // "End this consultation?" (Figma P-23 / D-07)
+  // The doctor's notes form (Figma D-07 Notes): after the confirm, or later when the patient ended the consultation.
+  const [notesForm, setNotesForm] = useState<'end' | 'later' | null>(null);
   const [ending, setEnding] = useState(false);
-  const [lateSummary, setLateSummary] = useState('');
-  const [savingSummary, setSavingSummary] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const goBack = useSafeBack(isDoctor ? '/doctor/appointments' : '/profile');
 
@@ -83,12 +87,19 @@ export default function ConsultationScreen() {
     }
   };
 
-  const finish = async () => {
+  // After "End consultation" in the confirm: the doctor goes on to write notes, the patient's consultation ends at once.
+  const confirmed = () => {
+    setConfirmEnd(false);
+    if (isDoctor) setNotesForm('end');
+    else void finish(null);
+  };
+
+  const finish = async (notes: ConsultationNotes | null) => {
     if (!id || ending) return;
     setEnding(true);
     try {
-      await endConsultation(id, summaryDraft, isDoctor ? 'doctor' : 'patient');
-      setEndModal(false);
+      await endConsultation(id, isDoctor ? notes : null, isDoctor ? 'doctor' : 'patient');
+      setNotesForm(null);
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to end the consultation.');
     } finally {
@@ -96,25 +107,27 @@ export default function ConsultationScreen() {
     }
   };
 
-  // The patient may have ended the consultation, so the doctor can add the summary afterwards.
-  const saveLateSummary = async () => {
-    if (!id || savingSummary || !lateSummary.trim()) return;
-    setSavingSummary(true);
+  // The patient may have ended the consultation, so the doctor can write the notes afterwards.
+  const saveLateNotes = async (notes: ConsultationNotes) => {
+    if (!id || savingNotes) return;
+    setSavingNotes(true);
     try {
-      await saveConsultationSummary(id, lateSummary);
-      setLateSummary('');
+      await saveConsultationNotes(id, notes);
+      setNotesForm(null);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save the summary.');
+      setError(value instanceof Error ? value.message : 'Unable to save the notes.');
     } finally {
-      setSavingSummary(false);
+      setSavingNotes(false);
     }
   };
 
-  // Rings the other person in the app, then opens the call screen (DECISIONS.md D11). It never opens a raw link.
+  // Rings the other person in the app, then opens the call screen (DECISIONS.md D11, D27). It never opens a raw link.
+  // The camera and microphone are asked for first, so nobody answers a call that cannot show a picture.
   const startVideoCall = async () => {
     if (!id || !uid) return;
     setError('');
     try {
+      await ensureCallPermissions();
       await startCall(id, uid);
       router.push({ pathname: '/video-call/[id]', params: { id } } as never);
     } catch (value) {
@@ -205,34 +218,22 @@ export default function ConsultationScreen() {
           ) : null}
 
           {ended ? (
+            // Figma P-24: the chat stays readable, and the summary has its own screen.
             <View style={styles.summaryCard}>
               <View style={styles.summaryHeader}>
-                <SymbolView name={{ ios: 'checkmark.seal.fill', android: 'verified', web: 'verified' }} size={16} tintColor={homeColors.green} />
+                <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={16} tintColor="#94A3B8" />
                 <Text style={styles.summaryTitle}>Consultation ended</Text>
               </View>
-              {consultation.endedAt ? (
-                <Text style={styles.summaryWhen}>{consultation.endedAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</Text>
-              ) : null}
-              <Text style={styles.summaryLabel}>DOCTOR&apos;S SUMMARY</Text>
-              <Text style={styles.summaryText}>{consultation.summary || 'No summary was recorded for this consultation.'}</Text>
-              {isDoctor && !consultation.summary ? (
-                <View style={styles.lateSummary}>
-                  <TextInput
-                    value={lateSummary}
-                    onChangeText={setLateSummary}
-                    placeholder="Add a summary for your patient..."
-                    placeholderTextColor="#C6D2E2"
-                    style={styles.summaryInput}
-                    multiline
-                  />
-                  <Pressable
-                    style={[styles.endConfirm, (savingSummary || !lateSummary.trim()) && styles.sendButtonDisabled]}
-                    onPress={saveLateSummary}
-                    disabled={savingSummary || !lateSummary.trim()}
-                  >
-                    <Text style={styles.endConfirmText}>{savingSummary ? 'Saving...' : 'Save Summary'}</Text>
-                  </Pressable>
-                </View>
+              <Text style={styles.summaryWhen}>
+                This chat is now read-only.{consultation.endedAt ? ` Ended ${consultation.endedAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.` : ''}
+              </Text>
+              <Pressable accessibilityRole="button" style={styles.viewSummary} onPress={() => router.push({ pathname: '/consultation/summary/[id]', params: { id } } as never)}>
+                <Text style={styles.viewSummaryText}>View summary</Text>
+              </Pressable>
+              {isDoctor && !consultation.summary && !consultation.advice ? (
+                <Pressable accessibilityRole="button" style={styles.addNotes} onPress={() => setNotesForm('later')}>
+                  <Text style={styles.addNotesText}>Add your notes</Text>
+                </Pressable>
               ) : null}
             </View>
           ) : null}
@@ -241,8 +242,11 @@ export default function ConsultationScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {ended ? (
-          <View style={styles.endedBar}>
-            <Text style={styles.endedBarText}>This consultation has ended. The chat history stays available above.</Text>
+          <View style={styles.composer}>
+            <View style={[styles.input, styles.inputClosed]}><Text style={styles.closedText}>Messaging is closed</Text></View>
+            <View style={[styles.sendButton, styles.sendButtonClosed]}>
+              <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={17} tintColor="#FFF" />
+            </View>
           </View>
         ) : (
           <View style={styles.composer}>
@@ -274,6 +278,7 @@ export default function ConsultationScreen() {
         <Pressable style={styles.backButton} onPress={goBack} hitSlop={10}>
           <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
         </Pressable>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(counterpartName)}</Text></View>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle} numberOfLines={1}>{counterpartName}</Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>{appointmentLabel}</Text>
@@ -283,55 +288,87 @@ export default function ConsultationScreen() {
             <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={17} tintColor="#FFF" />
           </Pressable>
         ) : null}
-        {canConsult && !ended && !(unpaid && !isDoctor) ? (
-          <Pressable style={styles.endButton} onPress={() => setEndModal(true)} hitSlop={8}>
-            <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#D9364F" />
-          </Pressable>
+        {booking && canConsult ? (
+          // Figma P-23: "View profile" and, while the consultation is open, "End consultation".
+          <MoreMenu style={styles.moreButton} tint="#0F172A" items={[
+            {
+              label: 'View profile',
+              icon: { ios: 'person.fill', android: 'person', web: 'person' },
+              onPress: () => (isDoctor && booking.patientId
+                ? router.push({ pathname: '/doctor/patient/[id]', params: { id: booking.patientId } })
+                : router.push({ pathname: '/booking/appointment', params: { id: booking.id } })),
+            },
+            ...(!ended && !(unpaid && !isDoctor)
+              ? [{ label: 'End consultation', icon: { ios: 'xmark', android: 'close', web: 'close' } as const, destructive: true, onPress: () => setConfirmEnd(true) }]
+              : []),
+          ]} />
         ) : null}
       </View>
 
       {body()}
 
-      <Modal visible={endModal} animationType="slide" transparent onRequestClose={() => setEndModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>End consultation</Text>
-              <Pressable onPress={() => setEndModal(false)} hitSlop={10}>
-                <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" />
-              </Pressable>
-            </View>
-            <Text style={styles.modalHint}>{isDoctor ? 'Write a short summary for your patient. They will see this in their appointment history.' : 'End this consultation? The chat stays readable, but you will not be able to send more messages. Your doctor can add a summary afterwards.'}</Text>
-            {isDoctor ? (
-            <TextInput
-              value={summaryDraft}
-              onChangeText={setSummaryDraft}
-              placeholder="e.g. Reviewed glucose logs. Advised lower-carb dinners and a follow-up in two weeks."
-              placeholderTextColor="#C6D2E2"
-              style={styles.summaryInput}
-              multiline
-            />
-            ) : null}
-            <Pressable style={[styles.endConfirm, ending && styles.sendButtonDisabled]} onPress={finish} disabled={ending}>
-              <Text style={styles.endConfirmText}>{ending ? 'Ending...' : 'End Consultation'}</Text>
+      <Modal visible={confirmEnd} animationType="fade" transparent onRequestClose={() => setConfirmEnd(false)}>
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmIcon}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={26} tintColor="#EF4444" /></View>
+            <Text style={styles.confirmTitle}>End this consultation?</Text>
+            <Text style={styles.confirmText}>
+              {isDoctor
+                ? "The patient won't be able to send new messages. You'll add your notes next."
+                : "You won't be able to send new messages. You can still read the chat and view the summary."}
+            </Text>
+            <Pressable accessibilityRole="button" style={[styles.confirmDanger, ending && styles.sendButtonDisabled]} onPress={confirmed} disabled={ending}>
+              <Text style={styles.confirmDangerText}>{ending ? 'Ending...' : 'End consultation'}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" style={styles.confirmKeep} onPress={() => setConfirmEnd(false)}>
+              <Text style={styles.confirmKeepText}>Keep chatting</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
+
+      <DoctorNotesForm
+        visible={notesForm !== null}
+        title={notesForm === 'later' ? 'Consultation notes' : 'End Consultation'}
+        patientName={counterpartName}
+        initial={notesForm === 'later' ? consultation : undefined}
+        submitLabel={notesForm === 'later' ? 'Save notes' : 'Save and end consultation'}
+        busy={ending || savingNotes}
+        error={error}
+        onSubmit={(notes) => (notesForm === 'later' ? saveLateNotes(notes) : finish(notes))}
+        onClose={() => setNotesForm(null)}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  lateSummary: { gap: 12, marginTop: 12 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 12, paddingBottom: 16, paddingHorizontal: 20, paddingTop: 56, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  addNotes: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 10, minHeight: 44 },
+  addNotesText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 12, paddingBottom: 16, paddingHorizontal: 20, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },
   headerTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
   headerSubtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 2 },
   callButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  endButton: { alignItems: 'center', backgroundColor: '#FBE6E9', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  moreButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 28 },
+  avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
+  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  viewSummary: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', marginTop: 10, minHeight: 44 },
+  viewSummaryText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  inputClosed: { justifyContent: 'center', paddingTop: 0 },
+  closedText: { color: '#94A3B8', fontFamily: Fonts.sans, fontSize: 14 },
+  sendButtonClosed: { backgroundColor: '#CBD5E1' },
+  confirmOverlay: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 32 },
+  confirmCard: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 32, gap: 10, maxWidth: 360, padding: 24, width: '100%' },
+  confirmIcon: { alignItems: 'center', backgroundColor: '#FDECEC', borderRadius: 32, height: 64, justifyContent: 'center', width: 64 },
+  confirmTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  confirmText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  confirmDanger: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#EF4444', borderRadius: 16, justifyContent: 'center', marginTop: 6, minHeight: 52 },
+  confirmDangerText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  confirmKeep: { alignItems: 'center', alignSelf: 'stretch', borderColor: homeColors.border, borderRadius: 16, borderWidth: 1, justifyContent: 'center', minHeight: 52 },
+  confirmKeepText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   loader: { marginTop: 40 },
   notice: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, padding: 24 },
   gate: { alignItems: 'center', gap: 10, padding: 32, paddingTop: 60 },
@@ -358,21 +395,9 @@ const styles = StyleSheet.create({
   summaryHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   summaryTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   summaryWhen: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11 },
-  summaryLabel: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginTop: 8 },
-  summaryText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
   error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 12, paddingHorizontal: 20, paddingBottom: 6 },
-  endedBar: { backgroundColor: homeColors.card, borderTopColor: homeColors.border, borderTopWidth: 1, padding: 20, paddingBottom: 32 },
-  endedBarText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, textAlign: 'center' },
   composer: { alignItems: 'flex-end', backgroundColor: homeColors.card, borderTopColor: homeColors.border, borderTopWidth: 1, flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 28 },
   input: { backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 22, borderWidth: 1, color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 14, maxHeight: 110, minHeight: 46, paddingHorizontal: 16, paddingTop: 13 },
   sendButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 23, height: 46, justifyContent: 'center', width: 46 },
   sendButtonDisabled: { opacity: 0.45 },
-  modalOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
-  modalHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  modalTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
-  modalHint: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19, marginTop: 8 },
-  summaryInput: { backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 14, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, marginTop: 16, minHeight: 110, padding: 14, textAlignVertical: 'top' },
-  endConfirm: { alignItems: 'center', backgroundColor: '#D9364F', borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 52 },
-  endConfirmText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
 });

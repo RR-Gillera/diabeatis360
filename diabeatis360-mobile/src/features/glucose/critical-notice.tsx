@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { AppText } from '@/components/ui/app-text';
+import { CallEmergencyButton } from '@/components/ui/call-emergency-button';
 import { Brand } from '@/constants/theme';
 
 /**
@@ -20,6 +21,7 @@ export function CriticalNotice({ readingMgdl }: { readingMgdl: number | null }) 
         {readingMgdl !== null ? `Your latest reading of ${readingMgdl} mg/dL is in a dangerous range. ` : 'Your latest reading is in a dangerous range. '}
         Please contact your doctor or go to the nearest hospital. Suggestions are paused until your reading is back in range.
       </AppText>
+      <CallEmergencyButton compact />
     </View>
   );
 }

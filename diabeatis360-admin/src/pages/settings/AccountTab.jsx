@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { Button, Card, Notice, TextField } from '../../components/ui'
 import { sendAdminPasswordReset } from '../../services/adminAccount'
+import { useResetEmail } from '../../lib/useResetEmail'
 
 // Update Account + Reset Password for the admin (Table 24, module 1).
 export default function AccountTab() {
@@ -10,6 +11,7 @@ export default function AccountTab() {
   const [name, setName] = useState(admin?.full_name ?? '')
   const [message, setMessage] = useState(null)
   const [busy, setBusy] = useState(false)
+  const reset = useResetEmail()
 
   const save = async (event) => {
     event.preventDefault()
@@ -30,8 +32,8 @@ export default function AccountTab() {
 
   const sendReset = async () => {
     try {
-      await sendAdminPasswordReset(admin.email)
-      setMessage({ tone: 'success', text: `A password reset link was sent to ${admin.email}.` })
+      const sent = await reset.send(() => sendAdminPasswordReset(admin.email))
+      if (sent) setMessage({ tone: 'success', text: `Reset link sent to ${admin.email}. Check the inbox (and Spam); it can take a minute.` })
     } catch {
       setMessage({ tone: 'error', text: 'We could not send the reset email. Please try again.' })
     }
@@ -48,7 +50,7 @@ export default function AccountTab() {
       </form>
       <div className="border-t border-gray-100 pt-4">
         <p className="mb-2 text-sm text-muted">Forgot or want to change your password? We will email you a reset link.</p>
-        <Button variant="outline" onClick={sendReset}>Send password reset email</Button>
+        <Button variant="outline" onClick={sendReset} disabled={reset.busy}>{reset.label('Send password reset email')}</Button>
       </div>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
     </Card>

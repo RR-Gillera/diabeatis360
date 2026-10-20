@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: Brand.colors.background, flex: 1 },
   scroll: { paddingBottom: 140 },
   pad: { paddingHorizontal: Brand.sizes.screenPadding },
-  header: { alignItems: 'center', flexDirection: 'row', gap: 16, paddingBottom: 16, paddingHorizontal: Brand.sizes.screenPadding, paddingTop: 32 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 16, paddingBottom: 16, paddingHorizontal: Brand.sizes.screenPadding, paddingTop: 12 },
   backButton: { alignItems: 'center', backgroundColor: Brand.colors.card, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   title: { fontSize: 24 },
   loader: { marginTop: 32 },

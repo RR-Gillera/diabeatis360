@@ -10,6 +10,14 @@
     "codebase": "default",
     "ignore": ["node_modules", ".git", "test", "*.local"]
   },
+  "hosting": {
+    "public": "diabeatis360-admin/dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "headers": [
+      { "source": "**", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ]
+  },
   "emulators": {
     "auth": { "port": 9099 },
     "firestore": { "port": 8080 },

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { BookingMoreMenu, bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { subscribeToBookableProviders } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
+import { NotificationBell } from '@/features/notifications/notification-bell';
 import type { Provider } from '@/features/booking/types';
 
 const filters = ['All', 'Endocrinologist', 'Diabetologist', 'Nutritionist'];
@@ -43,12 +44,8 @@ export default function FindDoctorScreen() {
           <Text style={styles.subtitle}>Consult with diabetes experts</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.headerButton} onPress={() => Alert.alert('Notifications', 'You are all caught up.')}>
-            <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-          </Pressable>
-          <Pressable style={styles.headerButton} onPress={() => Alert.alert('Coming Soon', 'More options are on the way.')}>
-            <SymbolView name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={16} tintColor="#64748B" />
-          </Pressable>
+          <NotificationBell style={styles.headerButton} />
+          <BookingMoreMenu style={styles.headerButton} />
         </View>
       </View>
 
@@ -98,7 +95,7 @@ export default function FindDoctorScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 56, paddingBottom: 24, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
   subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500', marginTop: 2 },
   headerActions: { flexDirection: 'row', gap: 12 },

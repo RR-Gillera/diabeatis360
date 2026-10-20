@@ -1,7 +1,8 @@
 import { SymbolView } from 'expo-symbols';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { Brand, Fonts } from '@/constants/theme';
+import { providerName, type SocialProvider } from './social-types';
 
 export const authColors = {
   navy: '#10182D',
@@ -21,6 +22,23 @@ export function AuthField({ label, secure, onToggleSecure, icon, ...props }: Tex
 
 export function AuthButton({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
   return <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text></Pressable>;
+}
+
+// The "G" and "f" buttons under the "OR CONNECT WITH" / "OR SIGN UP WITH" line on Login and Sign Up (DECISIONS.md D23;
+// Facebook replaced the Figma frame's Apple button on 2026-10-17). `busy` is the provider being signed in, if any.
+export function SocialButtons({ busy, onPress }: { busy: SocialProvider | null; onPress: (provider: SocialProvider) => void }) {
+  return <View style={styles.socials}>{(['google', 'facebook'] as const).map((provider) => {
+    const working = busy === provider;
+    return <Pressable
+      key={provider}
+      accessibilityRole="button"
+      accessibilityLabel={`Continue with ${providerName(provider)}`}
+      disabled={busy !== null}
+      onPress={() => onPress(provider)}
+      style={({ pressed }) => [styles.social, busy !== null && !working && styles.disabled, pressed && styles.pressed]}>
+      {working ? <ActivityIndicator color={authColors.green} /> : <Text style={provider === 'google' ? styles.google : styles.facebook}>{provider === 'google' ? 'G' : 'f'}</Text>}
+    </Pressable>;
+  })}</View>;
 }
 
 // Shared card-section shell used by the profile screens.
@@ -49,6 +67,10 @@ const styles = StyleSheet.create({
   buttonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   disabled: { opacity: 0.55 },
   pressed: { opacity: 0.82 },
+  socials: { flexDirection: 'row', gap: 16 },
+  social: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, flex: 1, height: 56, justifyContent: 'center' },
+  google: { color: '#53627A', fontSize: 23, fontWeight: '800' },
+  facebook: { color: '#1877F2', fontSize: 28, fontWeight: '900' },
   section: { backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 18, borderWidth: 1, gap: 12, marginTop: 18, padding: 18 },
   sectionTitle: { color: authColors.navy, fontSize: 16, fontWeight: '800' },
 });

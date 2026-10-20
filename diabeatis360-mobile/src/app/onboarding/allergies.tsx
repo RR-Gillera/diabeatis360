@@ -7,6 +7,9 @@ import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
 
 const presets = ['Nuts', 'Dairy', 'Eggs', 'Seafood'];
+// An explicit answer is required (DECISIONS.md D25): either allergies, or "None". Skipping is not allowed, because
+// meal suggestions and the scanner use this list to keep the person safe.
+const NONE = 'None';
 
 export default function AllergiesScreen() {
   const router = useRouter();
@@ -17,20 +20,26 @@ export default function AllergiesScreen() {
   const [otherText, setOtherText] = useState('');
 
   const toggle = (item: string) => {
-    setSelected((current) => current.includes(item) ? current.filter((value) => value !== item) : [...current, item]);
+    if (item === NONE) { setSelected((current) => (current.includes(NONE) ? [] : [NONE])); return; }
+    setSelected((current) => {
+      const rest = current.filter((value) => value !== NONE);
+      return rest.includes(item) ? rest.filter((value) => value !== item) : [...rest, item];
+    });
   };
 
   const addOther = () => {
     const value = otherText.trim();
-    if (value && !selected.includes(value)) setSelected((current) => [...current, value]);
+    if (value && value.toLowerCase() !== 'none' && !selected.includes(value)) setSelected((current) => [...current.filter((item) => item !== NONE), value]);
+    else if (value.toLowerCase() === 'none') setSelected([NONE]);
     setOtherText('');
     setShowOtherInput(false);
   };
 
-  const customEntries = selected.filter((item) => !presets.includes(item));
+  const customEntries = selected.filter((item) => !presets.includes(item) && item !== NONE);
   const visiblePresets = presets.filter((item) => item.toLowerCase().includes(search.toLowerCase()));
 
   const next = async () => {
+    if (!selected.length) return;
     if (email) await saveOnboardingValue(email, 'allergy', selected.join(', '), uid);
     router.push('/onboarding/activity');
   };
@@ -49,6 +58,7 @@ export default function AllergiesScreen() {
         <Text key={item} onPress={() => toggle(item)} style={[styles.allergy, styles.selected]}>{item} ✕</Text>
       ))}
       <Text onPress={() => setShowOtherInput((value) => !value)} style={[styles.allergy, showOtherInput && styles.selected]}>Other</Text>
+      <Text accessibilityRole="button" accessibilityState={{ selected: selected.includes(NONE) }} onPress={() => toggle(NONE)} style={[styles.allergy, selected.includes(NONE) && styles.selected]}>None</Text>
     </View>
     {showOtherInput ? (
       <View style={styles.otherRow}>
@@ -57,7 +67,8 @@ export default function AllergiesScreen() {
       </View>
     ) : null}
     <View style={styles.bottom}>
-      <AuthButton title="Next  ›" onPress={next} />
+      {!selected.length ? <Text style={styles.needAnswer}>Choose your allergies, or None if you have none.</Text> : null}
+      <AuthButton title="Next  ›" onPress={next} disabled={!selected.length} />
     </View>
   </View>;
 }
@@ -82,4 +93,5 @@ const styles = StyleSheet.create({
   otherInput: { backgroundColor: '#FFF', borderColor: authColors.green, borderRadius: 14, borderWidth: 1, color: authColors.navy, flex: 1, fontSize: 15, padding: 14 },
   addButton: { alignSelf: 'center', color: authColors.green, fontSize: 14, fontWeight: '800', paddingHorizontal: 12 },
   bottom: { marginTop: 'auto', paddingTop: 24 },
+  needAnswer: { color: authColors.muted, fontSize: 13, marginBottom: 10, textAlign: 'center' },
 });

@@ -18,7 +18,7 @@ const statusCopy: Record<BookingStatus, { label: string; color: string; backgrou
 
 const paymentCopy: Record<PaymentStatus, { label: string; color: string }> = {
   unpaid: { label: 'Not paid yet', color: '#B45309' },
-  paid: { label: 'Paid online', color: bookingColors.green },
+  paid: { label: 'Paid online (demo)', color: bookingColors.green },
   onsite: { label: 'Paying on-site', color: bookingColors.green },
 };
 
@@ -74,6 +74,14 @@ export default function AppointmentScreen() {
               </Text>
             </View>
 
+            {entry.concern ? (
+              <View style={styles.line}><Text style={styles.label}>YOUR NOTE TO THE DOCTOR</Text></View>
+            ) : null}
+            {entry.concern ? <Text style={styles.note}>{entry.concern}</Text> : null}
+            {entry.status === 'declined' && entry.declineReason ? (
+              <View style={styles.declined}><Text style={styles.declinedLabel}>DOCTOR&apos;S REASON</Text><Text style={styles.note}>{entry.declineReason}</Text></View>
+            ) : null}
+
             {entry.status === 'confirmed' && entry.paymentStatus === 'unpaid' ? (
               <Pressable style={styles.payButton} onPress={() => router.push({ pathname: '/booking/consultation-fee', params: { id: entry.id } })}>
                 <Text style={styles.payButtonText}>Pay Now</Text>
@@ -119,4 +127,7 @@ const styles = StyleSheet.create({
   waitingNote: { color: '#B45309', fontSize: 12, lineHeight: 18, marginTop: 18 },
   reference: { color: bookingColors.muted, fontSize: 11, marginTop: 24 },
   empty: { color: bookingColors.muted },
+  note: { color: bookingColors.navy, fontSize: 14, lineHeight: 20, marginTop: 6 },
+  declined: { backgroundColor: '#FBE6E9', borderRadius: 14, marginTop: 16, padding: 12 },
+  declinedLabel: { color: '#D9364F', fontSize: 10, fontWeight: '800' },
 });

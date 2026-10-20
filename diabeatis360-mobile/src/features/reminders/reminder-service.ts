@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
 import { Platform } from 'react-native';
@@ -40,16 +39,6 @@ function loadNotifications(): NotificationsModule | null {
   return cached;
 }
 
-/** The person's onboarding switches, saved on this phone (onboarding.tsx saves them as JSON). */
-async function readSwitches(email: string): Promise<Record<string, boolean>> {
-  try {
-    const raw = await AsyncStorage.getItem(`diabeatis360:onboarding:${email.trim().toLowerCase()}:notifications`);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
-  } catch {
-    return {};
-  }
-}
-
 /** Confirmed, future appointments of this patient (one equality filter, no composite index). */
 async function upcomingAppointments(patientId: string): Promise<Date[]> {
   const snapshot = await getDocs(query(collection(db, 'Bookings'), where('patient_id', '==', patientId)));
@@ -61,11 +50,11 @@ async function upcomingAppointments(patientId: string): Promise<Date[]> {
 }
 
 /**
- * Makes the phone's scheduled reminders match the person's switches: cancels the old ones and schedules the new ones.
+ * Makes the phone's scheduled reminders match the plan (every category, D29): cancels the old ones and schedules the new ones.
  * Called when a patient signs in / opens the app, so it always starts from a clean list. Returns how many were
  * scheduled (0 on the web or when permission was refused).
  */
-export async function syncReminders(uid: string, email: string): Promise<number> {
+export async function syncReminders(uid: string): Promise<number> {
   const Notifications = loadNotifications();
   if (!Notifications) return 0;
 
@@ -77,8 +66,8 @@ export async function syncReminders(uid: string, email: string): Promise<number>
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, { name: 'Health reminders', importance: Notifications.AndroidImportance.DEFAULT });
   }
 
-  const [switches, appointments] = await Promise.all([readSwitches(email), upcomingAppointments(uid).catch(() => [])]);
-  const planned = planReminders(switches, appointments);
+  const appointments = await upcomingAppointments(uid).catch(() => []);
+  const planned = planReminders(appointments);
 
   await Notifications.cancelAllScheduledNotificationsAsync();
   for (const item of planned) {

@@ -34,11 +34,20 @@ out with a message. A provider with `is_verified == false` sees a "pending verif
   `auth.currentUser` in a mount effect (`app/booking/select-date-time.tsx` still does the latter).
 - Env vars must be prefixed `EXPO_PUBLIC_` to reach the app. Anything EXPO_PUBLIC_ is bundled into
   the app and is NOT secret. Never put the Gemini key there: DECISIONS.md D1 routes all AI calls through Cloud Functions.
+  `EXPO_PUBLIC_USE_EMULATORS` is ignored in release builds (`src/firebase.js`).
+- Features that need the Blaze plan (the AI Cloud Functions, Storage for the guardian ID photo) must never show a
+  raw Firebase error or crash when the service does not exist yet: recognise it with `src/lib/feature-unavailable.ts`
+  and show its "This feature isn't available yet" message (DECISIONS.md D18, `../docs/GO_LIVE.md`). `npm test` checks it.
 - Scripts: `npm run lint` (expo lint). No typecheck script; use `npx tsc --noEmit`.
-- Testing happens in **Expo Go on a physical phone**. Things that need a development build
-  (not Expo Go): native Google Sign-In, remote push notifications. Don't choose a library that
-  breaks Expo Go without flagging it first. Local scheduled notifications via `expo-notifications`
-  are fine for reminders (not installed yet).
+- Testing happens in **Expo Go on a physical phone**. Things that need the installed app
+  (not Expo Go): Google and Facebook sign-in (DECISIONS.md D23) and remote push notifications. Don't choose a library that
+  breaks Expo Go without flagging it first: the two sign-in libraries are native, so `features/auth/social-login.ts`
+  loads them only when a button is tapped (Expo Go still opens the app and the buttons say "works in the installed
+  app"), and `social-login.web.ts` keeps them out of the web bundle. Local scheduled notifications via
+  `expo-notifications` are fine for reminders (not installed yet).
+- `app.config.js` wraps `app.json` and adds the Facebook plugin only when `EXPO_PUBLIC_FACEBOOK_APP_ID` and
+  `FACEBOOK_CLIENT_TOKEN` exist (EAS environment, `../docs/GO_LIVE.md` A10); the Google web client ID is
+  `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. All three are public IDs; the Facebook app secret never goes in a file.
 
 ## Design system (from Figma — see ../docs/FIGMA_MAP.md)
 Figma file: https://www.figma.com/design/zg94UJ7h9nxktg8Sf8mTJ3/DIABEATIS360 · PNG exports in
@@ -104,8 +113,11 @@ Not every flow has been re-verified live since teammates' latest merges.
 - Interpretation has only low/normal/high; the manuscript also requires **critical**. The thresholds
   (70 / 130 before meal / 180 after meal) are **hardcoded in `features/glucose/glucose-service.ts`**,
   not in a constants file, and are placeholders pending DECISIONS.md D4 / adviser sign-off.
-- Email verification is **mocked** (any 6-char code passes). Google/Apple sign-in intentionally not
-  implemented (buttons say "coming soon"). Apple needs the paid $99/yr developer account.
+- Email verification is **real** (DECISIONS.md D21): Firebase emails a link, the "Check your email" screen
+  (`app/verify-email.tsx`) notices when it is tapped, and the rules and AI server read the signed `email_verified`
+  claim. It is a link, not the 6-digit code the Figma frame (230:3825) shows. Google and Facebook sign-in are **built**
+  (DECISIONS.md D23; Facebook replaced Apple on 2026-10-17, D7) but need the console setup, a new APK and a phone test
+  (`../docs/GO_LIVE.md` A10); Facebook is team-only while its Meta app is in Development mode.
 - Notifications are in-app Firestore docs only: no push (FCM/expo-notifications), no scheduled reminders.
 - Language choice is saved, but the UI isn't translated (no i18n).
 - Pediatric/guardian verification (`Guardian_Verifications`) not built.
@@ -113,7 +125,6 @@ Not every flow has been re-verified live since teammates' latest merges.
 ## Known temporary shortcuts to remove
 - Mocked payment (GCash/Maya/Card UI) stays mocked for the prototype, but it must write a real
   Bookings doc (and a payment record if D3 says so). Label it clearly as a demo in code comments.
-- Email verification mock (see gaps).
 
 ## Gotchas learned
 - Test in a browser with `npx expo start --web`. For Expo Go on a phone, if changes don't show,

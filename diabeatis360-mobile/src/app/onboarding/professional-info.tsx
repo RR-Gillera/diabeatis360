@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
@@ -8,7 +8,9 @@ import { useAuth } from '@/features/auth/auth-context';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
 import { birthdateToTimestamp } from '@/features/auth/birthdate';
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
+import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { db } from '@/firebase';
+import { resetTo } from '@/lib/navigation';
 
 // Kept in step with the specialty filter pills on the patient's Find a Doctor
 // screen — a specialty picked here that isn't in that list would make the
@@ -33,6 +35,18 @@ export default function ProfessionalInfoScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Resubmitting after a rejection (Figma D-04): start from what the doctor sent before, so only the fix is typed.
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToDoctorProfile(uid, (profile) => {
+      if (seeded.current || !profile) return;
+      seeded.current = true;
+      if (profile.specialty) setSpecialty((current) => current || profile.specialty);
+      if (profile.prcLicenseNumber) setLicenseNumber((current) => current || profile.prcLicenseNumber);
+    }, () => {});
+  }, [uid]);
+
   const complete = Boolean(specialty && licenseNumber.trim() && expiry && agreed);
 
   const submit = async () => {
@@ -54,13 +68,17 @@ export default function ProfessionalInfoScreen() {
           // the Doctor Management module. Never set true from the doctor's own
           // device, or verification would mean nothing.
           is_verified: false,
+          // A resubmission after a rejection (Figma D-04) clears the admin's reason, so the doctor's screen goes back
+          // to "Verification in progress" and the admin sees the request again. The rules allow only this, never
+          // approving oneself.
+          rejection_reason: '',
           created_at: serverTimestamp(),
         }, { merge: true });
         await updateDoc(doc(db, 'Users', uid), { role: 'doctor' });
       }
       await saveOnboardingValue(email, 'specialty', specialty, uid);
       await completeOnboarding(email, 'doctor', uid);
-      router.replace('/doctor');
+      resetTo(router, '/doctor');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to submit your credentials.');
     } finally {

@@ -1,43 +1,36 @@
-import { httpsCallable } from 'firebase/functions';
+import { httpsCallable, httpsCallableFromURL } from 'firebase/functions';
 
 import { functions } from '@/firebase';
 import type {
   ExerciseSuggestion, LabelAnalysis, MealSuggestion, ProductLookup, RecommendationResult, SuggestionKind,
 } from '@/features/ai/types';
 
-// The ONLY place the app asks for AI output (DECISIONS.md D1, option A). It calls Firebase Cloud Functions; the
+import { AiError, toAiError } from './ai-error';
+import { FEATURE_UNAVAILABLE_MESSAGE, isFunctionMissing } from './feature-unavailable';
+
+// The ONLY place the app asks for AI output (DECISIONS.md D1, D19). It calls the AI functions (Vercel or Firebase); the
 // Gemini key never exists in the app. The functions read the user's profile and latest reading themselves, so the
-// app sends almost nothing, and they enforce sign-in, the critical-reading block and the Free-plan daily limits.
+// app sends almost nothing, and they enforce sign-in, the critical-reading block and the daily limits (D20).
+// How a failed call is understood (which limit it was, whether trying again can help) lives in ai-error.ts.
+export { AiError };
+export type { AiErrorCode } from './ai-error';
 
-export type AiErrorCode = 'limit' | 'unavailable' | 'signed-out' | 'invalid' | 'unknown';
-
-export class AiError extends Error {
-  code: AiErrorCode;
-  constructor(code: AiErrorCode, message: string) {
-    super(message);
-    this.code = code;
-  }
-}
-
-function toAiError(error: unknown): AiError {
-  const code = typeof error === 'object' && error && 'code' in error ? String((error as { code: unknown }).code) : '';
-  // The Functions client can append the HTTP status to the server's message ("... tomorrow. [429]"); people should not see it.
-  const message = error instanceof Error ? error.message.replace(/\s*\[\d{3}\]\s*$/, '') : '';
-  if (code === 'functions/resource-exhausted') return new AiError('limit', message || 'You have reached today\'s free limit.');
-  if (code === 'functions/unauthenticated') return new AiError('signed-out', 'Please sign in again to use this feature.');
-  if (code === 'functions/invalid-argument') return new AiError('invalid', message || 'That request was not valid.');
-  if (code === 'functions/unavailable' || code === 'functions/not-found' || code === 'functions/internal' || code === 'functions/deadline-exceeded') {
-    return new AiError('unavailable', 'The AI service is not reachable right now. Please try again in a moment.');
-  }
-  return new AiError('unknown', 'Something went wrong. Please try again.');
-}
+// Where the AI functions live. Without Blaze there are no Cloud Functions, so the same code runs on a free Vercel
+// server (DECISIONS.md D19) and EXPO_PUBLIC_AI_BASE_URL holds its address, e.g. https://diabeatis360-ai.vercel.app.
+// That address is not a secret: only signed-in users get answers, and the Gemini key stays on the server.
+// Unset: Firebase Cloud Functions (the emulators now, or Blaze later). The Firebase SDK sends the sign-in token either way.
+const AI_BASE_URL = (process.env.EXPO_PUBLIC_AI_BASE_URL ?? '').replace(/\/+$/, '');
 
 async function call<Input, Output>(name: string, data: Input): Promise<Output> {
   try {
-    const result = await httpsCallable<Input, Output>(functions, name)(data);
+    const callable = AI_BASE_URL
+      ? httpsCallableFromURL<Input, Output>(functions, `${AI_BASE_URL}/api/${name}`)
+      : httpsCallable<Input, Output>(functions, name);
+    const result = await callable(data);
     return result.data;
   } catch (error) {
-    throw toAiError(error);
+    // A function that is not deployed at all (404) is recognised first: trying again cannot help, so it is not "unavailable".
+    throw isFunctionMissing(error) ? new AiError('feature-unavailable', FEATURE_UNAVAILABLE_MESSAGE) : toAiError(error);
   }
 }
 

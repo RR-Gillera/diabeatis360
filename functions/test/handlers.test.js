@@ -11,6 +11,7 @@ const skip = emulator ? false : 'set FIRESTORE_EMULATOR_HOST (run inside firebas
 const { initializeApp } = require('firebase-admin/app')
 const { getFirestore, Timestamp } = require('firebase-admin/firestore')
 const { analyzeLabel, generateRecommendations, CRITICAL_MESSAGE } = require('../lib/handlers')
+const { FREE_LIMITS, PREMIUM_LIMITS, manilaDayKey } = require('../lib/limits')
 
 let db
 const mealsAnswer = {
@@ -43,7 +44,7 @@ test.before(() => {
 })
 
 async function reset() {
-  for (const name of ['Users', 'Glucose_Logs', 'Subscriptions', 'AI_Suggestions', 'AI_Suggestions_Foods', 'Nutrition_Scans', 'Food_Database']) {
+  for (const name of ['Users', 'Glucose_Logs', 'Subscriptions', 'AI_Suggestions', 'AI_Suggestions_Foods', 'Nutrition_Scans', 'Food_Database', 'Usage_Counters']) {
     const snapshot = await db.collection(name).get()
     await Promise.all(snapshot.docs.map((doc) => doc.ref.delete()))
   }
@@ -254,4 +255,148 @@ test('product memory: a label scan with a barcode links the scan to the product'
   assert.equal(scan.product_id, barBarcode)
   assert.equal(scan.source, 'gemini_label')
   assert.equal(result.ingredients_text, 'oats, sugar, peanuts, berries')
+})
+
+// ---- daily limits, fair use and the project-wide cap (D20) ---------------------------------------------------
+const failure = async (promise) => { try { await promise; return null } catch (error) { return error } }
+const counter = async (id) => (await db.doc(`Usage_Counters/${id}`).get()).data() ?? {}
+const addPremium = (uid) => db.collection('Subscriptions').add({ user_id: uid, status: 'active', expires_at: Timestamp.fromMillis(Date.now() + 86400000) })
+
+test('requests sent at the same moment cannot go past the Free limit (the slot is taken atomically)', { skip }, async () => {
+  await reset()
+  await addUser('r1', { allergies: 'None' })
+  const ai = fakeAi(exercisesAnswer)
+  const outcomes = await Promise.all(Array.from({ length: 6 }, () => failure(generateRecommendations({ db, uid: 'r1', kind: 'exercise', callAi: ai }))))
+  const refused = outcomes.filter(Boolean)
+  assert.equal(outcomes.length - refused.length, FREE_LIMITS.ai, 'exactly the Free limit got through')
+  assert.ok(refused.every((error) => error.code === 'resource-exhausted'), `unexpected failures: ${refused.map((error) => error.code)}`)
+  assert.equal(ai.calls, FREE_LIMITS.ai, 'Gemini was asked only as often as allowed')
+  assert.equal((await db.collection('AI_Suggestions').get()).size, FREE_LIMITS.ai)
+  assert.equal((await counter(`${manilaDayKey()}_r1`)).ai, FREE_LIMITS.ai)
+
+  await addUser('r2', { allergies: 'None' })
+  const scanAi = fakeAi(labelAnswer)
+  const scans = await Promise.all(Array.from({ length: 6 }, () => failure(analyzeLabel({ db, uid: 'r2', image: png, callAi: scanAi }))))
+  assert.equal(scans.filter((error) => !error).length, FREE_LIMITS.scan)
+  assert.ok(scans.filter(Boolean).every((error) => error.code === 'resource-exhausted'))
+  assert.equal(scanAi.calls, FREE_LIMITS.scan)
+})
+
+test('premium is "unlimited" in the app, but a fair-use ceiling stops a runaway account', { skip }, async () => {
+  await reset()
+  await addUser('pr1', { allergies: 'None' })
+  await addPremium('pr1')
+  const ai = fakeAi(exercisesAnswer)
+  for (let i = 0; i < PREMIUM_LIMITS.ai; i += 1) await generateRecommendations({ db, uid: 'pr1', kind: 'exercise', callAi: ai })
+  const refused = await failure(generateRecommendations({ db, uid: 'pr1', kind: 'exercise', callAi: ai }))
+  assert.equal(refused.code, 'resource-exhausted')
+  assert.equal(refused.details.scope, 'fair_use')
+  assert.doesNotMatch(refused.message, /upgrade/i, 'a Premium person is not told to upgrade')
+  assert.equal(ai.calls, PREMIUM_LIMITS.ai)
+
+  // Scans have their own ceiling, so reaching one does not block the other.
+  const scanAi = fakeAi(labelAnswer)
+  for (let i = 0; i < PREMIUM_LIMITS.scan; i += 1) await analyzeLabel({ db, uid: 'pr1', image: png, callAi: scanAi })
+  assert.equal((await failure(analyzeLabel({ db, uid: 'pr1', image: png, callAi: scanAi }))).details.scope, 'fair_use')
+  assert.equal(scanAi.calls, PREMIUM_LIMITS.scan)
+})
+
+test('the Free refusal says why and offers Premium; its details tell the app which kind of limit it was', { skip }, async () => {
+  await reset()
+  await addUser('fr1', { allergies: 'None' })
+  const ai = fakeAi(exercisesAnswer)
+  for (let i = 0; i < FREE_LIMITS.ai; i += 1) await generateRecommendations({ db, uid: 'fr1', kind: 'exercise', callAi: ai })
+  const refused = await failure(generateRecommendations({ db, uid: 'fr1', kind: 'exercise', callAi: ai }))
+  assert.deepEqual(refused.details, { limit: FREE_LIMITS.ai, feature: 'ai', scope: 'free' })
+  assert.match(refused.message, /Upgrade to Premium/)
+})
+
+test('the whole project has a daily cap; a product lookup, which uses no Gemini, still works at the cap', { skip }, async () => {
+  await reset()
+  const before = process.env.GEMINI_DAILY_CAP
+  process.env.GEMINI_DAILY_CAP = '3'
+  try {
+    const ai = fakeAi(exercisesAnswer)
+    for (const uid of ['c1', 'c2', 'c3']) {
+      await addUser(uid, { allergies: 'None' })
+      await generateRecommendations({ db, uid, kind: 'exercise', callAi: ai })
+    }
+    await addUser('c4', { allergies: 'None' })
+    const refused = await failure(generateRecommendations({ db, uid: 'c4', kind: 'exercise', callAi: ai }))
+    assert.equal(refused.code, 'resource-exhausted')
+    assert.equal(refused.details.scope, 'project')
+    assert.doesNotMatch(refused.message, /upgrade/i, 'upgrading cannot help when everyone is at the cap')
+    assert.equal(ai.calls, 3)
+    assert.equal((await counter(manilaDayKey())).gemini, 3)
+    assert.equal((await counter(`${manilaDayKey()}_c4`)).ai ?? 0, 0, 'a refused request is not counted against the person')
+
+    // Label scans share the same project cap ...
+    assert.equal((await failure(analyzeLabel({ db, uid: 'c4', image: png, callAi: fakeAi(labelAnswer) }))).details.scope, 'project')
+    // ... but a product answered from the shared Products collection makes no Gemini call.
+    await addProduct()
+    assert.equal((await lookupProduct({ db, uid: 'c4', barcode: barBarcode })).found, true)
+  } finally {
+    if (before === undefined) delete process.env.GEMINI_DAILY_CAP
+    else process.env.GEMINI_DAILY_CAP = before
+  }
+})
+
+test('a failed Gemini call, an unreadable photo or an unsafe answer gives the slot back', { skip }, async () => {
+  await reset()
+  const day = manilaDayKey()
+  const failing = async () => { throw new Error('boom') }
+  const unsafe = { items: [{ name: 'Peanut soup', ingredients: ['peanuts'] }] }
+
+  await addUser('f1', { allergies: 'peanuts' })
+  for (let i = 0; i < 3; i += 1) assert.equal(await code(generateRecommendations({ db, uid: 'f1', kind: 'meal', callAi: failing })), 'unavailable')
+  assert.equal(await code(generateRecommendations({ db, uid: 'f1', kind: 'meal', callAi: fakeAi(unsafe) })), 'unavailable', 'nothing safe was left after the allergen filter')
+  // Four failed attempts used nothing: both counters are back to zero ...
+  assert.equal((await counter(`${day}_f1`)).ai, 0)
+  assert.equal((await counter(day)).gemini, 0)
+  // ... so the whole Free allowance is still there.
+  const ai = fakeAi(exercisesAnswer)
+  for (let i = 0; i < FREE_LIMITS.ai; i += 1) await generateRecommendations({ db, uid: 'f1', kind: 'exercise', callAi: ai })
+  assert.equal(await code(generateRecommendations({ db, uid: 'f1', kind: 'exercise', callAi: ai })), 'resource-exhausted')
+
+  // A Gemini failure and a blurry photo do not use up a scan either.
+  await addUser('f3', { allergies: 'None' })
+  assert.equal(await code(analyzeLabel({ db, uid: 'f3', image: png, callAi: failing })), 'unavailable')
+  assert.equal((await analyzeLabel({ db, uid: 'f3', image: png, callAi: fakeAi({ readable: false }) })).readable, false)
+  assert.equal((await counter(`${day}_f3`)).scan, 0)
+})
+
+test('the allowance starts again on the next Manila day, not at midnight UTC', { skip }, async () => {
+  await reset()
+  await addUser('d1', { allergies: 'None' })
+  const ai = fakeAi(exercisesAnswer)
+  const noonManila = new Date('2026-10-12T04:00:00Z')
+  for (let i = 0; i < FREE_LIMITS.ai; i += 1) await generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: noonManila })
+  assert.equal(await code(generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: noonManila })), 'resource-exhausted')
+  // 23:59 in Manila (15:59 UTC) is still the same day; 00:00 Manila (16:00 UTC) is a new one.
+  assert.equal(await code(generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: new Date('2026-10-12T15:59:00Z') })), 'resource-exhausted')
+  assert.equal(await code(generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: new Date('2026-10-12T16:00:00Z') })), 'ok')
+})
+
+// DECISIONS.md D25: no suggestions, label scans or barcode ratings until the allergy question is answered.
+test('without an allergy answer every AI feature is refused: no Gemini call, nothing saved or counted', { skip }, async () => {
+  await reset()
+  const { ALLERGIES_MESSAGE } = require('../lib/handlers')
+  await addUser('uNoAllergies', { allergies: '' })
+  await db.doc('Products/4800000000017').set({ barcode: '4800000000017', product_name: 'Test Crackers', ingredients_text: 'wheat', nutrients: { calories: 100, carbs_g: 10, sugar_g: 1, fiber_g: 1, protein_g: 2, sodium_mg: 50 }, alternatives: [], verified: true })
+  const ai = fakeAi(mealsAnswer)
+  for (const call of [
+    generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai }),
+    analyzeLabel({ db, uid: 'uNoAllergies', image: png, callAi: fakeAi(labelAnswer) }),
+    lookupProduct({ db, uid: 'uNoAllergies', barcode: '4800000000017' }),
+  ]) {
+    await assert.rejects(call, (error) => error.code === 'failed-precondition' && error.message === ALLERGIES_MESSAGE)
+  }
+  assert.equal(ai.calls, 0)
+  assert.equal((await db.collection('AI_Suggestions').get()).size, 0)
+  assert.equal((await db.collection('Nutrition_Scans').get()).size, 0)
+  assert.equal((await db.collection('Usage_Counters').get()).size, 0)
+  // "None" is an answer: the same person may now generate.
+  await db.doc('Users/uNoAllergies').update({ allergies: 'None' })
+  const result = await generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai })
+  assert.ok(result.items.length > 0)
 })

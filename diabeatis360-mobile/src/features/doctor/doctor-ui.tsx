@@ -15,12 +15,15 @@ export const statusStyle: Record<BookingStatus, { label: string; color: string; 
   cancelled: { label: enumLabel('bookingStatus', 'cancelled'), color: '#D9364F', background: '#FBE6E9' },
 };
 
-type DoctorTab = 'home' | 'appointments' | 'patients' | 'profile';
+type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
 
+// The five tabs of the doctor frames (Dashboard, D-05, D-11; DECISIONS D24). The patients list stays reachable from the
+// dashboard's "My Patients" and from the History cards.
 const navItems = [
   { key: 'home', label: 'Home', href: '/doctor', icon: 'house.fill', iconAndroid: 'home' },
-  { key: 'appointments', label: 'Bookings', href: '/doctor/appointments', icon: 'calendar', iconAndroid: 'calendar_month' },
-  { key: 'patients', label: 'Patients', href: '/doctor/patients', icon: 'person.2.fill', iconAndroid: 'groups' },
+  { key: 'requests', label: 'Requests', href: '/doctor/appointments', icon: 'tray.fill', iconAndroid: 'inbox' },
+  { key: 'history', label: 'History', href: '/doctor/history' as Href, icon: 'clock.arrow.circlepath', iconAndroid: 'history' },
+  { key: 'notifications', label: 'Notifications', href: '/doctor/notifications', icon: 'bell.fill', iconAndroid: 'notifications' },
   { key: 'profile', label: 'Profile', href: '/doctor/profile', icon: 'person.fill', iconAndroid: 'person' },
 ] as const satisfies { key: DoctorTab; label: string; href: Href; icon: string; iconAndroid: string }[];
 
@@ -105,7 +108,7 @@ const styles = StyleSheet.create({
   nav: { alignItems: 'center', backgroundColor: homeColors.card, borderTopColor: homeColors.borderSoft, borderTopWidth: 1, bottom: 0, flexDirection: 'row', justifyContent: 'space-around', left: 0, paddingBottom: 24, paddingTop: 10, position: 'absolute', right: 0 },
   navItem: { alignItems: 'center', gap: 4, minWidth: 56 },
   navLabel: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 24, paddingHorizontal: 24, paddingTop: 56, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 24, paddingHorizontal: 24, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   headerLeft: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },

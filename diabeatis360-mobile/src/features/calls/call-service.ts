@@ -7,8 +7,9 @@ import { createNotification } from '@/features/notifications/notification-servic
 //   ringing -> accepted -> ended          (normal call)
 //   ringing -> declined | missed | ended  (not answered / cancelled)
 // The other person's app listens for a ringing call and shows an incoming-call screen (features/calls/incoming-call-host).
-// The video itself is Jitsi, loaded inside the app. Known limitation: it only rings while the app is open; ringing an app
-// that is fully closed needs push notifications, which are out of scope.
+// The video itself is a private Daily.co room, opened inside the app once the call is accepted (video-room.ts, D27).
+// Known limitation: it only rings while the app is open; ringing an app that is fully closed needs push notifications,
+// which are out of scope.
 
 export type CallStatus = 'ringing' | 'accepted' | 'declined' | 'missed' | 'ended';
 
@@ -17,7 +18,7 @@ export type CallRecord = {
   callerId: string;
   calleeId: string;
   status: CallStatus;
-  /** Random per call. The Jitsi room name comes from THIS, not the booking id (which is guessable). */
+  /** Random per call. The server names the Daily room after THIS, not the booking id (which is guessable). */
   room: string;
   createdAt: Date | null;
 };
@@ -26,12 +27,6 @@ export type CallRecord = {
 export const RING_TIMEOUT_MS = 30_000;
 /** A "ringing" call older than this is a leftover (the caller's app was closed), so the callee ignores it. */
 export const STALE_RING_MS = 45_000;
-
-/** The Jitsi room both people join, named after the call's random token. Only the two participants can read it. */
-export function videoRoomUrl(room: string, displayName?: string) {
-  const name = displayName ? `&userInfo.displayName="${encodeURIComponent(displayName)}"` : '';
-  return `https://meet.jit.si/diabeatis360-${room}#config.prejoinPageEnabled=false${name}`;
-}
 
 /** 24 random letters and digits (crypto when the platform has it). */
 function newRoomToken() {
@@ -53,10 +48,20 @@ function fromDoc(id: string, data: Record<string, unknown>): CallRecord {
   };
 }
 
-/** A person's display name (doctors live in Providers, everyone else in Users). */
+/**
+ * A person's display name (doctors live in Providers, everyone else in Users). Each read is tried on its own: since the
+ * booking-privacy rules (D22) a patient may not read a doctor's Users document, and reading both together failed as a
+ * whole, so the patient saw "Your doctor" instead of the doctor's name.
+ */
 export async function fetchDisplayName(userId: string) {
-  const [provider, user] = await Promise.all([getDoc(doc(db, 'Providers', userId)), getDoc(doc(db, 'Users', userId))]);
-  return String(provider.data()?.full_name || user.data()?.full_name || 'Diabeatis360 user');
+  const nameIn = async (collectionName: string) => {
+    try {
+      return (await getDoc(doc(db, collectionName, userId))).data()?.full_name as string | undefined;
+    } catch {
+      return undefined; // not allowed to read it: try the other place
+    }
+  };
+  return String((await nameIn('Providers')) || (await nameIn('Users')) || 'Diabeatis360 user');
 }
 
 /**

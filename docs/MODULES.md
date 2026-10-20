@@ -24,7 +24,7 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 - Successful login → role dashboard (UT-002, UT-019, UT-A001, IT-010). Deactivated → blocked with message.
 - Reset password → `sendPasswordResetEmail`. Update → edit name/other profile fields (UT-004).
 - Doctor signup continues to Professional Verification (PRC license number, specialty, city, fee).
-- Google Sign-In: optional, deferred (needs dev build) — see DECISIONS.md.
+- Google and Facebook sign-in: built 2026-10-17 (DECISIONS.md D23; native code, so the installed APK only, not Expo Go). Facebook replaced Apple (D7). Not a Table 24 row.
 - Figma: Login Screen, Sign Up Screen, Role Selection Gate, Doctor Account Verification, Profile screens.
 - **Pediatric account setup (manuscript UT-005, DECISIONS.md D16):** on the patient path, Role Selection Gate
   is followed by "For me" / "For my child". "For my child" collects the guardian's name, relationship and an
@@ -42,7 +42,8 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 
 - Onboarding steps (Figma "Profile Setup Step 3–10"): language (English / Filipino), birthdate,
   diabetes type (Type 1 / Type 2 / Prediabetes), food allergies, activity level, dietary preference,
-  notification toggles. Stored on the Users doc (fields per FIRESTORE_SCHEMA.md).
+  then Complete Setup. Reminders are always on (no notification toggles since DECISIONS.md D29; the phone asks for
+  notification permission itself). Stored on the Users doc (fields per FIRESTORE_SCHEMA.md).
 - Figma options — activity: Sedentary / Light / Active / Very Active; diet: Everything / Vegetarian /
   No Pork / Diabetic Diet. These differ from the data dictionary enums → DECISIONS.md D6.
 - Doctor can view a patient's health profile ONLY for patients who have a booking with them (UT-023).

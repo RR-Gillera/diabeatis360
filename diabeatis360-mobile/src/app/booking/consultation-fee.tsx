@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
 import { BookingHeader, BookingHeaderActions, bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { payForBooking, subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, PaymentMethod } from '@/features/booking/types';
@@ -137,17 +138,18 @@ export default function ConsultationFeeScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        {selected && selected !== 'Pay On-Site' ? <DemoPaymentNote /> : null}
         <View style={styles.checkout}>
           <View>
             <View style={styles.checkoutLabelRow}>
               <SymbolView name={{ ios: 'checkmark.shield.fill', android: 'verified_user', web: 'verified_user' }} size={14} tintColor={bookingColors.green} />
-              <Text style={styles.checkoutLabel}>SECURE CHECKOUT</Text>
+              <Text style={styles.checkoutLabel}>{selected === 'Pay On-Site' ? 'PAY AT THE CLINIC' : 'DEMO CHECKOUT'}</Text>
             </View>
             <Text style={styles.strong}>{formatFee(booking.fee)}</Text>
           </View>
           <View style={styles.payButton}>
             <PrimaryButton
-              title={selected === 'Pay On-Site' ? 'Confirm On-Site' : 'Pay Now'}
+              title={selected === 'Pay On-Site' ? 'Confirm On-Site' : `Pay ${formatFee(booking.fee)} (demo)`}
               onPress={pay}
               disabled={!selected}
               loading={paying}

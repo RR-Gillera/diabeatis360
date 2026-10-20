@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { glucoseDirection, interpretGlucose } from './glucose.ts';
+import { checkReading, glucoseDirection, interpretGlucose, READING_LIMITS } from './glucose.ts';
 
 test('critical low: below 54, both contexts', () => {
   for (const context of ['before_meal', 'after_meal']) {
@@ -57,4 +57,25 @@ test('direction tells critical low from critical high', () => {
   assert.equal(glucoseDirection(40, 'before_meal'), 'low');
   assert.equal(glucoseDirection(300, 'after_meal'), 'high');
   assert.equal(glucoseDirection(100, 'before_meal'), 'normal');
+});
+
+// DECISIONS.md D25: impossible values are refused, extreme ones need a confirmation.
+
+test('reading limits: outside 20-600, decimals and non-numbers are refused', () => {
+  for (const value of [0, -5, 19, 601, 9999, 1.5, 120.4, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.equal(checkReading(value).ok, false, `${value} should be refused`);
+  }
+  assert.match(checkReading(9999).message, /from 20 to 600/);
+});
+
+test('reading limits: the ends of the range are allowed but need a confirmation', () => {
+  for (const value of [READING_LIMITS.min, 39, 401, READING_LIMITS.max]) {
+    assert.deepEqual(checkReading(value), { ok: true, needsConfirmation: true }, `${value}`);
+  }
+});
+
+test('reading limits: everyday readings save without a question', () => {
+  for (const value of [40, 54, 70, 130, 180, 250, 400]) {
+    assert.deepEqual(checkReading(value), { ok: true, needsConfirmation: false }, `${value}`);
+  }
 });

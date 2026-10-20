@@ -8,6 +8,7 @@ import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 
 import { answerCall, fetchDisplayName, STALE_RING_MS, subscribeToIncomingCalls, type CallRecord } from './call-service';
+import { ensureCallPermissions } from './video-room';
 
 /**
  * Mounted once in the root layout (app/_layout.tsx). While the app is open and someone is signed in, it listens for a
@@ -19,6 +20,8 @@ export function IncomingCallHost() {
   const { uid } = useAuth();
   const [call, setCall] = useState<CallRecord | null>(null);
   const [callerName, setCallerName] = useState('');
+  // Shown on the ringing screen when the camera or microphone was not allowed (the call keeps ringing).
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (!uid) return;
@@ -44,13 +47,22 @@ export function IncomingCallHost() {
     let cancelled = false;
     fetchDisplayName(call.callerId).then((name) => { if (!cancelled) setCallerName(name); }).catch(() => {});
     Vibration.vibrate([0, 700, 500], true);
-    return () => { cancelled = true; setCallerName(''); Vibration.cancel(); };
+    return () => { cancelled = true; setCallerName(''); setNotice(''); Vibration.cancel(); };
   }, [call]);
 
   if (!call) return null;
 
   const respond = async (accept: boolean) => {
     const bookingId = call.id;
+    if (accept) {
+      // Asked before answering: on Android the call frame can only use what the app is already allowed (video-room.ts).
+      try {
+        await ensureCallPermissions();
+      } catch (value) {
+        setNotice(value instanceof Error ? value.message : 'Allow camera and microphone to use video calls.');
+        return;
+      }
+    }
     setCall(null);
     try {
       await answerCall(bookingId, accept);
@@ -70,6 +82,7 @@ export function IncomingCallHost() {
           </View>
           <AppText weight="extraBold" style={styles.name}>{callerName || 'Someone'}</AppText>
           <AppText style={styles.sub}>Diabeatis360 consultation</AppText>
+          {notice ? <AppText accessibilityLiveRegion="polite" style={styles.notice}>{notice}</AppText> : null}
         </View>
         <View style={styles.buttons}>
           <View style={styles.choice}>
@@ -98,6 +111,7 @@ const styles = StyleSheet.create({
   avatarText: { color: '#FFF', fontSize: 52 },
   name: { color: '#FFF', fontSize: 28, textAlign: 'center' },
   sub: { color: '#9FB88A', fontSize: 15 },
+  notice: { color: '#FCA5A5', fontSize: 15, lineHeight: 22, marginTop: 12, paddingHorizontal: 32, textAlign: 'center' },
   buttons: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 32 },
   choice: { alignItems: 'center', gap: 10 },
   round: { alignItems: 'center', borderRadius: 40, height: 80, justifyContent: 'center', width: 80 },

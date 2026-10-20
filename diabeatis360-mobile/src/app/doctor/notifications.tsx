@@ -7,11 +7,10 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatFee } from '@/features/booking/booking-ui';
-import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
+import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
-import { useSafeBack } from '@/hooks/use-safe-back';
 
 type Notice = {
   id: string;
@@ -78,7 +77,6 @@ function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
 
 export default function DoctorNotificationsScreen() {
   const router = useRouter();
-  const goBack = useSafeBack('/doctor');
   const { uid } = useAuth();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const [error, setError] = useState('');
@@ -128,7 +126,30 @@ export default function DoctorNotificationsScreen() {
         color: entry.severity === 'warning' ? '#D9364F' : homeColors.green,
         background: entry.severity === 'warning' ? '#FBE6E9' : homeColors.greenTint,
       }));
-    const list = [...messageNotices, ...verificationNotices, ...toNotices(appointments)];
+    // A patient logged a critical reading (D28). The alert is tagged with the booking behind the patient's share, so the
+    // patient is found in this doctor's own bookings; tapping opens that patient's profile and readings.
+    const patientOfBooking = new Map(appointments.map((booking) => [booking.id, booking.patientId]));
+    const criticalNotices: Notice[] = stored
+      .filter((entry) => entry.type === 'glucose_alert')
+      .map((entry) => {
+        const patientId = patientOfBooking.get(entry.relatedId) ?? '';
+        return {
+          id: entry.id,
+          patientId,
+          notificationId: entry.id,
+          // Unknown patient (the booking is not in the list yet): fall back to the consultation.
+          bookingId: patientId ? undefined : entry.relatedId || undefined,
+          unread: !entry.isRead,
+          title: 'Critical reading',
+          detail: entry.message,
+          when: entry.sentAt,
+          icon: 'exclamationmark.triangle.fill' as const,
+          iconAndroid: 'warning' as const,
+          color: '#D9364F',
+          background: '#FBE6E9',
+        };
+      });
+    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...toNotices(appointments)];
     // Pending requests first, then most recent — the doctor's action queue
     // matters more than strict chronology.
     return list.sort((a, b) => {
@@ -141,11 +162,11 @@ export default function DoctorNotificationsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Notifications" subtitle="Booking activity from your patients" onBack={() => goBack()} />
+      <DoctorHeader title="Notifications" subtitle="Booking activity and critical readings from your patients" />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
         {notices.length === 0 ? (
-          <EmptyState icon="bell.fill" iconAndroid="inbox" title="Nothing yet" detail="Booking requests and updates from your patients will show up here." />
+          <EmptyState icon="bell.fill" iconAndroid="inbox" title="Nothing yet" detail="Booking requests, updates and critical readings from your patients will show up here." />
         ) : notices.map((notice) => (
           <Pressable
             key={notice.id}
@@ -166,6 +187,7 @@ export default function DoctorNotificationsScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      <DoctorBottomNav active="notifications" />
     </View>
   );
 }

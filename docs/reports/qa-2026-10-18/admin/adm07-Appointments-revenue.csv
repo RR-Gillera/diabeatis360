@@ -1,0 +1,7 @@
+﻿"Date & time","Patient","Doctor","Status","Payment","Fee (PHP)","Commission 15% (PHP)"
+"Oct 23, 2026, 9:00 AM","Ben Premium","Dr. Jose Rizal Santos","Confirmed","Paid","500.00","75.00"
+"Oct 22, 2026, 10:00 AM","Hugo PhoneB","Dr. Karla Reyes","Completed","Pay on-site","650.00","97.50"
+"Oct 21, 2026, 3:00 PM","Hugo PhoneB","Dr. Karla Reyes","Declined","Unpaid","650.00","97.50"
+"Oct 20, 2026, 2:00 PM","Ivy Third-Updated","Dr. Jose Rizal Santos","Pending","Unpaid","500.00","75.00"
+"Oct 20, 2026, 10:00 AM","Gina PhoneA","Dr. Jose Rizal Santos","Completed","Paid","500.00","75.00"
+"Oct 18, 2026, 9:30 AM","Ivy Third-Updated","Dr. Karla Reyes","Declined","Unpaid","650.00","97.50"

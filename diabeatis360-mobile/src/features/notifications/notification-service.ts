@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, updateDoc, where, writeBatch } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 import { glucoseDirection, interpretGlucose } from '@/constants/glucose';
@@ -114,6 +114,16 @@ export function subscribeToNotifications(
 
 export async function markNotificationRead(notificationId: string) {
   await updateDoc(doc(db, 'Notifications', notificationId), { is_read: true });
+}
+
+/** "Mark all as read" (Figma P-22): one batched write, so it either all happens or none of it does. */
+export async function markAllNotificationsRead(notificationIds: string[]) {
+  // A Firestore batch holds at most 500 writes; a person never has that many unread, but split to be safe.
+  for (let start = 0; start < notificationIds.length; start += 500) {
+    const batch = writeBatch(db);
+    for (const id of notificationIds.slice(start, start + 500)) batch.update(doc(db, 'Notifications', id), { is_read: true });
+    await batch.commit();
+  }
 }
 
 /**

@@ -9,6 +9,7 @@ import { subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor
 import { DoctorBottomNav, DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
+import { resetTo } from '@/lib/navigation';
 
 // The fields a patient actually sees on the Find a Doctor card — which is why
 // leaving them blank makes a doctor effectively unbookable.
@@ -133,7 +134,7 @@ export default function DoctorProfileScreen() {
           <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />
         </Pressable>
 
-        <Pressable onPress={() => { signOut(); router.replace('/'); }}><Text style={styles.logout}>Log out</Text></Pressable>
+        <Pressable onPress={() => { signOut(); resetTo(router, '/'); }}><Text style={styles.logout}>Log out</Text></Pressable>
       </ScrollView>
       <DoctorBottomNav active="profile" />
     </View>

@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 
 import { birthdateToTimestamp } from './birthdate';
+import { allergiesDeclared, birthdateText } from './health-profile';
+import { firstUnansweredStep } from './onboarding-steps';
 
 import { db } from '@/firebase';
 
@@ -35,13 +37,13 @@ export async function hasCompletedOnboarding(email: string, uid?: string | null)
       const data = snapshot.data();
       if (data?.onboarding_completed === true) return true;
 
-      // Accounts that finished onboarding before this flag existed still need
-      // to be recognised, so fall back to evidence that they went through it.
+      // A doctor an admin added (Add Provider) never runs onboarding; their Providers record is the proof.
+      // There is no other shortcut any more: "has a birthdate or a diabetes type" used to count as finished, so a
+      // person who stopped at the Allergies step was never asked about allergies (DECISIONS.md D25).
       if (data?.role === 'doctor') {
         const provider = await getDoc(doc(db, 'Providers', uid));
         if (provider.exists()) return true;
       }
-      if (data?.birthdate || data?.diabetes_type || data?.activity_level || data?.dietary_preference) return true;
     } catch {
       // Offline or permission trouble — fall through to the local flag rather
       // than locking a legitimate user out of their own account.
@@ -50,7 +52,45 @@ export async function hasCompletedOnboarding(email: string, uid?: string | null)
   return (await AsyncStorage.getItem(`diabeatis360:onboarding:${email.trim().toLowerCase()}`)) === 'complete';
 }
 
+/**
+ * The onboarding screen to open for someone who has not finished: the first question without an answer, read from
+ * the Users document first and this phone's copy second (DECISIONS.md D25).
+ */
+export async function onboardingStartPath(email: string, uid?: string | null) {
+  const local = async (key: string) => (await getOnboardingValue(email, key)) ?? '';
+  let data: Record<string, unknown> = {};
+  let guardianSubmitted = false;
+  if (uid) {
+    try {
+      data = (await getDoc(doc(db, 'Users', uid))).data() ?? {};
+      if (data.account_type === 'minor') guardianSubmitted = (await getDoc(doc(db, 'Guardian_Verifications', uid))).exists();
+    } catch { /* offline: this phone's answers below */ }
+  }
+  return firstUnansweredStep({
+    language: String(data.language_preference ?? '') || await local('language'),
+    profileType: String(data.role ?? '') || await local('profileType'),
+    accountType: String(data.account_type ?? '') || await local('accountType'),
+    guardianSubmitted,
+    dateOfBirth: birthdateText(data.birthdate) || await local('dateOfBirth'),
+    condition: String(data.diabetes_type ?? '') || await local('condition'),
+    allergy: String(data.allergies ?? '') || await local('allergy'),
+    activity: String(data.activity_level ?? '') || await local('activity'),
+    diet: String(data.dietary_preference ?? '') || await local('diet'),
+  });
+}
+
+/** Thrown by completeOnboarding when a patient has not answered the allergy question; the screen sends them back to it. */
+export const ALLERGIES_MISSING = 'onboarding/allergies-missing';
+
 export async function completeOnboarding(email: string, profileType: 'patient' | 'doctor', uid?: string | null) {
+  // A patient cannot finish without answering the allergy question ("None" counts): AI suggestions depend on it.
+  if (profileType === 'patient') {
+    let stored: unknown = await getOnboardingValue(email, 'allergy');
+    if (uid && !allergiesDeclared(stored)) {
+      try { stored = (await getDoc(doc(db, 'Users', uid))).data()?.allergies; } catch { /* keep the local answer */ }
+    }
+    if (!allergiesDeclared(stored)) throw new Error(ALLERGIES_MISSING);
+  }
   await AsyncStorage.setItem(`diabeatis360:onboarding:${email.trim().toLowerCase()}`, 'complete');
   await AsyncStorage.setItem(`diabeatis360:profile:${email.trim().toLowerCase()}`, profileType);
   if (!uid) return;

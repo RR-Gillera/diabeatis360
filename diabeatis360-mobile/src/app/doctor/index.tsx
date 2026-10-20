@@ -3,81 +3,71 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { PLATFORM_COMMISSION_RATE } from '@/constants/commission';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { subscribeToBookingsForProvider, updateBookingStatus } from '@/features/booking/booking-service';
+import { initialsOf } from '@/features/booking/appointment-tabs';
+import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatFee } from '@/features/booking/booking-ui';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
-import { DoctorBottomNav, doctorStyles, EmptyState, StatusPill } from '@/features/doctor/doctor-ui';
+import { dashboardStats } from '@/features/doctor/doctor-stats';
+import { DoctorBottomNav, doctorStyles } from '@/features/doctor/doctor-ui';
 import type { DoctorProfile } from '@/features/doctor/types';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
-import { subscribeToNotifications } from '@/features/notifications/notification-service';
+import { shortTime } from '@/features/notifications/notification-display';
+import { subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
 
-function isSameDay(a: Date | null, b: Date) {
-  return Boolean(a) && a!.toDateString() === b.toDateString();
-}
-
+// The doctor's dashboard (Figma "Dashboard Earnings and Notifications", DECISIONS D24): today's numbers, the next
+// confirmed appointment and recent activity. Earnings are recorded amounts (payments are a demo), after the 15%
+// platform commission (D3). The frame's "Available 24/7" card is not built (D24).
 export default function DoctorHomeScreen() {
   const router = useRouter();
   const { uid, displayName } = useAuth();
-  const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
+  // null until the first answer arrives, so the cards show "—" instead of a misleading 0 while loading.
+  const [appointments, setAppointments] = useState<ProviderBookingEntry[] | null>(null);
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
+  const [activity, setActivity] = useState<NotificationEntry[]>([]);
   const [error, setError] = useState('');
-  const [actingOn, setActingOn] = useState<string | null>(null);
-  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     if (!uid) return;
     return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
   }, [uid]);
-
   useEffect(() => {
     if (!uid) return;
     return subscribeToDoctorProfile(uid, setProfile, () => {});
   }, [uid]);
-
   useEffect(() => {
     if (!uid) return;
-    return subscribeToNotifications(uid, (items) => setUnread(items.filter((item) => !item.isRead).length), () => {});
+    return subscribeToNotifications(uid, setActivity, () => {});
   }, [uid]);
 
-  const stats = useMemo(() => {
-    const today = new Date();
-    const pending = appointments.filter((entry) => entry.status === 'pending');
-    const todays = appointments.filter((entry) => isSameDay(entry.scheduledAt, today) && entry.status !== 'declined' && entry.status !== 'cancelled');
-    const patients = new Set(appointments.map((entry) => entry.patientId));
-    return { pending, todays, patientCount: patients.size };
-  }, [appointments]);
-
-  const upcoming = useMemo(() => appointments
-    .filter((entry) => entry.status === 'confirmed' && entry.scheduledAt && entry.scheduledAt >= new Date())
-    .slice(0, 3), [appointments]);
-
-  const decide = async (bookingId: string, status: 'confirmed' | 'declined') => {
-    setActingOn(bookingId);
-    try { await updateBookingStatus(bookingId, status); } finally { setActingOn(null); }
-  };
+  const [openedAt] = useState(() => new Date());
+  const stats = useMemo(() => dashboardStats(appointments ?? [], PLATFORM_COMMISSION_RATE, openedAt), [appointments, openedAt]);
+  const show = (value: string | number) => (appointments === null ? '—' : value);
+  const next = useMemo(() => (appointments ?? [])
+    .filter((entry) => entry.status === 'confirmed' && entry.scheduledAt && entry.scheduledAt.getTime() >= openedAt.getTime() - 60 * 60 * 1000)
+    .sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0))[0] ?? null, [appointments, openedAt]);
 
   // A name that already starts with "Dr." must not become "Dr. Dr.".
   const firstName = (displayName ?? profile?.fullName ?? 'Doctor').trim().replace(/^dr\.?\s+/i, '').split(' ')[0];
-  const hour = new Date().getHours();
+  const hour = openedAt.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  // A doctor with no specialty/licence/fee can't be meaningfully booked, so the
-  // dashboard nudges them to finish it rather than silently listing them blank.
+  // A doctor with no specialty/licence/fee can't be meaningfully booked, so the dashboard nudges them to finish it.
   const profileIncomplete = profile && (!profile.specialty || !profile.prcLicenseNumber || !profile.city || !profile.consultationFee);
+  const nextIsToday = next?.scheduledAt ? next.scheduledAt.toDateString() === openedAt.toDateString() : false;
 
   return (
     <View style={doctorStyles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={styles.hello}>Hello,</Text>
-            <Text style={styles.greeting}>{greeting},{'\n'}Dr. {firstName}!</Text>
+            <Text style={styles.greeting}>{greeting}, Dr. {firstName}!</Text>
+            <Text style={styles.date}>{openedAt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
           </View>
-          <Pressable style={styles.bellButton} onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}>
-            <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-            {stats.pending.length + unread ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{stats.pending.length + unread > 9 ? '9+' : stats.pending.length + unread}</Text></View> : null}
+          <Pressable accessibilityRole="button" accessibilityLabel="Profile" style={styles.me} onPress={() => router.navigate('/doctor/profile')}>
+            <Text style={styles.meText}>{initialsOf(profile?.fullName ?? displayName)}</Text>
           </Pressable>
         </View>
 
@@ -95,80 +85,58 @@ export default function DoctorHomeScreen() {
           </Pressable>
         ) : null}
 
-        <View style={styles.statRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.todays.length}</Text>
-            <Text style={styles.statLabel}>Today</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={[styles.statValue, stats.pending.length ? styles.statValueAlert : null]}>{stats.pending.length}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.patientCount}</Text>
-            <Text style={styles.statLabel}>Patients</Text>
-          </View>
-        </View>
-
-        <View style={styles.sectionHeader}>
-          <Text style={doctorStyles.sectionTitle}>Pending Requests</Text>
-          {stats.pending.length > 2 ? (
-            <Pressable onPress={() => router.push('/doctor/appointments')}><Text style={styles.seeAll}>See All</Text></Pressable>
-          ) : null}
-        </View>
-
-        {stats.pending.length === 0 ? (
-          <View style={styles.gutter}>
-            <EmptyState icon="checkmark.circle.fill" iconAndroid="check_circle" title="No pending requests" detail="New booking requests from patients will show up here." />
-          </View>
-        ) : stats.pending.slice(0, 2).map((entry) => (
-          <View key={entry.id} style={[doctorStyles.card, styles.requestCard]}>
-            <View style={styles.requestTop}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{entry.patientName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
-              <View style={styles.requestCopy}>
-                <Text style={styles.patientName}>{entry.patientName}</Text>
-                <Text style={styles.requestMeta}>
-                  {entry.scheduledAt ? entry.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-                  {entry.scheduledAt ? ` · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''} · {formatFee(entry.fee)}
-                </Text>
-              </View>
-              <StatusPill status={entry.status} />
+        <View style={styles.grid}>
+          <View style={styles.stat}><Text style={styles.statLabel}>TODAY&apos;S{'\n'}APPOINTMENTS</Text><Text style={styles.statValue}>{show(stats.today)}</Text></View>
+          <Pressable accessibilityRole="button" style={styles.stat} onPress={() => router.navigate('/doctor/appointments')}>
+            <Text style={styles.statLabel}>PENDING{'\n'}REQUESTS</Text>
+            <View style={styles.statRow}>
+              <Text style={styles.statValue}>{show(stats.pending)}</Text>
+              {stats.pending ? <View style={styles.newPill}><Text style={styles.newText}>New</Text></View> : null}
             </View>
-            <View style={styles.actions}>
-              <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'declined')} style={[styles.actionButton, styles.declineButton]}>
-                <Text style={styles.declineText}>Decline</Text>
-              </Pressable>
-              <Pressable disabled={actingOn === entry.id} onPress={() => decide(entry.id, 'confirmed')} style={[styles.actionButton, styles.acceptButton]}>
-                <Text style={styles.acceptText}>{actingOn === entry.id ? 'Saving...' : 'Accept'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        ))}
-
-        <View style={styles.sectionHeader}>
-          <Text style={doctorStyles.sectionTitle}>Upcoming</Text>
-        </View>
-        {upcoming.length === 0 ? (
-          <View style={styles.gutter}>
-            <EmptyState icon="calendar" iconAndroid="event_available" title="Nothing scheduled" detail="Accepted appointments will appear here." />
-          </View>
-        ) : upcoming.map((entry) => (
-          <Pressable key={entry.id} style={[doctorStyles.card, styles.upcomingCard]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
-            <View style={styles.avatarSmall}><Text style={styles.avatarTextSmall}>{entry.patientName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
-            <View style={styles.requestCopy}>
-              <Text style={styles.patientName}>{entry.patientName}</Text>
-              <Text style={styles.requestMeta}>
-                {entry.scheduledAt ? entry.scheduledAt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '—'}
-                {entry.scheduledAt ? ` · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
-              </Text>
-            </View>
-            <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={homeColors.textFaint} />
           </Pressable>
-        ))}
-
-        <View style={styles.sectionHeader}>
-          <Text style={doctorStyles.sectionTitle}>Quick Actions</Text>
+          <Pressable accessibilityRole="button" style={styles.stat} onPress={() => router.navigate('/doctor/history' as never)}>
+            <Text style={styles.statLabel}>COMPLETED</Text><Text style={styles.statValue}>{show(stats.completed)}</Text>
+          </Pressable>
+          <View style={styles.stat}><Text style={styles.statLabel}>TOTAL EARNINGS</Text><Text style={styles.statValue} adjustsFontSizeToFit numberOfLines={1}>{show(formatFee(stats.earnings))}</Text></View>
         </View>
+        <Text style={styles.footnote}>Earnings: recorded fees of paid consultations, after the 15% platform commission. Payments are a demo.</Text>
+
+        <Text style={[doctorStyles.sectionTitle, styles.section]}>Upcoming Appointment</Text>
+        {appointments === null ? null : next ? (
+          <View style={[doctorStyles.card, styles.nextCard]}>
+            <View style={styles.nextTop}>
+              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(next.patientName)}</Text></View>
+              <View style={styles.nextCopy}>
+                <Text style={styles.nextName}>{next.patientName}</Text>
+                <Text style={styles.nextMeta}>Diabetes consultation</Text>
+              </View>
+              <View style={styles.nextWhen}>
+                <Text style={styles.nextDay}>{nextIsToday ? 'Today' : next.scheduledAt?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                <Text style={styles.nextTime}>{next.scheduledAt?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</Text>
+              </View>
+            </View>
+            <Pressable accessibilityRole="button" style={styles.primary} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: next.id } })}>
+              <Text style={styles.primaryText}>View Consultation</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={[doctorStyles.card, styles.gutterCard]}><Text style={styles.muted}>No confirmed appointments coming up.</Text></View>
+        )}
+
+        <View style={styles.sectionRow}>
+          <Text style={doctorStyles.sectionTitle}>Recent Activity</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/doctor/notifications')}><Text style={styles.seeAll}>See all</Text></Pressable>
+        </View>
+        <View style={[doctorStyles.card, styles.gutterCard]}>
+          {activity.length === 0 ? <Text style={styles.muted}>Nothing yet.</Text> : activity.slice(0, 3).map((item, index) => (
+            <View key={item.id} style={[styles.activityRow, index > 0 && styles.activityDivider]}>
+              <Text style={styles.activityText}>{item.message}</Text>
+              <Text style={styles.activityWhen}>{shortTime(item.sentAt, openedAt)}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text style={[doctorStyles.sectionTitle, styles.section]}>Quick Actions</Text>
         <View style={styles.quickRow}>
           <Pressable style={styles.quickCard} onPress={() => router.push('/doctor/schedule')}>
             <View style={styles.quickIcon}><SymbolView name={{ ios: 'clock.fill', android: 'schedule', web: 'schedule' }} size={18} tintColor={homeColors.green} /></View>
@@ -188,42 +156,47 @@ export default function DoctorHomeScreen() {
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 140 },
   gutter: { marginHorizontal: 24 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 24, paddingHorizontal: 24, paddingTop: 48 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomColor: homeColors.border, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 20, paddingHorizontal: 24, paddingTop: 16 },
   headerCopy: { flex: 1 },
-  hello: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500' },
-  greeting: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 24, fontWeight: '800', lineHeight: 32, marginTop: 2 },
-  bellButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.border, borderRadius: 22, borderWidth: 1, height: 44, justifyContent: 'center', width: 44 },
-  bellDot: { alignItems: 'center', backgroundColor: homeColors.red, borderColor: '#FFF', borderRadius: 9, borderWidth: 2, height: 18, justifyContent: 'center', minWidth: 18, paddingHorizontal: 3, position: 'absolute', right: 4, top: 4 },
-  bellDotText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 9, fontWeight: '800' },
+  greeting: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 22, fontWeight: '900' },
+  date: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, marginTop: 4 },
+  me: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  meText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   alert: { alignItems: 'center', backgroundColor: 'rgba(251, 146, 60, 0.08)', borderRadius: 16, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 20, padding: 16 },
   alertIcon: { alignItems: 'center', backgroundColor: 'rgba(251, 146, 60, 0.14)', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
   alertCopy: { flex: 1 },
   alertTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   alertText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18, marginTop: 2 },
-  statRow: { flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 24 },
-  statCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flex: 1, paddingVertical: 20, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
-  statValue: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 28, fontWeight: '800' },
-  statValueAlert: { color: '#B45309' },
-  statLabel: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600', marginTop: 2 },
-  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 24, marginTop: 32 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginHorizontal: 24, marginTop: 20 },
+  stat: { backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flexBasis: '46%', flexGrow: 1, gap: 8, padding: 16 },
+  statLabel: { color: '#64748B', fontFamily: Fonts.sans, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },
+  statValue: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 28, fontWeight: '900' },
+  statRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  newPill: { backgroundColor: homeColors.greenTint, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  newText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700' },
+  footnote: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, lineHeight: 16, marginHorizontal: 24, marginTop: 8 },
+  section: { marginHorizontal: 24, marginTop: 28 },
+  sectionRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 24, marginTop: 28 },
   seeAll: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
-  requestCard: { gap: 16, marginHorizontal: 24, marginTop: 16 },
-  requestTop: { alignItems: 'center', flexDirection: 'row', gap: 14 },
-  requestCopy: { flex: 1 },
-  avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
-  avatarSmall: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  avatarTextSmall: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
-  patientName: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
-  requestMeta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 3 },
-  actions: { flexDirection: 'row', gap: 12 },
-  actionButton: { alignItems: 'center', borderRadius: 12, flex: 1, justifyContent: 'center', minHeight: 46 },
-  acceptButton: { backgroundColor: homeColors.green },
-  acceptText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
-  declineButton: { backgroundColor: '#FBE6E9' },
-  declineText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
-  upcomingCard: { alignItems: 'center', flexDirection: 'row', gap: 14, marginHorizontal: 24, marginTop: 12 },
-  quickRow: { flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 16 },
+  nextCard: { borderColor: 'rgba(98, 156, 44, 0.3)', gap: 16, marginHorizontal: 24, marginTop: 14 },
+  nextTop: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 14, height: 52, justifyContent: 'center', width: 52 },
+  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
+  nextCopy: { flex: 1 },
+  nextName: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
+  nextMeta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, marginTop: 2 },
+  nextWhen: { alignItems: 'flex-end' },
+  nextDay: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  nextTime: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600' },
+  primary: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 999, justifyContent: 'center', minHeight: 50 },
+  primaryText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  gutterCard: { marginHorizontal: 24, marginTop: 14 },
+  muted: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14 },
+  activityRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, paddingVertical: 12 },
+  activityDivider: { borderTopColor: homeColors.border, borderTopWidth: 1 },
+  activityText: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
+  activityWhen: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
+  quickRow: { flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 14 },
   quickCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flex: 1, gap: 10, paddingVertical: 20 },
   quickIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   quickText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },

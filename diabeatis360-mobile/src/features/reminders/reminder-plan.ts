@@ -19,36 +19,23 @@ export const DAILY_REMINDERS: Record<Exclude<ReminderCategory, 'appointment'>, D
 /** How far ahead of a confirmed appointment the reminder rings. */
 export const APPOINTMENT_LEAD_MINUTES = 60;
 
-// The onboarding "Notification Setup" screen has five switches. Each switch turns on a group of the six categories,
-// so the existing screen (Figma) needs no new settings page.
-const CATEGORIES_BY_SWITCH: Record<string, ReminderCategory[]> = {
-  'Blood Sugar Reminders': ['glucose', 'meal', 'medication'],
-  'Activity Goals': ['exercise', 'hydration'],
-  'Telehealth Messages': ['appointment'],
-};
+// Every category is always on (DECISIONS.md D29): the onboarding switches were removed, because a patient who wants
+// help with their health should not be one tap away from turning it off. The phone's own notification setting for the
+// app is the only off-switch.
 
 
 export type PlannedReminder = { title: string; body: string; when: { hour: number; minute: number } | { date: Date } };
 
-/** Pure planning step (no phone APIs): which notifications should exist for these switches and appointments. */
-export function planReminders(switches: Record<string, boolean>, appointments: Date[], now = new Date()): PlannedReminder[] {
-  const active = new Set<ReminderCategory>();
-  for (const [name, categories] of Object.entries(CATEGORIES_BY_SWITCH)) {
-    // A switch that was never saved counts as ON, the same default the onboarding screen shows.
-    if (switches[name] !== false) categories.forEach((category) => active.add(category));
-  }
-
+/** Pure planning step (no phone APIs): every daily reminder, plus one before each upcoming appointment. */
+export function planReminders(appointments: Date[], now = new Date()): PlannedReminder[] {
   const planned: PlannedReminder[] = [];
-  for (const [category, reminder] of Object.entries(DAILY_REMINDERS)) {
-    if (!active.has(category as ReminderCategory)) continue;
+  for (const reminder of Object.values(DAILY_REMINDERS)) {
     for (const [hour, minute] of reminder.times) planned.push({ title: reminder.title, body: reminder.body, when: { hour, minute } });
   }
-  if (active.has('appointment')) {
-    for (const start of appointments) {
-      const date = new Date(start.getTime() - APPOINTMENT_LEAD_MINUTES * 60_000);
-      if (date.getTime() > now.getTime()) {
-        planned.push({ title: 'Appointment soon', body: `Your consultation starts in ${APPOINTMENT_LEAD_MINUTES} minutes.`, when: { date } });
-      }
+  for (const start of appointments) {
+    const date = new Date(start.getTime() - APPOINTMENT_LEAD_MINUTES * 60_000);
+    if (date.getTime() > now.getTime()) {
+      planned.push({ title: 'Appointment soon', body: `Your consultation starts in ${APPOINTMENT_LEAD_MINUTES} minutes.`, when: { date } });
     }
   }
   return planned;

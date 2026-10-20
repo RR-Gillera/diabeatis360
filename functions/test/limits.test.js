@@ -2,7 +2,9 @@
 const assert = require('node:assert/strict')
 const { test } = require('node:test')
 
-const { FREE_LIMITS, checkLimit, countToday, hasPremium, startOfManilaDay } = require('../lib/limits')
+const {
+  DEFAULT_PROJECT_DAILY_CAP, FREE_LIMITS, PREMIUM_LIMITS, allowanceFor, checkLimit, countToday, hasPremium, manilaDayKey, projectDailyCap, startOfManilaDay,
+} = require('../lib/limits')
 
 test('free limits match the manuscript: 2 AI generations and 3 scans a day', () => {
   assert.deepEqual(FREE_LIMITS, { ai: 2, scan: 3 })
@@ -40,9 +42,31 @@ test('hasPremium needs an unexpired subscription that is active or cancelled-but
   assert.equal(hasPremium([], now), false)
 })
 
-test('checkLimit: free users stop at the limit, premium never does', () => {
-  assert.deepEqual(checkLimit({ feature: 'ai', premium: false, usedToday: 1 }), { allowed: true, used: 1, limit: 2 })
-  assert.deepEqual(checkLimit({ feature: 'ai', premium: false, usedToday: 2 }), { allowed: false, used: 2, limit: 2 })
-  assert.deepEqual(checkLimit({ feature: 'scan', premium: false, usedToday: 3 }), { allowed: false, used: 3, limit: 3 })
-  assert.deepEqual(checkLimit({ feature: 'scan', premium: true, usedToday: 99 }), { allowed: true, used: 99, limit: null })
+test('checkLimit: free users stop at the free limit, premium at the fair-use ceiling', () => {
+  assert.deepEqual(checkLimit({ feature: 'ai', premium: false, usedToday: 1 }), { allowed: true, used: 1, limit: 2, scope: 'free' })
+  assert.deepEqual(checkLimit({ feature: 'ai', premium: false, usedToday: 2 }), { allowed: false, used: 2, limit: 2, scope: 'free' })
+  assert.deepEqual(checkLimit({ feature: 'scan', premium: false, usedToday: 3 }), { allowed: false, used: 3, limit: 3, scope: 'free' })
+  assert.deepEqual(checkLimit({ feature: 'scan', premium: true, usedToday: 29 }), { allowed: true, used: 29, limit: 30, scope: 'fair_use' })
+  assert.deepEqual(checkLimit({ feature: 'scan', premium: true, usedToday: 30 }), { allowed: false, used: 30, limit: 30, scope: 'fair_use' })
+})
+
+test('premium is "unlimited" in the app but has a fair-use ceiling far above normal use (D20)', () => {
+  assert.deepEqual(PREMIUM_LIMITS, { ai: 30, scan: 30 })
+  assert.ok(PREMIUM_LIMITS.ai > FREE_LIMITS.ai * 5 && PREMIUM_LIMITS.scan > FREE_LIMITS.scan * 5)
+  assert.deepEqual(allowanceFor('ai', false), { limit: 2, scope: 'free' })
+  assert.deepEqual(allowanceFor('ai', true), { limit: 30, scope: 'fair_use' })
+})
+
+test('the project-wide daily cap defaults to 200 and can be set with GEMINI_DAILY_CAP', () => {
+  assert.equal(DEFAULT_PROJECT_DAILY_CAP, 200)
+  assert.equal(projectDailyCap({}), 200)
+  assert.equal(projectDailyCap({ GEMINI_DAILY_CAP: '120' }), 120)
+  // A typo must never switch the cap off or make it negative: anything that is not a positive whole number is ignored.
+  for (const bad of ['', 'abc', '0', '-5', '12.5', 'Infinity']) assert.equal(projectDailyCap({ GEMINI_DAILY_CAP: bad }), 200, bad)
+})
+
+test('manilaDayKey is the Manila calendar day, so counters reset at midnight Manila time', () => {
+  assert.equal(manilaDayKey(new Date('2026-09-26T20:00:00Z')), '2026-09-27') // 04:00 on the 27th in Manila
+  assert.equal(manilaDayKey(new Date('2026-09-26T15:59:59Z')), '2026-09-26') // 23:59:59 on the 26th in Manila
+  assert.equal(manilaDayKey(new Date('2026-09-26T16:00:00Z')), '2026-09-27') // exactly midnight in Manila
 })

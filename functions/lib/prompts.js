@@ -19,6 +19,9 @@ const SYSTEM_RULES = [
 const LANGUAGE_NAMES = { English: 'English', Filipino: 'Filipino (Tagalog)' }
 
 /** "Peanuts, Shellfish; dairy" -> ['peanuts', 'shellfish', 'dairy']. "None" or empty -> []. */
+// Older app versions saved 'Pre-Diabetic'; the app's code is 'Prediabetes' (DECISIONS.md D25).
+const diabetesTypeOf = (value) => (/^pre-?diabet(ic|es)$/i.test(String(value ?? '').trim()) ? 'Prediabetes' : String(value ?? '').trim())
+
 function parseAllergens(value) {
   const list = Array.isArray(value) ? value : String(value ?? '').split(/[,;\n]/)
   return list
@@ -44,7 +47,7 @@ function containsAllergen(text, allergens) {
 function describeProfile(profile) {
   const allergens = parseAllergens(profile.allergies)
   return [
-    `Diabetes type: ${profile.diabetes_type || 'not stated'}`,
+    `Diabetes type: ${diabetesTypeOf(profile.diabetes_type) || 'not stated'}`,
     `Allergies (must avoid): ${allergens.length ? allergens.join(', ') : 'none declared'}`,
     `Dietary preference: ${profile.dietary_preference || 'not stated'}`,
     `Activity level: ${profile.activity_level || 'not stated'}`,

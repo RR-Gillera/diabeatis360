@@ -89,7 +89,7 @@ export default function PlansTab({ plans }) {
           <TextField label="Price (₱)" type="number" min="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
           <TextField label="Duration (days)" type="number" min="0" value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: e.target.value })} />
           <div className="flex items-end gap-2">
-            <Button type="submit" disabled={busy}>{editingId ? 'Save changes' : 'Add plan'}</Button>
+            <Button type="submit" disabled={busy}>{busy ? 'Saving…' : editingId ? 'Save changes' : 'Add plan'}</Button>
             {editingId ? <Button variant="ghost" onClick={reset}>Cancel</Button> : null}
           </div>
         </form>

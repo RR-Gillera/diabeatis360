@@ -1,7 +1,12 @@
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { MoreMenu } from '@/components/ui/more-menu';
 import { Brand, Fonts, Spacing } from '@/constants/theme';
+import { NotificationBell } from '@/features/notifications/notification-bell';
+
+import { slotInstant } from './manila-time';
 
 export const bookingColors = {
   navy: '#10182D',
@@ -37,14 +42,19 @@ export function BookingHeader({ title, subtitle, onBack, actions }: { title: str
 export function BookingHeaderActions() {
   return (
     <View style={styles.headerActions}>
-      <Pressable style={styles.headerActionButton} onPress={() => Alert.alert('Notifications', 'You are all caught up.')}>
-        <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-      </Pressable>
-      <Pressable style={styles.headerActionButton} onPress={() => Alert.alert('Coming Soon', 'More options are on the way.')}>
-        <SymbolView name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={16} tintColor="#64748B" />
-      </Pressable>
+      <NotificationBell style={styles.headerActionButton} />
+      <BookingMoreMenu style={styles.headerActionButton} />
     </View>
   );
+}
+
+/** The three-dots menu on the patient's booking screens (DECISIONS D24): My appointments and Notifications. */
+export function BookingMoreMenu({ style }: { style?: StyleProp<ViewStyle> }) {
+  const router = useRouter();
+  return <MoreMenu style={style} items={[
+    { label: 'My appointments', icon: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, onPress: () => router.push('/booking/my-appointments' as never) },
+    { label: 'Notifications', icon: { ios: 'bell', android: 'notifications', web: 'notifications' }, onPress: () => router.push('/notifications') },
+  ]} />;
 }
 
 export function PrimaryButton({ title, onPress, disabled, loading }: { title: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
@@ -65,16 +75,10 @@ export function formatDate(value: Date) {
 
 // Merges a calendar day (from the date picker, time defaults to midnight)
 // with a "09:30 AM"-style slot label into one real Date — the value actually
-// persisted as a booking's scheduled_at.
+// persisted as a booking's scheduled_at. The time is Philippine time (DECISIONS.md D26), so a phone set to another
+// time zone still books the clinic's 09:30 AM.
 export function combineDateAndTime(date: Date, time: string): Date {
-  const match = /^(\d{1,2}):(\d{2})\s?(AM|PM)$/i.exec(time.trim());
-  if (!match) return date;
-  const [, hourText, minuteText, meridiem] = match;
-  let hour = Number(hourText) % 12;
-  if (meridiem.toUpperCase() === 'PM') hour += 12;
-  const combined = new Date(date);
-  combined.setHours(hour, Number(minuteText), 0, 0);
-  return combined;
+  return slotInstant(date, time) ?? date;
 }
 
 export const styles = StyleSheet.create({
