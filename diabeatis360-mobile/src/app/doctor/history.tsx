@@ -58,7 +58,7 @@ export default function DoctorHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: 12, padding: 24, paddingBottom: 140, paddingTop: 56 },
+  scroll: { gap: 12, padding: 24, paddingBottom: 140, paddingTop: 16 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
   subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, marginBottom: 6, marginTop: -6 },
   empty: { alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingTop: 120 },

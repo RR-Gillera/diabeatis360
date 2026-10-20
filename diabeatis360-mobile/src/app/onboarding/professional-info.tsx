@@ -10,6 +10,7 @@ import { birthdateToTimestamp } from '@/features/auth/birthdate';
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { db } from '@/firebase';
+import { resetTo } from '@/lib/navigation';
 
 // Kept in step with the specialty filter pills on the patient's Find a Doctor
 // screen — a specialty picked here that isn't in that list would make the
@@ -77,7 +78,7 @@ export default function ProfessionalInfoScreen() {
       }
       await saveOnboardingValue(email, 'specialty', specialty, uid);
       await completeOnboarding(email, 'doctor', uid);
-      router.replace('/doctor');
+      resetTo(router, '/doctor');
     } catch (value) {
       setError(value instanceof Error ? value.message : 'Unable to submit your credentials.');
     } finally {

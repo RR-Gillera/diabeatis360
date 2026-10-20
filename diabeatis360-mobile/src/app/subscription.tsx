@@ -242,7 +242,7 @@ export default function SubscriptionScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  scroll: { gap: 14, padding: 24, paddingBottom: 140, paddingTop: 48 },
+  scroll: { gap: 14, padding: 24, paddingBottom: 140, paddingTop: 16 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 28, fontWeight: '900', marginTop: 8 },
   subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 15, marginTop: -10 },
   error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },

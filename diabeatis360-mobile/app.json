@@ -65,6 +65,12 @@
         "projectId": "767c82a9-35d4-4d2a-a326-2f116edd5637"
       }
     },
-    "owner": "diabeatis360"
+    "owner": "diabeatis360",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/767c82a9-35d4-4d2a-a326-2f116edd5637"
+    }
   }
 }

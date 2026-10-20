@@ -156,7 +156,7 @@ export default function DoctorHomeScreen() {
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 140 },
   gutter: { marginHorizontal: 24 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomColor: homeColors.border, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 20, paddingHorizontal: 24, paddingTop: 52 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomColor: homeColors.border, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 20, paddingHorizontal: 24, paddingTop: 16 },
   headerCopy: { flex: 1 },
   greeting: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 22, fontWeight: '900' },
   date: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, marginTop: 4 },

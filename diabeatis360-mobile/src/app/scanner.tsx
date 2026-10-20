@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 
 import { AppText } from '@/components/ui/app-text';
@@ -34,6 +35,8 @@ function splitDataUrl(value: string): { base64: string; mimeType: 'image/jpeg' |
 // is not saved yet (or a product without one) needs a label photo: it goes to the analyzeLabel Cloud Function, which
 // asks Gemini; the photo is never stored (D2). Free plan: 3 photo scans a day, enforced on the server.
 export default function ScannerScreen() {
+  // The camera fills the whole screen, under the status bar too; the controls on top start below it (screen-top.ts).
+  const { top: statusBarHeight } = useSafeAreaInsets();
   const router = useRouter();
   const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
@@ -146,7 +149,7 @@ export default function ScannerScreen() {
   if (phase === 'result' && analysis) {
     return (
       <View style={styles.light}>
-        <View style={styles.resultHeader}>
+        <View style={[styles.resultHeader, { paddingTop: statusBarHeight + 12 }]}>
           <Pressable style={styles.closeLight} onPress={scanAgain} hitSlop={8}>
             <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor={Brand.colors.text} />
           </Pressable>
@@ -169,7 +172,7 @@ export default function ScannerScreen() {
   // Figma P-20: the Free plan's 3 scans are used up (known before scanning, or from the server's answer).
   if ((phase === 'camera' && !allowed && !barcodeOnly) || (phase === 'retry' && error?.code === 'limit')) {
     return (
-      <ScrollView style={styles.light} contentContainerStyle={styles.limitScroll}>
+      <ScrollView style={styles.light} contentContainerStyle={[styles.limitScroll, { paddingTop: statusBarHeight + 16 }]}>
         <RoundBackButton onPress={() => goBack()} />
         <AppText weight="extraBold" style={styles.limitTitle}>Scan Nutrition Label</AppText>
         <LimitReached
@@ -230,7 +233,7 @@ export default function ScannerScreen() {
         onBarcodeScanned={phase === 'camera' ? handleBarcode : undefined}
       />
 
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: statusBarHeight + 8 }]}>
         <Pressable style={styles.round} onPress={() => goBack()} hitSlop={8}>
           <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#FFF" />
         </Pressable>

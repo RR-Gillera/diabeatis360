@@ -123,7 +123,7 @@ export default function MyAppointmentsScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900', paddingHorizontal: 24, paddingTop: 56 },
+  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900', paddingHorizontal: 24, paddingTop: 16 },
   tabsScroll: { flexGrow: 0, marginTop: 14 },
   tabs: { gap: 8, paddingHorizontal: 24 },
   tab: { backgroundColor: '#FFFFFF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },

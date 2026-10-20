@@ -90,7 +90,7 @@ Check that the console's Firestore > Rules tab shows today's date. Do **not** ad
 EAS does not need a paid Firebase plan. Respondents install an APK instead of running Expo Go with a laptop, and reminders can only ring in the installed app.
 
 > **Set up on 2026-10-15:** Expo account `diabeatis360`, project `@diabeatis360/diabeatis360-mobile` (ID in `app.json`). EAS's **preview** environment holds the six `EXPO_PUBLIC_FIREBASE_*` values (taken from `firebase apps:sdkconfig`) and `EXPO_PUBLIC_AI_BASE_URL=https://diabeatis360-ai.vercel.app`, all plain text because none are secrets. The Android signing key was created by EAS and is stored on Expo's servers. **Keep that Expo account**: every future APK must be signed with the same key, or phones will refuse to update the app.
-> **To build again** after app code changes (any teammate signed in with `npx.cmd eas-cli login`): from `diabeatis360-mobile`, run `npx.cmd eas-cli build --platform android --profile preview`. Server-side changes (rules, the AI server) need no new build.
+> **To build again** after app code changes (any teammate signed in with `npx.cmd eas-cli login`): from `diabeatis360-mobile`, run `npx.cmd eas-cli build --platform android --profile preview`. Server-side changes (rules, the AI server) need no new build. Since 2026-10-20 most app changes no longer need a build: see **A12** (over-the-air updates).
 1. Commit the refreshed `diabeatis360-mobile/package-lock.json` first. EAS runs `npm ci`, which failed on the old lockfile (see Part D).
 2. Confirm the Android package id in `app.json` (`com.diabeatis360.app`). It is permanent if you ever publish to Google Play.
 3. From `diabeatis360-mobile`:
@@ -233,6 +233,29 @@ Ringing, Accept and Decline already work. The video itself needs a Daily.co key 
 7. **If it fails:** "The video service is busy right now" means Daily refused the request. Vercel > the project > **Logs** shows the reason, but Hobby keeps logs for only one hour, so look right away. A picture with no sound on Android usually means the microphone was refused: allow it in Android Settings > Apps > Diabeatis360 (or Expo Go) > Permissions.
 
 Tested locally on 2026-10-18 against a **fake** Daily (no account, no key, no real video): `functions/test/video.test.js` 4/4, `calls.test.js` 3/3 on the Firestore emulator, `vercel-e2e.test.js` 12/12 including joinCall through the real Firebase client SDK, and the call screen in a browser (QA report section 9). A real two-person call can only be tried after steps 1–4.
+
+## A12. Building the APK and sending over-the-air updates (DECISIONS D30)
+The app now has `expo-updates` (EAS Update). One APK built **with** it is installed once; after that, most changes reach the phones without reinstalling.
+
+**Build the APK (when needed) [PERSON or Claude]** from `diabeatis360-mobile`, signed in to EAS (`npx.cmd eas-cli whoami` shows `diabeatis360`):
+```
+npx.cmd eas-cli build --platform android --profile preview
+```
+- It uploads the project, waits in EAS's free queue (usually 15–30 minutes), then prints a link and a QR code. The same link is on expo.dev > diabeatis360-mobile > **Builds**.
+- On the phone: open the link > **Install** (or scan the QR) > download the APK > allow "Install unknown apps" for the browser > install. If Android refuses to update the old app, uninstall it first (all data lives in Firestore).
+- The `preview` profile builds on the **preview** channel, so this APK receives updates sent to `preview`.
+
+**Send an update instead of a build [PERSON or Claude]** (screens, wording, app logic: anything in `src/`):
+```
+npx.cmd eas-cli update --channel preview --environment preview --message "What changed, in one line"
+```
+- `--environment preview` makes the update use the same EAS settings as the APK (Firebase project, AI server address). Leave it out and it would use your own `.env`.
+- The phone downloads the update the next time the app opens and uses it from the **following** start (close the app fully and open it again to see it at once).
+- Undo: expo.dev > Updates > the previous update > **Republish**, or `npx.cmd eas-cli update:republish`.
+
+**When a new APK IS needed:** a new native package (`npx expo install` of something with native code), a permission or plugin change in `app.json` / `app.config.js`, new Google/Facebook IDs in the EAS environment, or an Expo SDK upgrade. Then **raise `version` in `app.json`** (for example 1.0.0 → 1.0.1) before building: the runtime version follows it (`runtimeVersion.policy: appVersion`), so old APKs never receive an update they cannot run. Phones with the old APK keep working; they simply stop getting updates until they install the new one.
+
+**Limits:** Expo's free plan covers the team and the respondents (monthly active users on the order of a thousand; check expo.dev/pricing). Updates do not apply in Expo Go or the web build.
 
 ---
 

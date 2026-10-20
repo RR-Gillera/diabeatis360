@@ -31,6 +31,6 @@ export function firstUnansweredStep(answers: OnboardingAnswers): string {
   if (!answered(answers.condition)) return '/onboarding/condition';
   if (!allergiesDeclared(answers.allergy)) return '/onboarding/allergies';
   if (!answered(answers.activity)) return '/onboarding/activity';
-  if (!answered(answers.diet)) return '/onboarding/dietary';
-  return '/onboarding/notifications';
+  // Dietary is the last step (D29): every answer given but setup not finished -> back to it, to tap Complete Setup.
+  return '/onboarding/dietary';
 }

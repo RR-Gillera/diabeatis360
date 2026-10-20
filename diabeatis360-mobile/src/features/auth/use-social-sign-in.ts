@@ -1,3 +1,4 @@
+import { resetTo } from '@/lib/navigation';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 
@@ -26,9 +27,9 @@ export function useSocialSignIn(showError: (message: string) => void) {
         const params = result.verificationEmailSent === null ? {} : { sent: result.verificationEmailSent ? '1' : '0' };
         router.replace({ pathname: '/verify-email', params } as never);
       } else if (await hasCompletedOnboarding(result.email)) {
-        router.replace(result.role === 'doctor' ? '/doctor' : '/user-home');
+        resetTo(router, result.role === 'doctor' ? '/doctor' : '/user-home');
       } else {
-        router.replace(await onboardingStartPath(result.email) as never);
+        resetTo(router, await onboardingStartPath(result.email) as never);
       }
     } catch (value) {
       // Closing Google's or Facebook's window is the person's choice, not an error.

@@ -129,7 +129,7 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingTop: 56 },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingTop: 16 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   title: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900' },
   markAll: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },

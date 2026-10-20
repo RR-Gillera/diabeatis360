@@ -5,6 +5,7 @@ import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, V
 
 import { AuthButton, authColors, authStyles, BrandMark } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
+import { resetTo } from '@/lib/navigation';
 import {
   CHECK_INTERVAL_MS, RESEND_COOLDOWN_SECONDS, errorCode, formatCountdown, verificationErrorMessage,
 } from '@/features/auth/verification';
@@ -54,7 +55,7 @@ export default function VerifyEmailScreen() {
   // After "Email verified!" has been on screen for a moment, carry on exactly as a normal login would.
   useEffect(() => {
     if (!confirmed) return;
-    const timer = setTimeout(() => router.replace(confirmed as never), 1200);
+    const timer = setTimeout(() => resetTo(router, confirmed as never), 1200);
     return () => clearTimeout(timer);
   }, [confirmed, router]);
 
@@ -112,7 +113,7 @@ export default function VerifyEmailScreen() {
   const leave = (to: '/login' | '/sign-up') => {
     leaving.current = true;
     signOut();
-    router.replace(to);
+    resetTo(router, to);
   };
 
   const description = sent === '0'

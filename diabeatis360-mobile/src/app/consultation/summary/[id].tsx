@@ -122,7 +122,7 @@ export default function ConsultationSummaryScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  scroll: { gap: 16, padding: 24, paddingBottom: 60, paddingTop: 48 },
+  scroll: { gap: 16, padding: 24, paddingBottom: 60, paddingTop: 16 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900', marginTop: 8 },
   error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13 },
   loader: { marginTop: 30 },

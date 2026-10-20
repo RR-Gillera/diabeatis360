@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthButton, authColors, authStyles, BrandMark } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
+import { resetTo } from '@/lib/navigation';
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function LandingScreen() {
     (async () => {
       try {
         const done = await hasCompletedOnboarding(email);
-        router.replace((done ? (role === 'doctor' ? '/doctor' : '/user-home') : await onboardingStartPath(email)) as never);
+        resetTo(router, (done ? (role === 'doctor' ? '/doctor' : '/user-home') : await onboardingStartPath(email)) as never);
       } catch {
         leaving.current = false;
         setRouteFailed(true); // could not tell (offline): show the normal page with Login

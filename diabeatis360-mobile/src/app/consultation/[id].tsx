@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   addNotes: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 10, minHeight: 44 },
   addNotesText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 12, paddingBottom: 16, paddingHorizontal: 20, paddingTop: 56, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 12, paddingBottom: 16, paddingHorizontal: 20, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },
   headerTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },

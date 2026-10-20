@@ -84,7 +84,7 @@ function resetErrorMessage(code: string | undefined) {
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 1, padding: 24, paddingTop: 56 },
+  scroll: { flexGrow: 1, padding: 24, paddingTop: 24 },
   title: { color: authColors.navy, fontSize: 28, fontWeight: '900', marginTop: 28 },
   subtitle: { color: authColors.muted, fontSize: 15, lineHeight: 23, marginTop: 12 },
   form: { gap: 20, marginTop: 28 },

@@ -101,7 +101,7 @@ export default function DoctorRequestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: 14, padding: 24, paddingBottom: 140, paddingTop: 56 },
+  scroll: { gap: 14, padding: 24, paddingBottom: 140, paddingTop: 16 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
   segment: { backgroundColor: '#E9EDF1', borderRadius: 18, flexDirection: 'row', padding: 4 },
   segmentItem: { alignItems: 'center', borderRadius: 14, flex: 1, paddingVertical: 11 },

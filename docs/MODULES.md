@@ -42,7 +42,8 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 
 - Onboarding steps (Figma "Profile Setup Step 3–10"): language (English / Filipino), birthdate,
   diabetes type (Type 1 / Type 2 / Prediabetes), food allergies, activity level, dietary preference,
-  notification toggles. Stored on the Users doc (fields per FIRESTORE_SCHEMA.md).
+  then Complete Setup. Reminders are always on (no notification toggles since DECISIONS.md D29; the phone asks for
+  notification permission itself). Stored on the Users doc (fields per FIRESTORE_SCHEMA.md).
 - Figma options — activity: Sedentary / Light / Active / Very Active; diet: Everything / Vegetarian /
   No Pork / Diabetic Diet. These differ from the data dictionary enums → DECISIONS.md D6.
 - Doctor can view a patient's health profile ONLY for patients who have a booking with them (UT-023).

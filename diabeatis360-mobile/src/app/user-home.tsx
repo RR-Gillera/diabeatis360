@@ -265,7 +265,7 @@ export default function UserHomeScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { paddingBottom: 130 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 48, paddingBottom: 24 },
+  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 24 },
   hello: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500' },
   greeting: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 24, fontWeight: '800', lineHeight: 32, marginTop: 2 },
   headerActions: { alignItems: 'center', flexDirection: 'row', gap: 16 },

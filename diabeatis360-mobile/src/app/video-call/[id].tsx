@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 
 import { AppText } from '@/components/ui/app-text';
@@ -23,6 +24,8 @@ export default function VideoCallScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { uid, displayName, role } = useAuth();
+  // The call fills the whole screen, under the status bar too; the name and timer start below it (screen-top.ts).
+  const { top: statusBarHeight } = useSafeAreaInsets();
   const isDoctor = role === 'doctor';
   const goBack = useSafeBack(isDoctor ? '/doctor/appointments' : '/user-home');
   const [call, setCall] = useState<CallRecord | null | undefined>(undefined);
@@ -166,7 +169,7 @@ export default function VideoCallScreen() {
             <AppText style={styles.text}>Connecting…</AppText>
           </View>
         )}
-        <View style={styles.topBar} pointerEvents="box-none">
+        <View style={[styles.topBar, { paddingTop: statusBarHeight + 12 }]} pointerEvents="box-none">
           <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{otherName || 'Video call'}</AppText></View>
           <View style={styles.timer}><View style={styles.timerDot} /><AppText weight="bold" style={styles.pillText}>{callClock(elapsed)}</AppText></View>
         </View>

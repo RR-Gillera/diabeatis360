@@ -13,6 +13,7 @@ import { DIABETES_TYPES, enumLabel } from '@/constants/enums';
 import { changedHealthFields, EMPTY_HEALTH_FORM, healthFormProblem, profileToForm, type HealthForm } from '@/features/auth/health-profile';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { BottomNav } from '@/features/home/home-ui';
+import { resetTo } from '@/lib/navigation';
 
 type HealthField =
   | { key: keyof HealthForm; label: string; type: 'date' }
@@ -162,7 +163,7 @@ export default function ProfileScreen() {
           <Pressable onPress={() => router.push('/booking/find-doctor')}><Text style={styles.link}>Book a new appointment →</Text></Pressable>
         </Section>
 
-        <Pressable onPress={() => { signOut(); router.replace('/'); }}><Text style={styles.logout}>Log out</Text></Pressable>
+        <Pressable onPress={() => { signOut(); resetTo(router, '/'); }}><Text style={styles.logout}>Log out</Text></Pressable>
       </ScrollView>
       <BottomNav active="profile" />
     </View>

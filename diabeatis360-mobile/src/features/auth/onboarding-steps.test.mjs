@@ -20,7 +20,7 @@ test('"None" answers the allergy question', () => {
 });
 
 test('every answer given: the last screen (Complete Setup)', () => {
-  assert.equal(firstUnansweredStep({ ...patientSoFar, allergy: 'Nuts', activity: 'Light', diet: 'No Pork' }), '/onboarding/notifications');
+  assert.equal(firstUnansweredStep({ ...patientSoFar, allergy: 'Nuts', activity: 'Light', diet: 'No Pork' }), '/onboarding/dietary', 'all answered but not finished: back to the last step (D29)');
 });
 
 test('doctors go to their professional details; a child account needs the guardian step', () => {
