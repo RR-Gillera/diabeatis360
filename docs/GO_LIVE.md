@@ -258,6 +258,7 @@ npx.cmd eas-cli update --channel preview --environment preview --message "What c
 **Limits:** Expo's free plan covers the team and the respondents (monthly active users on the order of a thousand; check expo.dev/pricing). Updates do not apply in Expo Go or the web build.
 
 ## A13. Clean start before respondents, and the Philippine foods (DECISIONS D32)
+> **Done 2026-10-29:** wiped (backup in `D:diabeatis360-backups`), placeholder "Rice" removed, 31 foods added. Re-run only for a future clean start.
 Run from the repo root, in this order, on the team's "go". Both scripts read the service-account key only through the
 environment variable below (never print it). In PowerShell:
 ```
