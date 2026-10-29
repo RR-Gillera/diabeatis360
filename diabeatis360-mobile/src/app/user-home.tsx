@@ -249,7 +249,8 @@ export default function UserHomeScreen() {
         </View>
       </ScrollView>
       <BottomNav active="home" />
-      <AddReadingModal visible={logModalVisible} onClose={() => setLogModalVisible(false)} onSaved={() => setLogModalVisible(false)} />
+      {/* A new reading opens the same result screen as on the Log tab: what it means, and Call 911 first if it is critical. */}
+      <AddReadingModal visible={logModalVisible} onClose={() => setLogModalVisible(false)} onSaved={(doctorsNotified) => { setLogModalVisible(false); router.push({ pathname: '/glucose-result', params: { doctors: String(doctorsNotified) } }); }} />
     </View>
   );
 }

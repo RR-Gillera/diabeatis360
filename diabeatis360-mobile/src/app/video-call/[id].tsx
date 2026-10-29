@@ -73,9 +73,11 @@ export default function VideoCallScreen() {
     return () => { cancelled = true; };
   }, [otherId]);
 
-  // The running clock while connected, and the final length once it ends.
+  // The running clock while connected, and the final length once it ends. It starts when the room has opened, not at
+  // "accept", so "Connecting…" and a room that could not open never count as call time (QA F-VC-TIMER).
+  const roomOpen = Boolean(room?.url);
   useEffect(() => {
-    if (status === 'accepted') {
+    if (status === 'accepted' && roomOpen) {
       if (connectedAt.current === null) connectedAt.current = Date.now();
       const timer = setInterval(() => setElapsed((Date.now() - (connectedAt.current ?? Date.now())) / 1000), 1000);
       return () => clearInterval(timer);
@@ -85,7 +87,7 @@ export default function VideoCallScreen() {
       connectedAt.current = null;
       setLasted(seconds);
     }
-  }, [status]);
+  }, [status, roomOpen]);
 
   // The caller gives up after RING_TIMEOUT_MS: the call is marked missed and the other person is left a note.
   useEffect(() => {
@@ -175,7 +177,7 @@ export default function VideoCallScreen() {
         )}
         <View style={[styles.topBar, { paddingTop: statusBarHeight + 12 }]} pointerEvents="box-none">
           <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{otherName || t('call.videoCall')}</AppText></View>
-          <View style={styles.timer}><View style={styles.timerDot} /><AppText weight="bold" style={styles.pillText}>{callClock(elapsed)}</AppText></View>
+          {roomOpen ? <View style={styles.timer}><View style={styles.timerDot} /><AppText weight="bold" style={styles.pillText}>{callClock(elapsed)}</AppText></View> : null}
         </View>
         <View style={styles.bottomBar} pointerEvents="box-none">
           <Pressable accessibilityRole="button" accessibilityLabel={t('call.end')} style={styles.endRound} onPress={hangUp}>

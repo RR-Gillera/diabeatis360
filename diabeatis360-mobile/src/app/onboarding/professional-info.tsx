@@ -6,7 +6,7 @@ import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
-import { birthdateToTimestamp } from '@/features/auth/birthdate';
+import { birthdateToTimestamp, parseBirthdate } from '@/features/auth/birthdate';
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { db } from '@/firebase';
@@ -49,7 +49,11 @@ export default function ProfessionalInfoScreen() {
     }, () => {});
   }, [uid]);
 
-  const complete = Boolean(specialty && licenseNumber.trim() && expiry && agreed);
+  // A licence that has already expired cannot be verified, so it is refused here (QA D-12); the admin still reviews it.
+  const [today] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day; });
+  const expiryDate = parseBirthdate(expiry);
+  const expired = Boolean(expiryDate && expiryDate.getTime() < today.getTime());
+  const complete = Boolean(specialty && licenseNumber.trim() && expiry && !expired && agreed);
 
   const submit = async () => {
     if (!email || !complete || saving) return;
@@ -130,6 +134,7 @@ export default function ProfessionalInfoScreen() {
           placeholder={t('setup.pro.expiryPlaceholder')}
           years={FUTURE_YEARS}
         />
+        {expired ? <Text style={styles.error}>{t('setup.pro.expired')}</Text> : null}
 
         <Text style={styles.label}>{t('setup.pro.upload')}</Text>
         {/* Deliberately inert: storing photos needs Firebase Storage, which is

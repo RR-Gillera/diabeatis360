@@ -42,6 +42,8 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
   const [time, setTime] = useState(initial?.followUpAt ? labelFromMinutes(initial.followUpAt.getHours() * 60 + initial.followUpAt.getMinutes()) : '09:00 AM');
   const [pickingTime, setPickingTime] = useState(false);
   const [problem, setProblem] = useState('');
+  // Ending with nothing written asks first (QA F-EMPTY-NOTES): the patient would only see "No summary recorded yet".
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
 
   // Re-seed the fields each time the sheet opens with different notes (for example after they were saved elsewhere).
   const seedKey = `${visible}:${initial?.summary ?? ''}:${initial?.advice ?? ''}:${initial?.followUpAt?.getTime() ?? ''}`;
@@ -53,6 +55,7 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
     setDay(initial?.followUpAt ? dateText(initial.followUpAt) : '');
     setTime(initial?.followUpAt ? labelFromMinutes(initial.followUpAt.getHours() * 60 + initial.followUpAt.getMinutes()) : '09:00 AM');
     setProblem('');
+    setConfirmEmpty(false);
   }
 
   const followUpAt = () => {
@@ -66,6 +69,7 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
   const submit = () => {
     const when = followUpAt();
     if (when && when.getTime() < Date.now()) { setProblem(t('doctor.notes.future')); return; }
+    if (!summary.trim() && !advice.trim() && !when && !confirmEmpty) { setConfirmEmpty(true); setProblem(t('doctor.notes.emptyConfirm')); return; }
     setProblem('');
     onSubmit({ summary, advice, followUpAt: when });
   };

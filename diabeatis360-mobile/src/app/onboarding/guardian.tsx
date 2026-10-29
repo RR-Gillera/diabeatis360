@@ -87,6 +87,7 @@ export default function GuardianScreen() {
       <View style={styles.camera}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         <View style={styles.cameraFrame} pointerEvents="none">
+          <View style={styles.idFrame} />
           <Text style={styles.cameraHint}>{t('setup.guardian.cameraHint')}</Text>
         </View>
         <View style={styles.cameraBar}>
@@ -171,6 +172,8 @@ const styles = StyleSheet.create({
   bottom: { marginTop: 32, paddingBottom: 12 },
   camera: { backgroundColor: '#000', flex: 1 },
   cameraFrame: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
+  // An ID card is about 1.6 times as wide as it is tall; the frame shows where to hold it (QA F-NO-FRAME).
+  idFrame: { aspectRatio: 1.6, borderColor: 'rgba(255,255,255,0.9)', borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, marginBottom: 16, width: '82%' },
   cameraHint: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, color: '#FFF', fontSize: 13, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8 },
   cameraBar: { alignItems: 'center', bottom: 0, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 44, paddingHorizontal: 32, position: 'absolute', right: 0, left: 0 },
   cameraCancel: { minWidth: 70 },

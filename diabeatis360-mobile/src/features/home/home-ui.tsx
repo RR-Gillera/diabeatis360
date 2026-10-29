@@ -58,7 +58,7 @@ export function BottomNav({ active }: { active: NavTarget }) {
     return (
       <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: isActive }} accessibilityLabel={t(item.labelKey)} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
         <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={20} tintColor={color} />
-        <Text style={[styles.navLabel, { color }]}>{t(item.labelKey)}</Text>
+        <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.navLabel, { color }]}>{t(item.labelKey)}</Text>
       </Pressable>
     );
   };

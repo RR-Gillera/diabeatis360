@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { screenTopStyle } from '@/constants/screen-top';
 import { Brand } from '@/constants/theme';
@@ -19,6 +20,7 @@ export default function DoctorLayout() {
   const router = useRouter();
   const { uid, signOut } = useAuth();
   const { top: statusBarHeight } = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const [profile, setProfile] = useState<DoctorProfile | null | undefined>(undefined);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function DoctorLayout() {
     <Stack
       screenOptions={({ route }) => ({
         headerShown: false,
-        animation: 'slide_from_right',
+        animation: reduceMotion ? 'none' : 'slide_from_right',
         contentStyle: screenTopStyle(route.name, statusBarHeight, 'doctor'),
       })}
     />

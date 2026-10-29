@@ -6,7 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
-import { AddReadingModal } from '@/features/glucose/glucose-ui';
+import { AddReadingModal, readingColors } from '@/features/glucose/glucose-ui';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav, homeColors, WeeklyChart } from '@/features/home/home-ui';
 import { useT } from '@/i18n/language-context';
@@ -166,14 +166,22 @@ export default function GlucoseLogScreen() {
             {group.items.map((entry) => {
               const theme = timeTheme(entry.loggedAt?.getHours() ?? 12);
               return (
-                <Pressable key={entry.id} style={styles.entryCard} onPress={() => { setEditing(entry); setModalVisible(true); }}>
+                <Pressable key={entry.id} accessibilityRole="button" accessibilityLabel={`${entry.readingMgdl} mg/dL, ${label('interpretation', entry.interpretation)}, ${label('mealContext', entry.context)}`} style={styles.entryCard} onPress={() => { setEditing(entry); setModalVisible(true); }}>
                   <View style={styles.entryLeft}>
                     <View style={[styles.entryIconWrap, { backgroundColor: theme.iconBg }]}>
                       <SymbolView name={{ ios: theme.icon, android: theme.iconAndroid, web: theme.iconAndroid }} size={20} tintColor={theme.iconColor} />
                     </View>
                     <View>
                       <Text style={styles.entryReading}>{entry.readingMgdl} <Text style={styles.entryUnit}>mg/dL</Text></Text>
-                      <Text style={styles.entryTime}>{entry.loggedAt ? clockTime(entry.loggedAt) : '—'}</Text>
+                      {/* The reading's class next to its time, so a past critical reading never looks like a normal one (QA D-22). */}
+                      <View style={styles.entryMeta}>
+                        <Text style={styles.entryTime}>{entry.loggedAt ? clockTime(entry.loggedAt) : '—'}</Text>
+                        {readingColors[entry.interpretation] ? (
+                          <View style={[styles.classPill, { backgroundColor: readingColors[entry.interpretation].background }]}>
+                            <Text style={[styles.classText, { color: readingColors[entry.interpretation].color }]}>{label('interpretation', entry.interpretation)}</Text>
+                          </View>
+                        ) : null}
+                      </View>
                     </View>
                   </View>
                   <View style={[styles.entryBadge, { backgroundColor: theme.badgeBg }]}>
@@ -246,7 +254,8 @@ const styles = StyleSheet.create({
   sheetRowTextActive: { color: homeColors.green },
   sheetCount: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
   sheetEmpty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 14, paddingVertical: 12, textAlign: 'center' },
-  scroll: { padding: 24, paddingBottom: 150 },
+  // Room under the last reading so the + button never covers it (QA F-FAB-OVERLAP).
+  scroll: { padding: 24, paddingBottom: 200 },
   card: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 32, borderWidth: 1, padding: 24, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   cardHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   cardTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '700' },
@@ -263,7 +272,10 @@ const styles = StyleSheet.create({
   entryIconWrap: { alignItems: 'center', borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
   entryReading: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '700' },
   entryUnit: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500' },
-  entryTime: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500', marginTop: 2 },
+  entryTime: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500' },
+  entryMeta: { alignItems: 'center', flexDirection: 'row', gap: 8, marginTop: 4 },
+  classPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
+  classText: { fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800' },
   entryBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   entryBadgeText: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '800', letterSpacing: -0.5, textTransform: 'uppercase' },
   fab: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 16, bottom: 112, elevation: 4, height: 64, justifyContent: 'center', position: 'absolute', right: 24, shadowColor: homeColors.green, shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.2, shadowRadius: 15, width: 64 },

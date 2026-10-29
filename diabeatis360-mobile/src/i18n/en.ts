@@ -1126,6 +1126,16 @@ export const en = {
   // ---- small leftovers
   'common.moreOptions': 'More options',
   'notif.loadFailed': 'We could not load your notifications. Check your connection.',
+
+  // ---- QA backlog 4a
+  'glucose.form.deleteConfirm': 'Tap again to delete this reading',
+
+  // ---- QA backlog 4b
+  'setup.pro.expired': 'That licence has already expired. Enter the expiry date on your current PRC ID.',
+  'doctor.notes.emptyConfirm': 'Nothing is written yet, so the patient will only see "No summary recorded yet". Tap again to continue without notes.',
+
+  // ---- QA backlog 4c
+  'glucose.form.offline': 'No connection right now. Your reading is kept on this phone and will be saved as soon as you are back online. Keep the app open until then.',
 } as const;
 
 export type MessageKey = keyof typeof en;

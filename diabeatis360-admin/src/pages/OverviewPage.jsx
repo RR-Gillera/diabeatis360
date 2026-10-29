@@ -61,8 +61,11 @@ export default function OverviewPage() {
 
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const bookingsThis = bookings.data.filter((b) => (toDate(b.scheduled_at) ?? 0) >= thisMonthStart).length
-    const bookingsLast = bookings.data.filter((b) => {
+    // A consultation is a booking the doctor accepted (confirmed) or finished (completed); declined, cancelled and
+    // still-pending requests are not consultations (QA D-20).
+    const consults = bookings.data.filter((b) => b.status === 'confirmed' || b.status === 'completed')
+    const bookingsThis = consults.filter((b) => (toDate(b.scheduled_at) ?? 0) >= thisMonthStart).length
+    const bookingsLast = consults.filter((b) => {
       const when = toDate(b.scheduled_at)
       return when && when >= lastMonthStart && when < thisMonthStart
     }).length
@@ -74,8 +77,9 @@ export default function OverviewPage() {
       activeToday: dailyActive[dailyActive.length - 1].count,
       dailyAverage,
       dailyActive,
-      pending: providers.data.filter((doctor) => !doctor.is_verified).length,
-      consultations: bookings.data.length,
+      // A rejected doctor is waiting to resubmit, not waiting for an admin (QA D-20).
+      pending: providers.data.filter((doctor) => !doctor.is_verified && !doctor.rejection_reason).length,
+      consultations: consults.length,
       consultationChange: percentChange(bookingsThis, bookingsLast),
       weekdays: countPerWeekday(bookings.data.map((b) => toDate(b.scheduled_at)).filter(Boolean)),
       revenue: revenueByPeriod(events, 'monthly'),

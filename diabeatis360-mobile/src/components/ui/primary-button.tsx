@@ -18,6 +18,7 @@ export function PrimaryButton({ title, loading, variant = 'primary', disabled, s
         styles.button,
         outline ? styles.outline : styles.filled,
         (disabled || loading) && styles.disabled,
+        state.pressed && styles.pressed,
         typeof style === 'function' ? style(state) : style,
       ]}
     >
@@ -35,5 +36,7 @@ const styles = StyleSheet.create({
   filled: { backgroundColor: Brand.colors.primary },
   outline: { backgroundColor: 'transparent', borderWidth: 2, borderColor: Brand.colors.primary },
   disabled: { opacity: 0.5 },
+  // A press shows at once, before the next screen loads (QA F-PRESS-FEEDBACK).
+  pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   label: { fontSize: 18 },
 });

@@ -11,6 +11,7 @@ import { subscribeToBookingsForProvider } from '@/features/booking/booking-servi
 import { formatFee } from '@/features/booking/booking-ui';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { dashboardStats } from '@/features/doctor/doctor-stats';
+import { isProfileComplete } from '@/features/doctor/profile-complete';
 import { DoctorBottomNav, doctorStyles } from '@/features/doctor/doctor-ui';
 import type { DoctorProfile } from '@/features/doctor/types';
 import type { ProviderBookingEntry } from '@/features/booking/types';
@@ -62,7 +63,7 @@ export default function DoctorHomeScreen() {
   const greeting = t(hour < 12 ? 'doctor.greeting.morning' : hour < 18 ? 'doctor.greeting.afternoon' : 'doctor.greeting.evening');
   const dateLine = `${t(`weekday.long.${WEEKDAYS[openedAt.getDay()]}`)}, ${shortDay(openedAt, language)}`;
   // A doctor with no specialty/licence/fee can't be meaningfully booked, so the dashboard nudges them to finish it.
-  const profileIncomplete = profile && (!profile.specialty || !profile.prcLicenseNumber || !profile.city || !profile.consultationFee);
+  const profileIncomplete = profile && !isProfileComplete(profile);
   const nextIsToday = next?.scheduledAt ? next.scheduledAt.toDateString() === openedAt.toDateString() : false;
 
   return (
@@ -93,18 +94,18 @@ export default function DoctorHomeScreen() {
         ) : null}
 
         <View style={styles.grid}>
-          <View style={styles.stat}><Text style={styles.statLabel}>{t('doctor.stat.today')}</Text><Text style={styles.statValue}>{show(stats.today)}</Text></View>
+          <View style={styles.stat}><Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.today')}</Text><Text style={styles.statValue}>{show(stats.today)}</Text></View>
           <Pressable accessibilityRole="button" style={styles.stat} onPress={() => router.navigate('/doctor/appointments')}>
-            <Text style={styles.statLabel}>{t('doctor.stat.pending')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.pending')}</Text>
             <View style={styles.statRow}>
               <Text style={styles.statValue}>{show(stats.pending)}</Text>
               {stats.pending ? <View style={styles.newPill}><Text style={styles.newText}>{t('doctor.new')}</Text></View> : null}
             </View>
           </Pressable>
           <Pressable accessibilityRole="button" style={styles.stat} onPress={() => router.navigate('/doctor/history' as never)}>
-            <Text style={styles.statLabel}>{t('doctor.stat.completed')}</Text><Text style={styles.statValue}>{show(stats.completed)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.completed')}</Text><Text style={styles.statValue}>{show(stats.completed)}</Text>
           </Pressable>
-          <View style={styles.stat}><Text style={styles.statLabel}>{t('doctor.stat.earnings')}</Text><Text style={styles.statValue} adjustsFontSizeToFit numberOfLines={1}>{show(formatFee(stats.earnings))}</Text></View>
+          <View style={styles.stat}><Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.earnings')}</Text><Text style={styles.statValue} adjustsFontSizeToFit numberOfLines={1}>{show(formatFee(stats.earnings))}</Text></View>
         </View>
         <Text style={styles.footnote}>{t('doctor.earningsNote', { rate: Math.round(PLATFORM_COMMISSION_RATE * 100) })}</Text>
 

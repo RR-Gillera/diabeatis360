@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -14,7 +14,12 @@ import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
 
 const contexts: MealContext[] = ['before_meal', 'after_meal'];
 
-const livePreviewCopy: Record<Interpretation, { color: string; background: string }> = {
+// Offline, Firestore keeps a new reading on this phone (it already shows in the list) and sends it when the connection is
+// back; only then does the save finish. After this long the sheet says so instead of spinning on "Saving..." (QA D-17).
+const OFFLINE_NOTICE_MS = 6000;
+
+/** The colours of each reading class, used for the live preview here and the history rows on the Log tab. */
+export const readingColors: Record<Interpretation, { color: string; background: string }> = {
   low: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
   normal: { color: homeColors.green, background: homeColors.greenTint },
   high: { color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
@@ -35,6 +40,12 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [offline, setOffline] = useState(false);
+  // The sheet was closed while a save was still waiting for the connection: when it finishes later, do not open the
+  // result screen out of nowhere.
+  const closedWhileSaving = useRef(false);
+  // Delete asks first (QA D-13): the first tap turns the button into "Tap again to delete".
+  const [confirmDelete, setConfirmDelete] = useState(false);
   // Set after the first tap on Save for a rare value (20-39 or 401-600 mg/dL): the second tap saves it (D25).
   const [confirming, setConfirming] = useState(false);
 
@@ -54,37 +65,44 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   const check = reading.trim() !== '' ? checkReading(readingValue) : null;
   const isValidReading = check?.ok === true;
   const liveLevel = isValidReading ? interpretGlucose(readingValue, context) : null;
-  const livePreview = liveLevel ? { ...livePreviewCopy[liveLevel], label: label('interpretation', liveLevel) } : null;
+  const livePreview = liveLevel ? { ...readingColors[liveLevel], label: label('interpretation', liveLevel) } : null;
 
-  const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); setConfirming(false); };
-  const close = () => { reset(); onClose(); };
+  const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); setConfirming(false); setConfirmDelete(false); };
+  const close = () => { if (saving) closedWhileSaving.current = true; reset(); setOffline(false); onClose(); };
 
   const save = async () => {
     if (!uid || !check?.ok) return;
     if (check.needsConfirmation && !confirming) { setConfirming(true); return; }
-    setSaving(true); setError('');
+    setSaving(true); setError(''); setOffline(false);
+    closedWhileSaving.current = false;
+    const slow = setTimeout(() => setOffline(true), OFFLINE_NOTICE_MS);
     try {
       let doctorsNotified = 0;
       if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
       else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date(), language)).doctorsNotified;
+      setOffline(false);
+      if (closedWhileSaving.current) return;
       reset();
       onSaved(doctorsNotified);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : t('glucose.form.saveFailed'));
+    } catch {
+      // The value was checked on screen already, so a failure here is the connection or the database: one plain message.
+      setError(t('glucose.form.saveFailed'));
     } finally {
+      clearTimeout(slow);
       setSaving(false);
     }
   };
 
   const remove = async () => {
     if (!entry || deleting) return;
+    if (!confirmDelete) { setConfirmDelete(true); return; }
     setDeleting(true); setError('');
     try {
       await deleteGlucoseLog(entry.id);
       reset();
       onSaved(0);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : t('glucose.form.deleteFailed'));
+    } catch {
+      setError(t('glucose.form.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -124,9 +142,10 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
           <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
             <Text style={styles.saveButtonText}>{saving ? t('glucose.form.saving') : confirming ? t('glucose.form.confirmSave', { value: readingValue }) : editing ? t('glucose.form.saveChanges') : t('glucose.form.save')}</Text>
           </Pressable>
+          {offline ? <Text accessibilityLiveRegion="polite" style={styles.offline}>{t('glucose.form.offline')}</Text> : null}
           {editing ? (
-            <Pressable style={styles.deleteButton} onPress={remove} disabled={deleting}>
-              <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : t('glucose.form.delete')}</Text>
+            <Pressable accessibilityRole="button" style={styles.deleteButton} onPress={remove} disabled={deleting}>
+              <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : confirmDelete ? t('glucose.form.deleteConfirm') : t('glucose.form.delete')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -200,6 +219,7 @@ const styles = StyleSheet.create({
   saveButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 56 },
   saveButtonDisabled: { opacity: 0.55 },
   saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  offline: { color: '#475569', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' },
   deleteButton: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 8, minHeight: 46 },
   deleteButtonText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
 });

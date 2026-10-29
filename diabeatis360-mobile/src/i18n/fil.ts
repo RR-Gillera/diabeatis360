@@ -1126,4 +1126,14 @@ export const fil: Record<MessageKey, string> = {
   // ---- small leftovers
   'common.moreOptions': 'Iba pang opsyon',
   'notif.loadFailed': 'Hindi namin ma-load ang mga abiso mo. Tingnan ang koneksyon mo.',
+
+  // ---- QA backlog 4a
+  'glucose.form.deleteConfirm': 'I-tap ulit para burahin ang reading na ito',
+
+  // ---- QA backlog 4b
+  'setup.pro.expired': 'Expired na ang license na iyan. Ilagay ang petsa ng pag-expire na nasa kasalukuyan mong PRC ID.',
+  'doctor.notes.emptyConfirm': 'Wala pang nakasulat, kaya "Wala pang naitalang buod" lang ang makikita ng pasyente. I-tap ulit para magpatuloy nang walang tala.',
+
+  // ---- QA backlog 4c
+  'glucose.form.offline': 'Walang koneksyon ngayon. Nakatabi sa phone na ito ang reading mo at mase-save ito pagbalik ng internet. Huwag munang isara ang app.',
 };
