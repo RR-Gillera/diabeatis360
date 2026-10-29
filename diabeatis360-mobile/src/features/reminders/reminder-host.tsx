@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { useAuth } from '@/features/auth/auth-context';
+import { useT } from '@/i18n/language-context';
 
 import { clearReminders, syncReminders } from './reminder-service';
 
@@ -10,12 +11,14 @@ import { clearReminders, syncReminders } from './reminder-service';
  */
 export function ReminderHost() {
   const { role, uid } = useAuth();
+  const { language } = useT();
   const hadReminders = useRef(false);
 
   useEffect(() => {
     if (role === 'user' && uid) {
       hadReminders.current = true;
-      syncReminders(uid).catch(() => {
+      // Re-scheduled when the language changes, so the reminders on the phone switch language too.
+      syncReminders(uid, language).catch(() => {
         // Reminders are a convenience; a failure must never get in the way of using the app.
       });
     } else if (role !== 'user' && hadReminders.current) {
@@ -23,7 +26,7 @@ export function ReminderHost() {
       hadReminders.current = false;
       clearReminders().catch(() => {});
     }
-  }, [role, uid]);
+  }, [role, uid, language]);
 
   return null;
 }

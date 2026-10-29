@@ -5,11 +5,13 @@ import { AuthButton } from '@/features/auth/auth-ui';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
 import { SETUP_PROGRESS, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
+import { useT } from '@/i18n/language-context';
 
 // Figma "Role Selection Gate" (Choose Your Profile Type).
 export default function ProfileTypeScreen() {
   const router = useRouter();
   const { email } = useAuth();
+  const { t } = useT();
   const [profileType, setProfileType] = useState<'patient' | 'doctor'>('patient');
   // The two roles have different numbers of steps left, so the bar tracks the
   // role actually selected rather than quoting the patient's progress at a doctor.
@@ -26,23 +28,23 @@ export default function ProfileTypeScreen() {
   };
   return (
     <SetupScreen
-      section="INITIAL SETUP"
+      section={t('setup.section.initial')}
       percent={percent}
-      title={'Choose Your\nProfile Type'}
-      subtitle="Select the role that best describes your usage of Diabeatis360."
-      footer={<AuthButton title="Next" icon="arrow" onPress={finish} />}
+      title={t('setup.role.title')}
+      subtitle={t('setup.role.subtitle')}
+      footer={<AuthButton title={t('common.next')} icon="arrow" onPress={finish} />}
     >
       <SetupOption
         icon={{ ios: 'heart.text.square.fill', android: 'monitor_heart' }}
-        title="Patient / User"
-        detail="Track blood sugar, meals, and consult with specialists."
+        title={t('setup.role.patient')}
+        detail={t('setup.role.patientDetail')}
         selected={profileType === 'patient'}
         onPress={() => setProfileType('patient')}
       />
       <SetupOption
         icon={{ ios: 'stethoscope', android: 'stethoscope' }}
-        title="Medical Doctor"
-        detail="Manage telehealth appointments, view patient logs, and provide expert care."
+        title={t('setup.role.doctor')}
+        detail={t('setup.role.doctorDetail')}
         selected={profileType === 'doctor'}
         onPress={() => setProfileType('doctor')}
       />

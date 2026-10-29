@@ -8,6 +8,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { screenTopStyle } from '@/constants/screen-top';
 import { BookingProvider } from '@/features/booking/booking-context';
 import { AuthProvider } from '@/features/auth/auth-context';
+import { LanguageProvider } from '@/i18n/language-context';
 import { IncomingCallHost } from '@/features/calls/incoming-call-host';
 import { ReminderHost } from '@/features/reminders/reminder-host';
 
@@ -25,6 +26,8 @@ export default function TabLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       <AuthProvider>
+        {/* The screens' language (English / Filipino), D33. Inside AuthProvider: it follows the signed-in profile. */}
+        <LanguageProvider>
         <BookingProvider>
           <Stack
             initialRouteName="index"
@@ -43,6 +46,7 @@ export default function TabLayout() {
           {/* Keeps the phone's local health reminders scheduled (all categories are on, D29) and in step with appointments. */}
           <ReminderHost />
         </BookingProvider>
+        </LanguageProvider>
       </AuthProvider>
     </ThemeProvider>
   );

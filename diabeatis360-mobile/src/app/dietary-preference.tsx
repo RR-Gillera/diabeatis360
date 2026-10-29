@@ -10,15 +10,17 @@ import { SetupOption } from '@/features/auth/setup-kit';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { ProfileTop } from '@/features/profile/profile-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Profile > Dietary Preference: the same four choices and cards as setup (Figma Step 9), saved on their own.
 export default function DietaryPreferenceScreen() {
   const goBack = useSafeBack('/profile');
   const { uid, email } = useAuth();
+  const { t } = useT();
   const profile = useHealthProfile(uid, email);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scroll}>
-      <ProfileTop title="Dietary Preference" subtitle="We'll tailor your meal recommendations based on your selection." onBack={goBack} />
+      <ProfileTop title={t('profile.menu.diet')} subtitle={t('setup.dietary.subtitle')} onBack={goBack} />
       {profile ? <DietPicker start={profile.form.diet} onDone={goBack} /> : <ActivityIndicator color={Brand.colors.primary} style={styles.loading} />}
     </ScrollView>
   );
@@ -26,6 +28,7 @@ export default function DietaryPreferenceScreen() {
 
 function DietPicker({ start, onDone }: { start: string; onDone: () => void }) {
   const { uid, email } = useAuth();
+  const { t } = useT();
   const [diet, setDiet] = useState(start);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -37,8 +40,8 @@ function DietPicker({ start, onDone }: { start: string; onDone: () => void }) {
     try {
       await saveOnboardingValue(email, 'diet', diet, uid);
       onDone();
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Could not save. Please try again.');
+    } catch {
+      setError(t('common.couldNotSave'));
       setSaving(false);
     }
   };
@@ -46,10 +49,10 @@ function DietPicker({ start, onDone }: { start: string; onDone: () => void }) {
   return (
     <View>
       {DIETS.map((option) => (
-        <SetupOption key={option.value} icon={option.icon} title={option.value} detail={option.detail} selected={diet === option.value} onPress={() => setDiet(option.value)} />
+        <SetupOption key={option.value} icon={option.icon} title={t(option.labelKey)} detail={t(option.detailKey)} selected={diet === option.value} onPress={() => setDiet(option.value)} />
       ))}
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.save}><AuthButton title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving || !diet} /></View>
+      <View style={styles.save}><AuthButton title={saving ? t('common.saving') : t('common.save')} onPress={save} disabled={saving || !diet} /></View>
     </View>
   );
 }

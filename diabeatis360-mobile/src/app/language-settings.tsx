@@ -9,23 +9,28 @@ import { SetupNote, SetupOption } from '@/features/auth/setup-kit';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { ProfileTop } from '@/features/profile/profile-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
+import type { Language } from '@/i18n/translate';
 
-// Profile > Language: the same two cards as setup (Figma Step 3). Saved to Users.language_preference.
+// Profile > Language: the same two cards as setup (Figma Step 3). Saving writes Users.language_preference and switches
+// every screen at once (D33); the AI also answers in that language (functions/lib/prompts.js).
 export default function LanguageSettingsScreen() {
   const goBack = useSafeBack('/profile');
   const { uid, email } = useAuth();
+  const { t } = useT();
   const profile = useHealthProfile(uid, email);
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scroll}>
-      <ProfileTop title="Language" subtitle="Choose your preferred language for a better health management experience." onBack={goBack} />
-      {profile ? <LanguagePicker start={profile.language} onDone={goBack} /> : <ActivityIndicator color={Brand.colors.primary} style={styles.loading} />}
+      <ProfileTop title={t('languageSettings.title')} subtitle={t('setup.language.subtitle')} onBack={goBack} />
+      {profile ? <LanguagePicker start={profile.language === 'Filipino' ? 'Filipino' : 'English'} onDone={goBack} /> : <ActivityIndicator color={Brand.colors.primary} style={styles.loading} />}
     </ScrollView>
   );
 }
 
-function LanguagePicker({ start, onDone }: { start: string; onDone: () => void }) {
+function LanguagePicker({ start, onDone }: { start: Language; onDone: () => void }) {
   const { uid, email } = useAuth();
-  const [language, setLanguage] = useState(start === 'Filipino' ? 'Filipino' : 'English');
+  const { t, setLanguage } = useT();
+  const [language, setChoice] = useState<Language>(start);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,20 +40,21 @@ function LanguagePicker({ start, onDone }: { start: string; onDone: () => void }
     setSaving(true);
     try {
       await saveOnboardingValue(email, 'language', language, uid);
+      setLanguage(language);
       onDone();
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Could not save. Please try again.');
+    } catch {
+      setError(t('common.couldNotSave'));
       setSaving(false);
     }
   };
 
   return (
     <View>
-      <SetupOption emoji="🇺🇸" title="English" detail="System Default" selected={language === 'English'} onPress={() => setLanguage('English')} />
-      <SetupOption emoji="🇵🇭" title="Filipino / Tagalog" detail="Lokal na Wika" selected={language === 'Filipino'} onPress={() => setLanguage('Filipino')} />
-      <SetupNote>The app&apos;s screens are in English for now. Your choice is saved, and the Filipino screens arrive in an update.</SetupNote>
+      <SetupOption emoji="🇺🇸" title="English" detail={t('setup.language.englishDetail')} selected={language === 'English'} onPress={() => setChoice('English')} />
+      <SetupOption emoji="🇵🇭" title="Filipino / Tagalog" detail={t('setup.language.filipinoDetail')} selected={language === 'Filipino'} onPress={() => setChoice('Filipino')} />
+      <SetupNote>{t('languageSettings.note')}</SetupNote>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.save}><AuthButton title={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} /></View>
+      <View style={styles.save}><AuthButton title={saving ? t('common.saving') : t('common.save')} onPress={save} disabled={saving} /></View>
     </View>
   );
 }

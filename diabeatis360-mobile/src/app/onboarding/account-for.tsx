@@ -4,11 +4,12 @@ import { StyleSheet, Text } from 'react-native';
 
 import { AuthButton, authColors } from '@/features/auth/auth-ui';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
-import { GUARDIAN_UPLOAD_UNAVAILABLE, isGuardianPhotoStorageAvailable } from '@/features/auth/guardian-service';
+import { isGuardianPhotoStorageAvailable } from '@/features/auth/guardian-service';
 import { useAuth } from '@/features/auth/auth-context';
 import { SETUP_PROGRESS, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
 import { Brand } from '@/constants/theme';
 import type { AccountType } from '@/constants/enums';
+import { useT } from '@/i18n/language-context';
 
 // "For me" / "For my child" (DECISIONS.md D16, UT-005): shown only on the patient path, right after
 // Choose Your Profile Type. There is no Figma frame for this screen (see docs/FIGMA_MAP.md), so it is built
@@ -16,6 +17,7 @@ import type { AccountType } from '@/constants/enums';
 export default function AccountForScreen() {
   const router = useRouter();
   const { email, uid } = useAuth();
+  const { t } = useT();
   const [accountType, setAccountType] = useState<AccountType>('self');
   const [notice, setNotice] = useState('');
   const [checking, setChecking] = useState(false);
@@ -30,7 +32,7 @@ export default function AccountForScreen() {
       setChecking(true);
       const available = await isGuardianPhotoStorageAvailable();
       setChecking(false);
-      if (!available) { setNotice(GUARDIAN_UPLOAD_UNAVAILABLE); return; }
+      if (!available) { setNotice(t('setup.accountFor.uploadUnavailable')); return; }
     }
     await saveOnboardingValue(email, 'accountType', accountType, uid);
     // A guardian account collects the guardian's details first; the child's own health profile (starting
@@ -40,24 +42,24 @@ export default function AccountForScreen() {
 
   return (
     <SetupScreen
-      section="PERSONAL DETAILS"
+      section={t('setup.section.personal')}
       percent={SETUP_PROGRESS.accountFor}
-      title={'Who is this\naccount for?'}
-      subtitle="Diabeatis360 supports both adults and children under a parent or guardian’s supervision."
+      title={t('setup.accountFor.title')}
+      subtitle={t('setup.accountFor.subtitle')}
       onBack={router.canGoBack() ? () => router.back() : undefined}
-      footer={<AuthButton title={checking ? 'Checking…' : 'Next'} icon={checking ? undefined : 'arrow'} onPress={finish} disabled={checking} />}
+      footer={<AuthButton title={checking ? t('setup.accountFor.checking') : t('common.next')} icon={checking ? undefined : 'arrow'} onPress={finish} disabled={checking} />}
     >
       <SetupOption
         icon={{ ios: 'person.fill', android: 'person' }}
-        title="For me"
-        detail="I am 18 or older and will use this account myself."
+        title={t('setup.accountFor.self')}
+        detail={t('setup.accountFor.selfDetail')}
         selected={accountType === 'self'}
         onPress={() => { setAccountType('self'); setNotice(''); }}
       />
       <SetupOption
         icon={{ ios: 'figure.and.child.holdinghands', android: 'family_restroom' }}
-        title="For my child"
-        detail="This account is for a child under 18. I will verify as their parent or legal guardian."
+        title={t('setup.accountFor.minor')}
+        detail={t('setup.accountFor.minorDetail')}
         selected={accountType === 'minor'}
         onPress={() => { setAccountType('minor'); setNotice(''); }}
       />

@@ -3,6 +3,8 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
+import { monthNames } from '@/i18n/translate';
+import { useT } from '@/i18n/language-context';
 
 import { authColors } from './auth-ui';
 import { parseBirthdate } from './birthdate';
@@ -44,6 +46,10 @@ function partsFrom(value: string | null | undefined): Parts {
  * the Firestore records already use.
  */
 export function BirthdateWheels({ value, onChange, years = YEARS }: { value: string | null; onChange: (formatted: string | null) => void; years?: number[] }) {
+  // Month names are shown in the person's language; the value produced stays English ("March 14, 1981"), which is
+  // what the profile code reads and stores (D33).
+  const { t, language } = useT();
+  const shownMonths = monthNames(language);
   const [parts, setParts] = useState<Parts>(() => partsFrom(value));
 
   // Re-seed when the caller swaps in a different stored value (e.g. the profile
@@ -81,9 +87,9 @@ export function BirthdateWheels({ value, onChange, years = YEARS }: { value: str
 
   return (
     <View style={styles.columns}>
-      <Column label="Month" items={MONTHS} selectedIndex={parts.monthIndex} onSelect={(index) => pickMonth(index)} render={(item) => String(item)} />
-      <Column label="Day" items={dayOptions} selectedIndex={parts.day !== null ? dayOptions.indexOf(parts.day) : null} onSelect={(index) => commit({ ...parts, day: dayOptions[index] })} render={(item) => String(item)} />
-      <Column label="Year" items={years} selectedIndex={parts.year !== null ? years.indexOf(parts.year) : null} onSelect={(index) => pickYear(years[index])} render={(item) => String(item)} />
+      <Column label={t('date.month')} items={MONTHS} selectedIndex={parts.monthIndex} onSelect={(index) => pickMonth(index)} render={(item) => shownMonths[MONTHS.indexOf(String(item))] ?? String(item)} />
+      <Column label={t('date.day')} items={dayOptions} selectedIndex={parts.day !== null ? dayOptions.indexOf(parts.day) : null} onSelect={(index) => commit({ ...parts, day: dayOptions[index] })} render={(item) => String(item)} />
+      <Column label={t('date.year')} items={years} selectedIndex={parts.year !== null ? years.indexOf(parts.year) : null} onSelect={(index) => pickYear(years[index])} render={(item) => String(item)} />
     </View>
   );
 }
@@ -108,6 +114,7 @@ function Column<T>({ label, items, selectedIndex, onSelect, render }: { label: s
  * profile editor where a full-screen picker would be overkill.
  */
 export function BirthdateField({ value, onChange, title = 'Date of Birth', placeholder = 'Select your date of birth', years }: { value: string; onChange: (formatted: string) => void; title?: string; placeholder?: string; years?: number[] }) {
+  const { t, date } = useT();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(value || null);
 
@@ -116,9 +123,9 @@ export function BirthdateField({ value, onChange, title = 'Date of Birth', place
 
   return (
     <>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${title}: ${value || placeholder}`} style={styles.field} onPress={show}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${title}: ${value ? date(value) : placeholder}`} style={styles.field} onPress={show}>
         <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor="#64748B" />
-        <Text style={[styles.fieldText, !value && styles.fieldPlaceholder]}>{value || placeholder}</Text>
+        <Text style={[styles.fieldText, !value && styles.fieldPlaceholder]}>{value ? date(value) : placeholder}</Text>
       </Pressable>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
@@ -126,14 +133,14 @@ export function BirthdateField({ value, onChange, title = 'Date of Birth', place
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{title}</Text>
-              <Pressable onPress={() => setOpen(false)} hitSlop={10}><Text style={styles.cancel}>Cancel</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => setOpen(false)} hitSlop={10}><Text style={styles.cancel}>{t('common.cancel')}</Text></Pressable>
             </View>
             <BirthdateWheels value={draft} onChange={setDraft} years={years} />
             <View style={styles.preview}>
-              <Text style={styles.previewText}>{draft ?? 'Select month, day and year'}</Text>
+              <Text style={styles.previewText}>{draft ? date(draft) : t('date.pickAll')}</Text>
             </View>
             <Pressable style={[styles.confirm, !draft && styles.confirmDisabled]} onPress={confirm} disabled={!draft}>
-              <Text style={styles.confirmText}>Done</Text>
+              <Text style={styles.confirmText}>{t('common.done')}</Text>
             </Pressable>
           </View>
         </View>

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
 
 import { authColors } from './auth-ui';
 
@@ -35,19 +36,20 @@ export function SetupScreen({ section, percent, title, subtitle, onBack, childre
   children: ReactNode;
   footer: ReactNode;
 }) {
+  const { t } = useT();
   return (
     // A ScrollView, so a small phone or large system text never pushes the Next button off the screen.
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <View accessible accessibilityLabel={`${section.toLowerCase()}, ${percent}% complete`} style={styles.progressRow}>
+      <View accessible accessibilityLabel={`${section.toLowerCase()}, ${t('common.percentComplete', { percent })}`} style={styles.progressRow}>
         <Text style={styles.section}>{section}</Text>
-        <Text style={[styles.percent, percent === 100 && styles.percentDone]}>{percent}% Complete</Text>
+        <Text style={[styles.percent, percent === 100 && styles.percentDone]}>{t('common.percentComplete', { percent })}</Text>
       </View>
       <View style={styles.track}><View style={[styles.fill, { width: `${percent}%` }]} /></View>
 
       {onBack ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack} hitSlop={12} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} onPress={onBack} hitSlop={12} style={styles.back}>
           <SymbolView name={{ ios: 'arrow.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={MUTED_LIGHT} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('common.back')}</Text>
         </Pressable>
       ) : <View style={styles.noBack} />}
 

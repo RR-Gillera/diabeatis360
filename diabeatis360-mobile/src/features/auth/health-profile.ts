@@ -6,6 +6,8 @@
 // the fields the person actually changed are written, never an empty one.
 import type { AndroidSymbol, SFSymbol } from 'expo-symbols';
 
+import type { MessageKey } from '@/i18n/en';
+
 import { normalizeDiabetesType } from '@/constants/enums';
 
 export type HealthForm = {
@@ -64,20 +66,21 @@ export function healthFormProblem(form: HealthForm): string | null {
 // ---- The answer lists shared by setup and Profile (Figma Step 8 and 9, P-12), so both always offer the same words.
 
 type OptionIcon = { ios: SFSymbol; android: AndroidSymbol };
-export type ProfileOption = { value: string; detail: string; icon: OptionIcon };
+/** `value` is the stored code (always English); `labelKey` / `detailKey` are what the screens show (D33). */
+export type ProfileOption = { value: string; detail: string; icon: OptionIcon; labelKey: MessageKey; detailKey: MessageKey };
 
 export const ACTIVITY_LEVELS: ProfileOption[] = [
-  { value: 'Sedentary', detail: 'Office job, little to no exercise', icon: { ios: 'sofa.fill', android: 'weekend' } },
-  { value: 'Light', detail: '1-2 days of light activity/week', icon: { ios: 'figure.walk', android: 'directions_walk' } },
-  { value: 'Active', detail: '3-5 days of exercise/week', icon: { ios: 'figure.run', android: 'directions_run' } },
-  { value: 'Very Active', detail: 'Hard exercise 6-7 days/week', icon: { ios: 'flame.fill', android: 'local_fire_department' } },
+  { value: 'Sedentary', detail: 'Office job, little to no exercise', icon: { ios: 'sofa.fill', android: 'weekend' }, labelKey: 'activity.Sedentary', detailKey: 'activity.Sedentary.detail' },
+  { value: 'Light', detail: '1-2 days of light activity/week', icon: { ios: 'figure.walk', android: 'directions_walk' }, labelKey: 'activity.Light', detailKey: 'activity.Light.detail' },
+  { value: 'Active', detail: '3-5 days of exercise/week', icon: { ios: 'figure.run', android: 'directions_run' }, labelKey: 'activity.Active', detailKey: 'activity.Active.detail' },
+  { value: 'Very Active', detail: 'Hard exercise 6-7 days/week', icon: { ios: 'flame.fill', android: 'local_fire_department' }, labelKey: 'activity.Very Active', detailKey: 'activity.Very Active.detail' },
 ];
 
 export const DIETS: ProfileOption[] = [
-  { value: 'Everything', detail: 'No specific restrictions', icon: { ios: 'fork.knife', android: 'restaurant' } },
-  { value: 'Vegetarian', detail: 'Plant-based diet, no meat', icon: { ios: 'leaf.fill', android: 'eco' } },
-  { value: 'No Pork', detail: 'All meats except pork products', icon: { ios: 'nosign', android: 'block' } },
-  { value: 'Diabetic Diet', detail: 'Low sugar & glycemic index focus', icon: { ios: 'drop.fill', android: 'water_drop' } },
+  { value: 'Everything', detail: 'No specific restrictions', icon: { ios: 'fork.knife', android: 'restaurant' }, labelKey: 'diet.Everything', detailKey: 'diet.Everything.detail' },
+  { value: 'Vegetarian', detail: 'Plant-based diet, no meat', icon: { ios: 'leaf.fill', android: 'eco' }, labelKey: 'diet.Vegetarian', detailKey: 'diet.Vegetarian.detail' },
+  { value: 'No Pork', detail: 'All meats except pork products', icon: { ios: 'nosign', android: 'block' }, labelKey: 'diet.No Pork', detailKey: 'diet.No Pork.detail' },
+  { value: 'Diabetic Diet', detail: 'Low sugar & glycemic index focus', icon: { ios: 'drop.fill', android: 'water_drop' }, labelKey: 'diet.Diabetic Diet', detailKey: 'diet.Diabetic Diet.detail' },
 ];
 
 /** The detail line for a stored activity level or diet ("Light" -> "1-2 days of light activity/week"), or ''. */

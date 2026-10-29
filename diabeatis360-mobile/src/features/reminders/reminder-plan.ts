@@ -24,18 +24,19 @@ export const APPOINTMENT_LEAD_MINUTES = 60;
 // app is the only off-switch.
 
 
-export type PlannedReminder = { title: string; body: string; when: { hour: number; minute: number } | { date: Date } };
+/** `category` lets the phone write the reminder in the person's language (reminder-service.ts, D33); title/body are the English text. */
+export type PlannedReminder = { category: ReminderCategory; title: string; body: string; when: { hour: number; minute: number } | { date: Date } };
 
 /** Pure planning step (no phone APIs): every daily reminder, plus one before each upcoming appointment. */
 export function planReminders(appointments: Date[], now = new Date()): PlannedReminder[] {
   const planned: PlannedReminder[] = [];
-  for (const reminder of Object.values(DAILY_REMINDERS)) {
-    for (const [hour, minute] of reminder.times) planned.push({ title: reminder.title, body: reminder.body, when: { hour, minute } });
+  for (const [category, reminder] of Object.entries(DAILY_REMINDERS) as [Exclude<ReminderCategory, 'appointment'>, DailyReminder][]) {
+    for (const [hour, minute] of reminder.times) planned.push({ category, title: reminder.title, body: reminder.body, when: { hour, minute } });
   }
   for (const start of appointments) {
     const date = new Date(start.getTime() - APPOINTMENT_LEAD_MINUTES * 60_000);
     if (date.getTime() > now.getTime()) {
-      planned.push({ title: 'Appointment soon', body: `Your consultation starts in ${APPOINTMENT_LEAD_MINUTES} minutes.`, when: { date } });
+      planned.push({ category: 'appointment', title: 'Appointment soon', body: `Your consultation starts in ${APPOINTMENT_LEAD_MINUTES} minutes.`, when: { date } });
     }
   }
   return planned;

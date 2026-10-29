@@ -4,7 +4,9 @@ import { Platform } from 'react-native';
 
 import { db } from '@/firebase';
 
-import { planReminders } from './reminder-plan';
+import { translate, type Language } from '@/i18n/translate';
+
+import { APPOINTMENT_LEAD_MINUTES, planReminders } from './reminder-plan';
 
 // Local reminders for the six categories of the Notifications module (glucose check, meal, medication, exercise,
 // hydration, appointment). They are scheduled ON THE PHONE with expo-notifications, so they still ring when the app is
@@ -54,7 +56,7 @@ async function upcomingAppointments(patientId: string): Promise<Date[]> {
  * Called when a patient signs in / opens the app, so it always starts from a clean list. Returns how many were
  * scheduled (0 on the web or when permission was refused).
  */
-export async function syncReminders(uid: string): Promise<number> {
+export async function syncReminders(uid: string, language: Language = 'English'): Promise<number> {
   const Notifications = loadNotifications();
   if (!Notifications) return 0;
 
@@ -72,7 +74,11 @@ export async function syncReminders(uid: string): Promise<number> {
   await Notifications.cancelAllScheduledNotificationsAsync();
   for (const item of planned) {
     await Notifications.scheduleNotificationAsync({
-      content: { title: item.title, body: item.body },
+      // In the person's language (D33): the same keys as Profile > Notifications.
+      content: {
+        title: translate(language, `reminders.${item.category}.title`),
+        body: translate(language, `reminders.${item.category}.body`, { minutes: APPOINTMENT_LEAD_MINUTES }),
+      },
       trigger:
         'hour' in item.when
           ? { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: item.when.hour, minute: item.when.minute, channelId: CHANNEL_ID }

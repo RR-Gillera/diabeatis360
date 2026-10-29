@@ -9,6 +9,8 @@ import { useAuth } from '@/features/auth/auth-context';
 import { allergyText, COMMON_ALLERGIES, NO_ALLERGIES, toggleAllergy } from '@/features/auth/health-profile';
 import { SETUP_PROGRESS, SetupScreen } from '@/features/auth/setup-kit';
 import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
+import type { MessageKey } from '@/i18n/translate';
 
 // Figma "Profile Setup Step 7" (Any allergies or ingredients to avoid?).
 // An explicit answer is required (DECISIONS.md D25): either allergies, or "None". Skipping is not allowed, because
@@ -16,13 +18,15 @@ import { Brand } from '@/constants/theme';
 export default function AllergiesScreen() {
   const router = useRouter();
   const { email, uid } = useAuth();
+  const { t } = useT();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
 
   const typed = search.trim();
-  const visible = COMMON_ALLERGIES.filter((item) => item.toLowerCase().includes(typed.toLowerCase()));
+  const chipLabel = (item: string) => t(`allergy.${item}` as MessageKey);
+  const visible = COMMON_ALLERGIES.filter((item) => [item, chipLabel(item)].some((name) => name.toLowerCase().includes(typed.toLowerCase())));
   const custom = selected.filter((item) => !COMMON_ALLERGIES.includes(item) && item !== NO_ALLERGIES);
-  const canAddTyped = typed.length > 0 && !visible.some((item) => item.toLowerCase() === typed.toLowerCase())
+  const canAddTyped = typed.length > 0 && !visible.some((item) => [item, chipLabel(item)].some((name) => name.toLowerCase() === typed.toLowerCase()))
     && !selected.some((item) => item.toLowerCase() === typed.toLowerCase());
 
   const tap = (item: string) => setSelected((current) => toggleAllergy(current, item));
@@ -36,14 +40,14 @@ export default function AllergiesScreen() {
 
   return (
     <SetupScreen
-      section="PERSONAL DETAILS"
+      section={t('setup.section.personal')}
       percent={SETUP_PROGRESS.allergies}
-      title={'Any allergies or\ningredients to avoid?'}
-      subtitle="This helps us recommend safer meals and avoid ingredients that may affect your health. Select as many as apply."
+      title={t('setup.allergies.title')}
+      subtitle={t('setup.allergies.subtitle')}
       onBack={() => router.back()}
       footer={<>
-        {!selected.length ? <Text style={styles.needAnswer}>Choose your allergies, or None if you have none.</Text> : null}
-        <AuthButton title="Next" icon="next" onPress={next} disabled={!selected.length} />
+        {!selected.length ? <Text style={styles.needAnswer}>{t('setup.allergies.needAnswer')}</Text> : null}
+        <AuthButton title={t('common.next')} icon="next" onPress={next} disabled={!selected.length} />
       </>}
     >
       <View style={styles.search}>
@@ -54,30 +58,31 @@ export default function AllergiesScreen() {
           value={search}
           onChangeText={setSearch}
           onSubmitEditing={addTyped}
-          placeholder="Search or type an allergy"
+          placeholder={t('setup.allergies.search')}
           placeholderTextColor="#94A3B8"
-          accessibilityLabel="Search or type an allergy"
+          accessibilityLabel={t('setup.allergies.search')}
           returnKeyType="done"
           style={styles.searchInput}
         />
       </View>
 
       <View style={styles.grid}>
-        {visible.map((item) => <Chip key={item} label={item} selected={selected.includes(item)} onPress={() => tap(item)} />)}
+        {visible.map((item) => <Chip key={item} label={chipLabel(item)} selected={selected.includes(item)} onPress={() => tap(item)} />)}
         {custom.map((item) => <Chip key={item} label={item} selected removable onPress={() => tap(item)} />)}
-        {canAddTyped ? <Chip label={`+ Add "${typed}"`} selected={false} onPress={addTyped} /> : null}
-        <Chip label="None" selected={selected.includes(NO_ALLERGIES)} onPress={() => tap(NO_ALLERGIES)} />
+        {canAddTyped ? <Chip label={t('setup.allergies.addTyped', { name: typed })} selected={false} onPress={addTyped} /> : null}
+        <Chip label={t('allergy.None')} selected={selected.includes(NO_ALLERGIES)} onPress={() => tap(NO_ALLERGIES)} />
       </View>
     </SetupScreen>
   );
 }
 
 function Chip({ label, selected, removable, onPress }: { label: string; selected: boolean; removable?: boolean; onPress: () => void }) {
+  const { t } = useT();
   return (
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
-      accessibilityLabel={removable ? `${label}, tap to remove` : label}
+      accessibilityLabel={removable ? t('common.tapToRemove', { label }) : label}
       onPress={onPress}
       style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}
     >

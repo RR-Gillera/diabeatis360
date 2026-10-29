@@ -9,6 +9,7 @@ import { MenuRow, ProfileTop, profileColors, type ProfileIcon } from '@/features
 import { APPOINTMENT_LEAD_MINUTES, DAILY_REMINDERS } from '@/features/reminders/reminder-plan';
 import { reminderPermission } from '@/features/reminders/reminder-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Profile > Notifications (DECISIONS.md D29, D31). Reminders are always on, so this screen does not offer switches: it
 // says what the person will get and when (read from reminder-plan.ts, the same list the phone schedules), whether
@@ -28,6 +29,7 @@ function clock(hour: number, minute: number) {
 export default function NotificationSettingsScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/profile');
+  const { t } = useT();
   const [status, setStatus] = useState<'on' | 'off' | 'unavailable' | null>(null);
 
   // Checked again whenever the screen comes back, e.g. after the person allowed notifications in the phone's settings.
@@ -38,16 +40,16 @@ export default function NotificationSettingsScreen() {
   }, []));
 
   const banner = status === 'off'
-    ? { tone: styles.bannerOff, icon: { ios: 'bell.slash.fill', android: 'notifications_off' } as const, color: Brand.colors.danger, title: 'Notifications are off on this phone', text: 'Reminders cannot ring until you allow them in the phone’s settings.' }
+    ? { tone: styles.bannerOff, icon: { ios: 'bell.slash.fill', android: 'notifications_off' } as const, color: Brand.colors.danger, title: t('reminders.off.title'), text: t('reminders.off.text') }
     : status === 'on'
-      ? { tone: styles.bannerOn, icon: { ios: 'checkmark.circle.fill', android: 'check_circle' } as const, color: Brand.colors.primary, title: 'Notifications are on', text: 'Your reminders are scheduled on this phone and ring even when the app is closed.' }
+      ? { tone: styles.bannerOn, icon: { ios: 'checkmark.circle.fill', android: 'check_circle' } as const, color: Brand.colors.primary, title: t('reminders.on.title'), text: t('reminders.on.text') }
       : status === 'unavailable'
-        ? { tone: styles.bannerInfo, icon: { ios: 'info.circle.fill', android: 'info' } as const, color: '#475569', title: 'Reminders ring in the installed app', text: 'They are not available in a web browser or in Expo Go.' }
+        ? { tone: styles.bannerInfo, icon: { ios: 'info.circle.fill', android: 'info' } as const, color: '#475569', title: t('reminders.unavailable.title'), text: t('reminders.unavailable.text') }
         : null;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scroll}>
-      <ProfileTop title="Notifications" subtitle="Reminders are always on, to help you stay on track every day." onBack={goBack} />
+      <ProfileTop title={t('reminders.title')} subtitle={t('reminders.subtitle')} onBack={goBack} />
 
       {banner ? (
         <View accessibilityLiveRegion="polite" style={[styles.banner, banner.tone]}>
@@ -59,16 +61,17 @@ export default function NotificationSettingsScreen() {
         </View>
       ) : null}
 
-      <Text accessibilityRole="header" style={styles.heading}>Your daily reminders</Text>
+      <Text accessibilityRole="header" style={styles.heading}>{t('reminders.daily')}</Text>
       <View style={styles.list}>
         {(Object.keys(DAILY_REMINDERS) as (keyof typeof DAILY_REMINDERS)[]).map((key) => {
           const reminder = DAILY_REMINDERS[key];
           const icon = ICONS[key];
+          const title = t(`reminders.${key}.title`);
           return (
-            <View key={key} accessible accessibilityLabel={`${reminder.title}: ${reminder.times.map(([hour, minute]) => clock(hour, minute)).join(', ')}`} style={styles.item}>
+            <View key={key} accessible accessibilityLabel={`${title}: ${reminder.times.map(([hour, minute]) => clock(hour, minute)).join(', ')}`} style={styles.item}>
               <View style={styles.itemIcon}><SymbolView name={{ ios: icon.ios, android: icon.android, web: icon.android }} size={20} tintColor={Brand.colors.primary} /></View>
               <View style={styles.itemCopy}>
-                <Text style={styles.itemTitle}>{reminder.title}</Text>
+                <Text style={styles.itemTitle}>{title}</Text>
                 <Text style={styles.itemTimes}>{reminder.times.map(([hour, minute]) => clock(hour, minute)).join('  ·  ')}</Text>
               </View>
             </View>
@@ -77,23 +80,23 @@ export default function NotificationSettingsScreen() {
         <View style={[styles.item, styles.itemLast]}>
           <View style={styles.itemIcon}><SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor={Brand.colors.primary} /></View>
           <View style={styles.itemCopy}>
-            <Text style={styles.itemTitle}>Appointment soon</Text>
-            <Text style={styles.itemTimes}>{APPOINTMENT_LEAD_MINUTES} minutes before each confirmed appointment</Text>
+            <Text style={styles.itemTitle}>{t('reminders.appointment.title')}</Text>
+            <Text style={styles.itemTimes}>{t('reminders.appointment.when', { minutes: APPOINTMENT_LEAD_MINUTES })}</Text>
           </View>
         </View>
       </View>
 
-      <Text accessibilityRole="header" style={styles.heading}>In the app</Text>
+      <Text accessibilityRole="header" style={styles.heading}>{t('reminders.inApp')}</Text>
       <MenuRow
         icon={{ ios: 'bell.badge.fill', android: 'notifications_active' }}
-        title="Alerts and messages"
-        subtitle="BOOKINGS · MESSAGES · ALERTS"
+        title={t('reminders.alerts')}
+        subtitle={t('reminders.alertsDetail')}
         onPress={() => router.push('/notifications')}
       />
 
       <View style={styles.settings}>
-        <AuthButton title="Open phone notification settings" onPress={() => { void Linking.openSettings(); }} />
-        <Text style={styles.settingsHint}>To stop reminders, turn off notifications for Diabeatis360 in your phone’s settings.</Text>
+        <AuthButton title={t('reminders.openSettings')} onPress={() => { void Linking.openSettings(); }} />
+        <Text style={styles.settingsHint}>{t('reminders.howToStop')}</Text>
       </View>
     </ScrollView>
   );

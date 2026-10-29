@@ -6,6 +6,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { RoundBackButton } from '@/components/ui/round-back-button';
 import { Brand } from '@/constants/theme';
 import type { MemberTier } from '@/features/gamification/member-tier';
+import { useT } from '@/i18n/language-context';
 
 // The pieces of the Profile screens, drawn from the Figma frames "Profile and Premium Screens", [P-11] Health Profile
 // and [P-12] Health Profile (Edit): menu rows with an icon tile and a chevron, the green gradient Premium card, the
@@ -34,10 +35,11 @@ export function ProfileTop({ title, subtitle, onBack, action }: { title: string;
 
 /** The light-green "Edit" pill of P-11. */
 export function EditPill({ onPress }: { onPress: () => void }) {
+  const { t } = useT();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="Edit health profile" onPress={onPress} style={({ pressed }) => [styles.editPill, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={t('health.editA11y')} onPress={onPress} style={({ pressed }) => [styles.editPill, pressed && styles.pressed]}>
       <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} tintColor={GREEN} />
-      <Text style={styles.editPillText}>Edit</Text>
+      <Text style={styles.editPillText}>{t('common.edit')}</Text>
     </Pressable>
   );
 }
@@ -104,11 +106,13 @@ const TIER_LOOK: Record<MemberTier, { background: string; border: string; color:
 
 /** "BRONZE MEMBER" / "SILVER MEMBER" / "GOLD MEMBER" (D31). */
 export function TierBadge({ tier }: { tier: MemberTier }) {
+  const { t } = useT();
   const look = TIER_LOOK[tier];
+  const text = t('profile.tierBadge', { tier: tier.toUpperCase() });
   return (
-    <View accessibilityLabel={`${tier} member`} style={[styles.tier, { backgroundColor: look.background, borderColor: look.border }]}>
+    <View accessibilityLabel={text} style={[styles.tier, { backgroundColor: look.background, borderColor: look.border }]}>
       <SymbolView name={{ ios: 'shield.fill', android: 'shield', web: 'shield' }} size={12} tintColor={look.color} />
-      <Text style={[styles.tierText, { color: look.color }]}>{tier.toUpperCase()} MEMBER</Text>
+      <Text style={[styles.tierText, { color: look.color }]}>{text}</Text>
     </View>
   );
 }
@@ -125,16 +129,18 @@ export function InfoCard({ title, children }: { title: string; children: ReactNo
 
 /** "Name ............ Maria Santos" inside an InfoCard. */
 export function InfoLine({ label, value }: { label: string; value: string }) {
+  const { t } = useT();
   return (
     <View style={styles.line}>
       <Text style={styles.lineLabel}>{label}</Text>
-      <Text style={[styles.lineValue, !value && styles.lineMissing]}>{value || 'Not set'}</Text>
+      <Text style={[styles.lineValue, !value && styles.lineMissing]}>{value || t('common.notSet')}</Text>
     </View>
   );
 }
 
 /** A rounded chip: selectable in P-12, read-only in P-11 (`onPress` left out). */
 export function Chip({ label, selected, onPress, removable }: { label: string; selected?: boolean; onPress?: () => void; removable?: boolean }) {
+  const { t } = useT();
   const body = (
     <>
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
@@ -146,7 +152,7 @@ export function Chip({ label, selected, onPress, removable }: { label: string; s
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked: Boolean(selected) }}
-      accessibilityLabel={removable ? `${label}, tap to remove` : label}
+      accessibilityLabel={removable ? t('common.tapToRemove', { label }) : label}
       onPress={onPress}
       hitSlop={4}
       style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}

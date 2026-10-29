@@ -53,7 +53,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --import ./scripts/register-ts-alias.mjs --test \"src/constants/*.test.mjs\" \"src/features/auth/*.test.mjs\" \"src/features/booking/appointment-tabs.test.mjs\" \"src/features/booking/manila-time.test.mjs\" \"src/features/calls/join-error.test.mjs\" \"src/features/gamification/*.test.mjs\" \"src/features/glucose/doctor-alert.test.mjs\" \"src/features/consultation/consultation-format.test.mjs\" \"src/features/doctor/doctor-stats.test.mjs\" \"src/features/notifications/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/features/subscription/plan-display.test.mjs\" \"src/lib/*.test.mjs\""
+    "test": "node --import ./scripts/register-ts-alias.mjs --test \"src/constants/*.test.mjs\" \"src/features/auth/*.test.mjs\" \"src/features/booking/appointment-tabs.test.mjs\" \"src/features/booking/manila-time.test.mjs\" \"src/features/calls/join-error.test.mjs\" \"src/features/gamification/*.test.mjs\" \"src/features/glucose/doctor-alert.test.mjs\" \"src/features/consultation/consultation-format.test.mjs\" \"src/features/doctor/doctor-stats.test.mjs\" \"src/features/notifications/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/features/subscription/plan-display.test.mjs\" \"src/lib/*.test.mjs\" \"src/i18n/*.test.mjs\""
   },
   "private": true
 }
