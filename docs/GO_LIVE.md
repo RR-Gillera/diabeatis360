@@ -257,6 +257,23 @@ npx.cmd eas-cli update --channel preview --environment preview --message "What c
 
 **Limits:** Expo's free plan covers the team and the respondents (monthly active users on the order of a thousand; check expo.dev/pricing). Updates do not apply in Expo Go or the web build.
 
+## A13. Clean start before respondents, and the Philippine foods (DECISIONS D32)
+Run from the repo root, in this order, on the team's "go". Both scripts read the service-account key only through the
+environment variable below (never print it). In PowerShell:
+```
+$env:GOOGLE_APPLICATION_CREDENTIALS = "$PWDserviceAccountKey.json"
+node functions/scripts/live-cleanup.js --live              # 1. dry run: read the counts
+node functions/scripts/live-cleanup.js --live --apply      # 2. backup to D:diabeatis360-backups, then delete; plans and badges put back
+node functions/scripts/seed-ph-foods.js --live             # 3. dry run: the 31 foods it would add
+node functions/scripts/seed-ph-foods.js --live --apply     # 4. add them
+Remove-Item Env:GOOGLE_APPLICATION_CREDENTIALS
+```
+- Step 2 deletes **every account except the admin**, including the team's own test accounts: sign up again afterwards.
+- Keep the backup file private (it holds everyone's test data). It is outside the repo on purpose.
+- Then open the admin panel > Content > Food Database: the foods are there and can be edited or hidden; ask the adviser
+  or a dietitian to review them (each row says where its numbers came from).
+- Tested on the emulators: `firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node --test functions/test/live-cleanup.test.js"`.
+
 ---
 
 # Part B: needs Blaze (later)

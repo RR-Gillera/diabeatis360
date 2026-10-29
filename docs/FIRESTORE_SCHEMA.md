@@ -11,7 +11,7 @@ intent. Names below are lowercase for readability. If this file and seed.cjs dis
 | providers | Auth UID | email, full_name, specialty, prc_license_number, city, consultation_fee (number), is_verified, verified_by, created_at, is_active |
 | admins | Auth UID | email, full_name, role (`super_admin`/`admin`), last_login, created_at |
 | glucose_logs | auto | patient_id, reading_mgdl (int mg/dL), context (`before_meal`/`after_meal`), notes, logged_at, created_at, interpretation (D13: the app's names are final) |
-| food_database | auto | food_name, glycemic_index, category, calories, status (`active`/`hidden`), added_by_admin_id |
+| food_database | auto (`ph-…` for the seeded Philippine foods, D32) | food_name (with its serving, e.g. "Steamed white rice (1 cup, 158 g)"), glycemic_index (0–100; 0 = no carbohydrate), category, calories (for that serving), status (`active`/`hidden`), added_by_admin_id, created_at, source (optional text: where the GI and calories came from, D32) |
 | ai_suggestions | auto | user_id, suggestion_type (`chat`/`meal`/`exercise`/`risk`), prompt, response, generated_at |
 | ai_suggestions_foods | auto | suggestion_id, food_id |
 | nutrition_scans | auto | user_id, image_url (optional, `null` per D2), product_name, product_id (barcode, D12 proposed), health_rating (`suitable`/`caution`/`unsuitable`), scanned_at |
