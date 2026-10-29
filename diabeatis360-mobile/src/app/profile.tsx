@@ -1,192 +1,189 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { doc, getDoc } from 'firebase/firestore';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
-import { db } from '@/firebase';
-import { authColors, authStyles, AuthButton, Section } from '@/features/auth/auth-ui';
+import { Brand } from '@/constants/theme';
+import { enumLabel } from '@/constants/enums';
 import { useAuth } from '@/features/auth/auth-context';
-import { getOnboardingValue, saveOnboardingValue } from '@/features/auth/onboarding';
 import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
-import { BirthdateField } from '@/features/auth/birthdate-picker';
-import { DIABETES_TYPES, enumLabel } from '@/constants/enums';
-import { changedHealthFields, EMPTY_HEALTH_FORM, healthFormProblem, profileToForm, type HealthForm } from '@/features/auth/health-profile';
-import { AppointmentHistoryList } from '@/features/booking/booking-history';
+import { useHealthProfile } from '@/features/auth/use-health-profile';
+import { initialsOf } from '@/features/booking/appointment-tabs';
+import { wellnessStats } from '@/features/gamification/gamification-service';
+import { compactNumber, memberTier } from '@/features/gamification/member-tier';
+import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav } from '@/features/home/home-ui';
+import { MenuRow, PremiumCard, profileColors, TierBadge } from '@/features/profile/profile-ui';
+import { reminderPermission } from '@/features/reminders/reminder-service';
+import { activeSubscription, subscribeToSubscriptions, type Subscription } from '@/features/subscription/subscription-service';
 import { resetTo } from '@/lib/navigation';
 
-type HealthField =
-  | { key: keyof HealthForm; label: string; type: 'date' }
-  | { key: keyof HealthForm; label: string; type: 'text'; placeholder?: string }
-  | { key: keyof HealthForm; label: string; type: 'options'; options: readonly string[] };
-
-// Option lists mirror the onboarding screens exactly — the doctor's patient
-// view shows these values verbatim, so free text would fragment them.
-const healthFields: HealthField[] = [
-  { key: 'dateOfBirth', label: 'Date of Birth', type: 'date' },
-  { key: 'condition', label: 'Condition', type: 'options', options: DIABETES_TYPES },
-  { key: 'allergy', label: 'Allergies', type: 'text', placeholder: 'e.g. Nuts, Dairy, Seafood, or None' },
-  { key: 'activity', label: 'Activity Level', type: 'options', options: ['Sedentary', 'Light', 'Active', 'Very Active'] },
-  { key: 'diet', label: 'Dietary Preference', type: 'options', options: ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet'] },
-];
-
-// The full profile/account screen — reachable from the dashboard's bottom nav.
-// Everything here (edit profile, health profile, appointment history) used to
-// live directly on the Home tab before that was rebuilt as the Figma dashboard;
-// it moved here unchanged so the Profile tab keeps that functionality.
+// Figma "Profile and Premium Screens": the person at the top (initials, name, email, membership tier), three stat tiles,
+// then the menu. The health profile itself is on its own screens now (P-11 view, P-12 edit), and appointment history
+// lives on the Doctors tab (My appointments), as in Figma. The photo is replaced by initials: storing photos needs
+// Firebase Storage, which the free Spark plan does not include (DECISIONS.md D18, D31).
 export default function ProfileScreen() {
   const router = useRouter();
-  const { uid, email, displayName, signOut, updateDisplayName } = useAuth();
-  const [name, setName] = useState(displayName ?? '');
-  const [savingName, setSavingName] = useState(false);
-  const [nameSaved, setNameSaved] = useState(false);
+  const { uid, email, displayName, signOut } = useAuth();
+  const profile = useHealthProfile(uid, email);
+  const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [guardian, setGuardian] = useState<GuardianVerification | null>(null);
+  const [reminders, setReminders] = useState<'on' | 'off' | 'unavailable'>('unavailable');
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
-  // health is the form; loaded is what Firestore held when the screen opened, so Save can write only real changes.
-  const [health, setHealth] = useState<HealthForm>(EMPTY_HEALTH_FORM);
-  const [loaded, setLoaded] = useState<HealthForm>(EMPTY_HEALTH_FORM);
-  const [healthError, setHealthError] = useState('');
-  const [savingHealth, setSavingHealth] = useState(false);
-  const [healthSaved, setHealthSaved] = useState(false);
-  const [loadingHealth, setLoadingHealth] = useState(true);
-  const [guardianVerification, setGuardianVerification] = useState<GuardianVerification | null>(null);
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToGlucoseHistory(uid, setEntries, () => {});
+  }, [uid]);
 
-  useEffect(() => { setName(displayName ?? ''); }, [displayName]);
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToSubscriptions(uid, setSubscriptions, () => {});
+  }, [uid]);
 
   // Set only on a pediatric account (DECISIONS.md D16); null for an adult's own account.
   useEffect(() => {
     if (!uid) return;
-    return subscribeToGuardianVerification(uid, setGuardianVerification, () => {});
+    return subscribeToGuardianVerification(uid, setGuardian, () => {});
   }, [uid]);
 
-  // The profile comes from the Users document (DECISIONS.md D25), so it is the same on every phone. The phone's
-  // own copy only fills a field Firestore does not have (e.g. offline), and is never written back by itself.
-  useEffect(() => {
-    if (!email) { setLoadingHealth(false); return; }
+  // Checked each time Profile comes back into view: the person may have just changed it in the phone's settings.
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
-    (async () => {
-      let form = { ...EMPTY_HEALTH_FORM };
-      try { if (uid) form = profileToForm((await getDoc(doc(db, 'Users', uid))).data()); } catch { /* offline: fall back below */ }
-      for (const field of healthFields) {
-        if (!form[field.key]) form = { ...form, [field.key]: (await getOnboardingValue(email, field.key)) ?? '' };
-      }
-      if (!cancelled) { setHealth(form); setLoaded(form); setLoadingHealth(false); }
-    })();
+    reminderPermission().then((value) => { if (!cancelled) setReminders(value); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [email, uid]);
+  }, []));
 
-  const saveName = async () => {
-    if (!name.trim()) return;
-    setSavingName(true); setNameSaved(false);
-    try { await updateDisplayName(name); setNameSaved(true); } finally { setSavingName(false); }
-  };
+  const stats = useMemo(() => wellnessStats(entries), [entries]);
+  const { tier } = memberTier(stats.points);
+  const premium = activeSubscription(subscriptions) !== null;
+  const name = profile?.fullName || displayName || 'Your name';
+  const diet = profile?.form.diet ?? '';
+  const language = profile?.language === 'Filipino' ? 'FILIPINO' : 'ENGLISH (US)';
+  const reminderStatus = reminders === 'on' ? 'ALWAYS ON' : reminders === 'off' ? 'OFF IN PHONE SETTINGS' : 'IN THE INSTALLED APP';
 
-  // Only the fields the person changed, never a blank (a blank used to wipe the stored profile, QA 2026-10-18 HP-03b).
-  const saveHealth = async () => {
-    if (!email) return;
-    const problem = healthFormProblem(health);
-    if (problem) { setHealthError(problem); return; }
-    setSavingHealth(true); setHealthSaved(false); setHealthError('');
-    try {
-      const changes = changedHealthFields(loaded, health);
-      for (const [key, value] of Object.entries(changes)) await saveOnboardingValue(email, key, value as string, uid);
-      setLoaded(health);
-      setHealthSaved(true);
-    } catch (value) {
-      setHealthError(value instanceof Error ? value.message : 'Your health profile could not be saved. Please try again.');
-    } finally { setSavingHealth(false); }
-  };
+  const logOut = () => { setConfirmLogout(false); signOut(); resetTo(router, '/'); };
 
   return (
-    <View style={authStyles.screen}>
+    <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.role}>PROFILE</Text>
-        <Text style={styles.email}>{email}</Text>
+        <View style={styles.person}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Edit your profile" onPress={() => router.push('/health-profile/edit')} style={styles.avatarWrap}>
+            <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View>
+            <View style={styles.avatarEdit}>
+              <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor="#FFFFFF" />
+            </View>
+          </Pressable>
+          <View style={styles.personCopy}>
+            <Text accessibilityRole="header" style={styles.name} numberOfLines={2}>{name}</Text>
+            <Text style={styles.email} numberOfLines={1}>{email}</Text>
+            <TierBadge tier={tier} />
+          </View>
+        </View>
 
-        {guardianVerification ? (
-          <View style={styles.guardianBox}>
-            <Text style={styles.guardianTitle}>Managed by: {guardianVerification.guardianFullName || 'Guardian'} ({enumLabel('guardianRelationship', guardianVerification.relationship)})</Text>
-            <Text style={[styles.guardianStatus, guardianVerification.status === 'rejected' && styles.guardianStatusRejected]}>
-              {enumLabel('verificationStatus', guardianVerification.status)}
-              {guardianVerification.status === 'rejected' && guardianVerification.rejectionReason ? ` — ${guardianVerification.rejectionReason}` : ''}
+        <View style={styles.stats}>
+          <Stat value={compactNumber(stats.totalLogs)} label="TOTAL LOGS" />
+          <Stat value={compactNumber(stats.streak)} label="DAY STREAK" />
+          <Stat value={compactNumber(stats.points)} label="POINTS" />
+        </View>
+
+        {guardian ? (
+          <View style={styles.guardian}>
+            <Text style={styles.guardianTitle}>Managed by {guardian.guardianFullName || 'a guardian'} ({enumLabel('guardianRelationship', guardian.relationship)})</Text>
+            <Text style={[styles.guardianStatus, guardian.status === 'rejected' && styles.guardianRejected]}>
+              {enumLabel('verificationStatus', guardian.status)}
+              {guardian.status === 'rejected' && guardian.rejectionReason ? ` — ${guardian.rejectionReason}` : ''}
             </Text>
-            {guardianVerification.status === 'rejected' ? (
-              <Pressable onPress={() => router.push({ pathname: '/onboarding/guardian', params: { mode: 'resubmit' } })}>
-                <Text style={styles.link}>Resubmit guardian verification →</Text>
+            {guardian.status === 'rejected' ? (
+              <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/onboarding/guardian', params: { mode: 'resubmit' } })}>
+                <Text style={styles.guardianLink}>Resubmit guardian verification</Text>
               </Pressable>
             ) : null}
           </View>
         ) : null}
 
-        <Section title="Edit Profile">
-          <TextInput value={name} onChangeText={(value) => { setName(value); setNameSaved(false); }} placeholder="Full name" style={styles.input} />
-          <AuthButton title={savingName ? 'Saving...' : nameSaved ? 'Saved ✓' : 'Save Name'} onPress={saveName} disabled={savingName} />
-        </Section>
+        <View style={styles.menu}>
+          <MenuRow icon={{ ios: 'person.text.rectangle', android: 'manage_accounts' }} title="Edit Profile" onPress={() => router.push('/health-profile')} />
+          <MenuRow icon={{ ios: 'fork.knife', android: 'restaurant' }} title="Dietary Preference" subtitle={diet ? diet.toUpperCase() : undefined} onPress={() => router.push('/dietary-preference')} />
+          <MenuRow icon={{ ios: 'character.bubble', android: 'translate' }} title="Language" subtitle={language} onPress={() => router.push('/language-settings')} />
+          <MenuRow icon={{ ios: 'bell.fill', android: 'notifications' }} title="Notifications" subtitle={reminderStatus} onPress={() => router.push('/notification-settings')} />
+          <MenuRow icon={{ ios: 'gift.fill', android: 'redeem' }} tint="green" title="My Rewards" subtitle={`${tier.toUpperCase()} · ${compactNumber(stats.points)} PTS`} onPress={() => router.push('/rewards')} />
+          {premium
+            ? <PremiumCard title="Premium Member" subtitle="Manage your plan" onPress={() => router.push('/subscription')} />
+            : <PremiumCard title="Upgrade to Premium" subtitle="More AI suggestions and label scans" onPress={() => router.push('/subscription')} />}
+          <MenuRow icon={{ ios: 'rectangle.portrait.and.arrow.right', android: 'logout' }} title="Logout" tone="danger" onPress={() => setConfirmLogout(true)} />
+        </View>
 
-        <Section title="Health Profile">
-          {loadingHealth ? <ActivityIndicator color={authColors.green} /> : <>
-            {healthFields.map((field) => {
-              const update = (value: string) => { setHealth((current) => ({ ...current, [field.key]: value })); setHealthSaved(false); setHealthError(''); };
-              return (
-                <View key={field.key} style={styles.fieldRow}>
-                  <Text style={styles.fieldLabel}>{field.label.toUpperCase()}</Text>
-                  {field.type === 'date' ? (
-                    <BirthdateField value={health[field.key] ?? ''} onChange={update} />
-                  ) : field.type === 'options' ? (
-                    <View style={styles.chipRow}>
-                      {field.options.map((option) => {
-                        const active = health[field.key] === option;
-                        return (
-                          <Pressable key={option} onPress={() => update(option)} style={[styles.chip, active && styles.chipActive]}>
-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{option}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <TextInput value={health[field.key] ?? ''} onChangeText={update} placeholder={field.placeholder ?? field.label} placeholderTextColor="#A7B8CD" style={styles.input} />
-                  )}
-                </View>
-              );
-            })}
-            {healthError ? <Text style={styles.healthError}>{healthError}</Text> : null}
-            <AuthButton title={savingHealth ? 'Saving...' : healthSaved ? 'Saved ✓' : 'Save Health Profile'} onPress={saveHealth} disabled={savingHealth} />
-          </>}
-        </Section>
-
-        <Section title="Membership & Rewards">
-          <Pressable onPress={() => router.navigate('/subscription')}><Text style={styles.link}>View membership plans →</Text></Pressable>
-          <Pressable onPress={() => router.navigate('/rewards')}><Text style={styles.link}>Wellness rewards & badges →</Text></Pressable>
-        </Section>
-
-        <Section title="Appointment History">
-          <AppointmentHistoryList patientId={uid} />
-          <Pressable onPress={() => router.push('/booking/find-doctor')}><Text style={styles.link}>Book a new appointment →</Text></Pressable>
-        </Section>
-
-        <Pressable onPress={() => { signOut(); resetTo(router, '/'); }}><Text style={styles.logout}>Log out</Text></Pressable>
+        <View style={styles.legal}>
+          <Text accessibilityRole="link" style={styles.legalLink} onPress={() => router.push('/privacy-policy')}>Privacy Policy</Text>
+          <Text style={styles.legalDot}>·</Text>
+          <Text accessibilityRole="link" style={styles.legalLink} onPress={() => router.push('/terms-of-service')}>Terms of Service</Text>
+        </View>
       </ScrollView>
       <BottomNav active="profile" />
+
+      <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => setConfirmLogout(false)}>
+        <View style={styles.dim}>
+          <View style={styles.dialog}>
+            <Text accessibilityRole="header" style={styles.dialogTitle}>Log out?</Text>
+            <Text style={styles.dialogText}>Your readings and appointments stay saved. Reminders on this phone stop until you log in again.</Text>
+            <Pressable accessibilityRole="button" onPress={logOut} style={({ pressed }) => [styles.dialogDanger, pressed && styles.pressed]}>
+              <Text style={styles.dialogDangerText}>Log out</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => setConfirmLogout(false)} style={({ pressed }) => [styles.dialogCancel, pressed && styles.pressed]}>
+              <Text style={styles.dialogCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <View accessible accessibilityLabel={`${label.toLowerCase()}: ${value}`} style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+const shadow = { elevation: 1, shadowColor: '#94A3B8', shadowOffset: { height: 4, width: 0 }, shadowOpacity: 0.08, shadowRadius: 12 } as const;
+
 const styles = StyleSheet.create({
-  scroll: { padding: 24, paddingBottom: 130, gap: 8 },
-  role: { color: authColors.navy, fontSize: 32, fontWeight: '900', marginTop: 12 },
-  email: { color: authColors.muted, fontSize: 14, marginBottom: 8 },
-  guardianBox: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, gap: 4, marginTop: 8, padding: 14 },
-  guardianTitle: { color: authColors.navy, fontSize: 13, fontWeight: '800' },
-  guardianStatus: { color: authColors.muted, fontSize: 12, fontWeight: '700' },
-  guardianStatusRejected: { color: '#D9364F' },
-  healthError: { color: '#D9364F', fontSize: 13, lineHeight: 18 },
-  input: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, color: authColors.navy, fontSize: 15, minHeight: 46, paddingHorizontal: 14 },
-  fieldRow: { gap: 6 },
-  fieldLabel: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 9 },
-  chipActive: { backgroundColor: authColors.green, borderColor: authColors.green },
-  chipText: { color: authColors.muted, fontSize: 13, fontWeight: '700' },
-  chipTextActive: { color: '#FFF' },
-  link: { color: authColors.green, fontSize: 14, fontWeight: '700' },
-  logout: { color: '#D9364F', fontSize: 16, fontWeight: '800', marginTop: 32, textAlign: 'center' },
+  screen: { backgroundColor: Brand.colors.background, flex: 1 },
+  scroll: { padding: 24, paddingBottom: 140 },
+  pressed: { opacity: 0.86 },
+  person: { alignItems: 'center', flexDirection: 'row', gap: 18, marginTop: 8 },
+  avatarWrap: { height: 84, width: 84 },
+  avatar: { alignItems: 'center', backgroundColor: '#DCF2A9', borderColor: '#FFFFFF', borderRadius: 26, borderWidth: 3, height: 84, justifyContent: 'center', width: 84, ...shadow },
+  avatarText: { color: '#3F6212', fontFamily: Brand.font.extraBold, fontSize: 28 },
+  avatarEdit: { alignItems: 'center', backgroundColor: Brand.colors.primary, borderColor: '#FFFFFF', borderRadius: 14, borderWidth: 2, bottom: -4, height: 28, justifyContent: 'center', position: 'absolute', right: -4, width: 28 },
+  personCopy: { flex: 1, gap: 4 },
+  name: { color: profileColors.navy, fontFamily: Brand.font.extraBold, fontSize: 22, letterSpacing: -0.3 },
+  email: { color: profileColors.muted, fontFamily: Brand.font.regular, fontSize: 14, marginBottom: 4 },
+  stats: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  stat: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, flex: 1, gap: 4, paddingVertical: 18, ...shadow },
+  statValue: { color: Brand.colors.primary, fontFamily: Brand.font.extraBold, fontSize: 22 },
+  statLabel: { color: profileColors.muted, fontFamily: Brand.font.bold, fontSize: 10, letterSpacing: 0.6 },
+  guardian: { backgroundColor: '#FFFFFF', borderRadius: 20, gap: 4, marginTop: 16, padding: 16, ...shadow },
+  guardianTitle: { color: profileColors.navy, fontFamily: Brand.font.bold, fontSize: 13 },
+  guardianStatus: { color: profileColors.muted, fontFamily: Brand.font.medium, fontSize: 12 },
+  guardianRejected: { color: Brand.colors.danger },
+  guardianLink: { color: Brand.colors.primary, fontFamily: Brand.font.bold, fontSize: 13, marginTop: 4 },
+  menu: { gap: 12, marginTop: 24 },
+  legal: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 24 },
+  legalLink: { color: profileColors.faint, fontFamily: Brand.font.medium, fontSize: 12, paddingVertical: 6 },
+  legalDot: { color: profileColors.faint, fontSize: 12 },
+  dim: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 24 },
+  dialog: { alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderRadius: 28, gap: 12, padding: 24 },
+  dialogTitle: { color: profileColors.navy, fontFamily: Brand.font.extraBold, fontSize: 22 },
+  dialogText: { color: profileColors.muted, fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 22, marginBottom: 8 },
+  dialogDanger: { alignItems: 'center', backgroundColor: Brand.colors.danger, borderRadius: 16, justifyContent: 'center', minHeight: 54 },
+  dialogDangerText: { color: '#FFFFFF', fontFamily: Brand.font.bold, fontSize: 16 },
+  dialogCancel: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 16, justifyContent: 'center', minHeight: 54 },
+  dialogCancelText: { color: profileColors.navy, fontFamily: Brand.font.bold, fontSize: 16 },
 });

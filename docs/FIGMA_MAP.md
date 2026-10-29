@@ -24,14 +24,14 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Login Screen | 25:2528 | Account — **the frame's Apple button is a Facebook button in the build** (team decision 2026-10-17, DECISIONS.md D7); same on Sign Up. Both the Google and Facebook buttons sign people in (D23); the look is unchanged except for a spinner in the button that is working. Tell the adviser. |
 | Sign Up Screen | 25:99 | Account |
 | Doctor Account Verification (code entry) | 230:3825 | Account — **built as "Check your email" (an emailed LINK, not a 6-digit code), DECISIONS.md D21.** Header, "Step 2 of 3" bar, title, resend line with a timer, big green button and footer follow the frame; the six code boxes are replaced by the address the link was sent to. Used by patients and doctors alike. |
-| Role Selection Gate | 25:191 | Account |
+| Role Selection Gate | 25:191 | Account — `app/onboarding/profile-type.tsx` on the shared setup kit (`features/auth/setup-kit.tsx`, D31) |
 | *(no frame)* "For me" / "For my child" (D16, UT-005) | — | Account |
 | *(no frame)* Guardian's details (D16, UT-005) | — | Health Profile |
-| Profile Setup Step 3 — Language | 25:393 | Health Profile |
-| Profile Setup Step 5 — Birthdate | 25:312 | Health Profile |
-| Profile Setup Step 6 / 7 — Dietary/Allergies (WIP) | 67:8 / 68:90 | Health Profile |
-| Profile Setup Step 8 — Activity level | 25:462 | Health Profile |
-| Profile Setup Step 9 / 10 — Dietary profile + Complete | 25:552 / 68:205 | Health Profile |
+| Profile Setup Step 3 — Language | 25:393 | Health Profile — `app/onboarding/language.tsx` (setup kit, D31) |
+| Profile Setup Step 5 — Birthdate | 25:312 | Health Profile — `app/onboarding/date-of-birth.tsx` (setup kit, D31; subtitle without "dosages", D25) |
+| Profile Setup Step 6 / 7 — Condition / Allergies | 67:8 / 68:90 | Health Profile — `app/onboarding/condition.tsx`, `allergies.tsx` (setup kit, D31). Figma's section labels kept (Condition says DIETARY PROFILE, Allergies PERSONAL DETAILS). Allergies adds a "None" chip (required answer, D25) and typed allergies. |
+| Profile Setup Step 8 — Activity level | 25:462 | Health Profile — `app/onboarding/activity.tsx` (setup kit, icons as in the frame, D31) |
+| Profile Setup Step 9 / 10 — Dietary profile + Complete | 25:552 / 68:205 | Health Profile — Step 9 `app/onboarding/dietary.tsx` is the last step (100%, Complete Setup). **Step 10 Notification Setup is not built (D29: reminders always on).** |
 | Dashboard (Home) | 3:229 | Blood Sugar / Gamification |
 | Log Blood Sugar (history + add sheet) | 4:1480 | Blood Sugar |
 | View Blood Trends | 23:526 | Blood Sugar |
@@ -46,7 +46,7 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Payment Screen (mock GCash/Maya/Card) | 196:3245 | Appointment |
 | Payment Success | 196:3425 | Appointment |
 | Live Consultation Chatroom | 25:1610 | Consultation Chat |
-| Profile and Premium Screens | 3:463 | Account / Subscription |
+| Profile and Premium Screens | 3:463 | Account / Subscription — `app/profile.tsx` (D31): initials instead of a photo (no Storage on Spark, D18); the badge is the points tier (Bronze/Silver/Gold); "Upgrade to Premium" says what Premium really adds (more AI suggestions and scans). Menu rows open `health-profile` (P-11), `dietary-preference`, `language-settings`, `notification-settings`, `rewards`, `subscription`. |
 | Premium comparison (Free vs Premium) | 3:630 | Subscription |
 | My Rewards System | 25:1726 | Gamification |
 | Bottom Nav component | 194:350 | shared |
@@ -67,7 +67,7 @@ name. Built in batch 1 (patient):
 | [P-25] Consultation Summary (and None Yet) | `app/consultation/summary/[id].tsx` (Doctor's notes, Advice and Follow-up, batch 3) |
 | [P-26] to [P-29] Video call | `app/video-call/[id].tsx` |
 | [P-30] to [P-32] Subscription | `app/subscription.tsx` ("Premium until", never "renews": payments are a demo) |
-Already matching in earlier work: P-04 to P-06, P-08 to P-12 (P-10 Interpretation - Critical got its Call 911 button in D25; P-11/P-12 Health Profile is still one editable form, not the read-only cards + Edit of the frame: QA 2026-10-18 D-26). Built in batch 2 (doctor and admin):
+Already matching in earlier work: P-04 to P-06, P-08 to P-12 (P-10 Interpretation - Critical got its Call 911 button in D25; P-11/P-12 Health Profile rebuilt as the read-only cards + Edit of the frames in D31: `app/health-profile/index.tsx`, `app/health-profile/edit.tsx`). Built in batch 2 (doctor and admin):
 
 D26 (2026-10-18): "Payment Success" now reads "Demo payment recorded" with a Demo payment note, and Consultation Fee says "DEMO CHECKOUT" / "Pay ₱… (demo)" instead of "SECURE CHECKOUT" / "Pay Now": a deliberate difference from the frames, so respondents are not misled.
 | Frame | Screen in the app |

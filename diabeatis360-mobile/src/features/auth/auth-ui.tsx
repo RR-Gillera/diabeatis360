@@ -1,7 +1,7 @@
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
-import { Brand, Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { providerName, type SocialProvider } from './social-types';
 
 export const authColors = {
@@ -20,8 +20,16 @@ export function AuthField({ label, secure, onToggleSecure, icon, ...props }: Tex
   return <View style={styles.fieldGroup}><Text style={styles.label}>{label}</Text><View style={styles.inputWrap}>{icon ? <SymbolView name={{ ios: icon === 'mail' ? 'envelope.fill' : 'lock.fill', android: icon, web: icon }} size={16} tintColor="#9BACBF" /> : null}<TextInput {...props} secureTextEntry={secure} style={styles.input} placeholderTextColor="#C6D2E2" autoCapitalize="none" />{onToggleSecure ? <Pressable onPress={onToggleSecure} hitSlop={10}><SymbolView name={{ ios: secure ? 'eye.slash' : 'eye', android: secure ? 'visibility_off' : 'visibility', web: secure ? 'visibility_off' : 'visibility' }} size={19} tintColor="#C6D2E2" /></Pressable> : null}</View></View>;
 }
 
-export function AuthButton({ title, onPress, disabled }: { title: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text></Pressable>;
+const BUTTON_ICONS = {
+  next: { ios: 'chevron.right', android: 'chevron_right' },
+  arrow: { ios: 'arrow.right', android: 'arrow_forward' },
+  done: { ios: 'checkmark.circle.fill', android: 'check_circle' },
+} as const;
+
+/** The big green button. `icon` adds Figma's trailing chevron, arrow or check after the title. */
+export function AuthButton({ title, onPress, disabled, icon }: { title: string; onPress: () => void; disabled?: boolean; icon?: keyof typeof BUTTON_ICONS }) {
+  const symbol = icon ? BUTTON_ICONS[icon] : null;
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text>{symbol ? <SymbolView name={{ ios: symbol.ios, android: symbol.android, web: symbol.android }} size={20} tintColor="#FFFFFF" /> : null}</Pressable>;
 }
 
 // The "G" and "f" buttons under the "OR CONNECT WITH" / "OR SIGN UP WITH" line on Login and Sign Up (DECISIONS.md D23;
@@ -60,17 +68,17 @@ const styles = StyleSheet.create({
   rightLeaf: { right: 11, transform: [{ rotate: '42deg' }] },
   leafStem: { backgroundColor: authColors.green, bottom: 7, height: 19, position: 'absolute', transform: [{ rotate: '45deg' }], width: 3 },
   fieldGroup: { gap: 8 },
-  label: { color: authColors.muted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '800', letterSpacing: 0.7 },
+  label: { color: authColors.muted, fontFamily: Brand.font.extraBold, fontSize: 12, letterSpacing: 0.7 },
   inputWrap: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 16 },
-  input: { color: authColors.navy, flex: 1, fontFamily: Fonts.sans, fontSize: 16 },
-  button: { alignItems: 'center', backgroundColor: authColors.green, borderRadius: 14, justifyContent: 'center', minHeight: 56 },
-  buttonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
-  disabled: { opacity: 0.55 },
-  pressed: { opacity: 0.82 },
+  input: { color: authColors.navy, flex: 1, fontFamily: Brand.font.regular, fontSize: 16 },
+  button: { alignItems: 'center', backgroundColor: authColors.green, borderRadius: 18, elevation: 3, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 60, shadowColor: authColors.green, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.22, shadowRadius: 16 },
+  buttonText: { color: '#FFF', fontFamily: Brand.font.bold, fontSize: 17 },
+  disabled: { elevation: 0, opacity: 0.5, shadowOpacity: 0 },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
   socials: { flexDirection: 'row', gap: 16 },
   social: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, flex: 1, height: 56, justifyContent: 'center' },
-  google: { color: '#53627A', fontSize: 23, fontWeight: '800' },
-  facebook: { color: '#1877F2', fontSize: 28, fontWeight: '900' },
+  google: { color: '#53627A', fontFamily: Brand.font.extraBold, fontSize: 23 },
+  facebook: { color: '#1877F2', fontFamily: Brand.font.extraBold, fontSize: 28 },
   section: { backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 18, borderWidth: 1, gap: 12, marginTop: 18, padding: 18 },
-  sectionTitle: { color: authColors.navy, fontSize: 16, fontWeight: '800' },
+  sectionTitle: { color: authColors.navy, fontFamily: Brand.font.extraBold, fontSize: 16 },
 });

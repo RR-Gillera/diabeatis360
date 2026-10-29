@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+
+import { Brand } from '@/constants/theme';
 
 import { authColors } from './auth-ui';
 import { parseBirthdate } from './birthdate';
@@ -113,9 +116,9 @@ export function BirthdateField({ value, onChange, title = 'Date of Birth', place
 
   return (
     <>
-      <Pressable style={styles.field} onPress={show}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${title}: ${value || placeholder}`} style={styles.field} onPress={show}>
+        <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor="#64748B" />
         <Text style={[styles.fieldText, !value && styles.fieldPlaceholder]}>{value || placeholder}</Text>
-        <Text style={styles.fieldIcon}>▣</Text>
       </Pressable>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
@@ -146,10 +149,9 @@ const styles = StyleSheet.create({
   columnScroll: { backgroundColor: '#F9FBFC', borderRadius: 12, height: 180 },
   wheelText: { color: '#A7B8CD', fontSize: 16, fontWeight: '700', paddingVertical: 10, textAlign: 'center' },
   active: { backgroundColor: '#F1F7EE', color: authColors.green, fontSize: 17 },
-  field: { alignItems: 'center', backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 46, paddingHorizontal: 14 },
-  fieldText: { color: authColors.navy, fontSize: 15, fontWeight: '600' },
-  fieldPlaceholder: { color: '#A7B8CD', fontWeight: '500' },
-  fieldIcon: { color: authColors.green, fontSize: 15 },
+  field: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 56, paddingHorizontal: 16 },
+  fieldText: { color: authColors.navy, flex: 1, fontFamily: Brand.font.medium, fontSize: 16 },
+  fieldPlaceholder: { color: '#A7B8CD' },
   overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },

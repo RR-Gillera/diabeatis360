@@ -82,6 +82,20 @@ export async function syncReminders(uid: string): Promise<number> {
   return planned.length;
 }
 
+/**
+ * Whether this phone lets the app show reminders, for Profile > Notifications (D31): 'on', 'off' (refused, or turned
+ * off in the phone's settings), or 'unavailable' (the web and Expo Go, where reminders cannot ring). Only reads.
+ */
+export async function reminderPermission(): Promise<'on' | 'off' | 'unavailable'> {
+  const Notifications = loadNotifications();
+  if (!Notifications) return 'unavailable';
+  try {
+    return (await Notifications.getPermissionsAsync()).granted ? 'on' : 'off';
+  } catch {
+    return 'unavailable';
+  }
+}
+
 /** Removes every scheduled reminder (used at sign-out so the next person on this phone does not get them). */
 export async function clearReminders() {
   await loadNotifications()?.cancelAllScheduledNotificationsAsync();

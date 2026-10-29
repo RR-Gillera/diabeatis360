@@ -1,17 +1,49 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
 
-import { AuthButton, authColors, authStyles } from '@/features/auth/auth-ui';
+import { AuthButton } from '@/features/auth/auth-ui';
 import { ALLERGIES_MISSING, completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
-import { Choice } from '@/features/auth/onboarding-ui';
+import { DIETS } from '@/features/auth/health-profile';
+import { SETUP_PROGRESS, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
 import { resetTo } from '@/lib/navigation';
 
-// The LAST onboarding step since D29: the Notification Setup screen was removed and reminders are always on (the phone
-// itself still asks "Allow notifications?" on first open). Finishing here completes onboarding and opens Home as the
-// only screen in the history, so the back gesture on Home cannot return to setup.
+// Figma "Profile Setup Step 9" (Any dietary preferences?). The LAST onboarding step since D29: the Notification Setup
+// screen was removed and reminders are always on (the phone itself still asks "Allow notifications?" on first open).
+// Finishing here completes onboarding and opens Home as the only screen in the history, so the back gesture on Home
+// cannot return to setup.
+export default function DietaryScreen() {
+  const router = useRouter();
+  const { email, uid } = useAuth();
+  const [diet, setDiet] = useState('Diabetic Diet');
+  const [saving, setSaving] = useState(false);
 
-export default function DietaryScreen() { const router = useRouter(); const { email, uid } = useAuth(); const [diet, setDiet] = useState('Diabetic Diet'); const finish = async () => { if (!email) return; await saveOnboardingValue(email, 'diet', diet, uid); try { await completeOnboarding(email, 'patient', uid); } catch (value) { if (value instanceof Error && value.message === ALLERGIES_MISSING) { router.replace('/onboarding/allergies'); return; } throw value; } resetTo(router, '/user-home'); }; return <View style={[authStyles.screen, styles.screen]}><Progress /><Text style={styles.back} onPress={() => router.back()}>‹  Back</Text><Text style={styles.title}>Any dietary{`\n`}preferences?</Text><Text style={styles.subtitle}>We&apos;ll tailor your meal recommendations based on your selection.</Text><Choice title="Everything" detail="No specific restrictions" selected={diet === 'Everything'} onPress={() => setDiet('Everything')} /><Choice title="Vegetarian" detail="Plant-based diet, no meat" selected={diet === 'Vegetarian'} onPress={() => setDiet('Vegetarian')} /><Choice title="No Pork" detail="All meats except pork products" selected={diet === 'No Pork'} onPress={() => setDiet('No Pork')} /><Choice title="Diabetic Diet" detail="Low sugar & glycemic index focus" selected={diet === 'Diabetic Diet'} onPress={() => setDiet('Diabetic Diet')} /><View style={styles.bottom}><AuthButton title="Complete Setup  ✓" onPress={finish} /></View></View>; }
-function Progress() { return <><View style={styles.progress}><Text style={styles.section}>DIETARY PROFILE</Text><Text style={styles.step}>100% Complete</Text></View><View style={styles.track}><View style={[styles.fill, { width: '100%' }]} /></View></>; }
-const styles = StyleSheet.create({ screen: { padding: 24 }, progress: { flexDirection: 'row', justifyContent: 'space-between' }, section: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 }, step: { color: '#91A4BF', fontSize: 11, fontWeight: '700' }, track: { backgroundColor: '#DDE5EF', height: 6, marginTop: 10 }, fill: { backgroundColor: authColors.green, height: '100%' }, back: { color: '#91A4BF', fontSize: 15, marginTop: 44 }, title: { color: authColors.navy, fontSize: 31, fontWeight: '900', lineHeight: 38, marginTop: 26 }, subtitle: { color: authColors.muted, fontSize: 16, lineHeight: 25, marginTop: 14 }, bottom: { marginTop: 'auto', paddingTop: 24 } });
+  const finish = async () => {
+    if (!email || saving) return;
+    setSaving(true);
+    try {
+      await saveOnboardingValue(email, 'diet', diet, uid);
+      await completeOnboarding(email, 'patient', uid);
+    } catch (value) {
+      setSaving(false);
+      if (value instanceof Error && value.message === ALLERGIES_MISSING) { router.replace('/onboarding/allergies'); return; }
+      throw value;
+    }
+    resetTo(router, '/user-home');
+  };
+
+  return (
+    <SetupScreen
+      section="DIETARY PROFILE"
+      percent={SETUP_PROGRESS.dietary}
+      title={'Any dietary\npreferences?'}
+      subtitle="We'll tailor your meal recommendations based on your selection."
+      onBack={() => router.back()}
+      footer={<AuthButton title={saving ? 'Finishing…' : 'Complete Setup'} icon={saving ? undefined : 'done'} onPress={finish} disabled={saving} />}
+    >
+      {DIETS.map((option) => (
+        <SetupOption key={option.value} icon={option.icon} title={option.value} detail={option.detail} selected={diet === option.value} onPress={() => setDiet(option.value)} />
+      ))}
+    </SetupScreen>
+  );
+}

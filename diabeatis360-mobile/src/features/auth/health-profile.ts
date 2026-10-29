@@ -1,9 +1,11 @@
 // The health profile as the Profile screen edits it, and how it maps to the Users document (DECISIONS.md D25).
-// Kept free of app imports so it can be unit-tested with plain Node (npm test).
+// Kept free of app (Firebase / React Native) imports so it can be unit-tested with plain Node (npm test).
 //
 // Why this exists: Profile used to fill its form from the phone's local storage, so on a new phone the form was
 // blank, and "Save" then wrote those blanks over the stored profile. Now the form is filled from Firestore and only
 // the fields the person actually changed are written, never an empty one.
+import type { AndroidSymbol, SFSymbol } from 'expo-symbols';
+
 import { normalizeDiabetesType } from '@/constants/enums';
 
 export type HealthForm = {
@@ -55,8 +57,63 @@ export function changedHealthFields(before: HealthForm, after: HealthForm): Part
 
 /** What stops a save, or null. Allergies may not be left empty: "None" is how someone says they have none. */
 export function healthFormProblem(form: HealthForm): string | null {
-  if (!form.allergy.trim()) return 'Add your allergies, or type None if you have none. Meal suggestions use them to keep you safe.';
+  if (!form.allergy.trim()) return 'Choose your allergies, or None if you have none. Meal suggestions use them to keep you safe.';
   return null;
+}
+
+// ---- The answer lists shared by setup and Profile (Figma Step 8 and 9, P-12), so both always offer the same words.
+
+type OptionIcon = { ios: SFSymbol; android: AndroidSymbol };
+export type ProfileOption = { value: string; detail: string; icon: OptionIcon };
+
+export const ACTIVITY_LEVELS: ProfileOption[] = [
+  { value: 'Sedentary', detail: 'Office job, little to no exercise', icon: { ios: 'sofa.fill', android: 'weekend' } },
+  { value: 'Light', detail: '1-2 days of light activity/week', icon: { ios: 'figure.walk', android: 'directions_walk' } },
+  { value: 'Active', detail: '3-5 days of exercise/week', icon: { ios: 'figure.run', android: 'directions_run' } },
+  { value: 'Very Active', detail: 'Hard exercise 6-7 days/week', icon: { ios: 'flame.fill', android: 'local_fire_department' } },
+];
+
+export const DIETS: ProfileOption[] = [
+  { value: 'Everything', detail: 'No specific restrictions', icon: { ios: 'fork.knife', android: 'restaurant' } },
+  { value: 'Vegetarian', detail: 'Plant-based diet, no meat', icon: { ios: 'leaf.fill', android: 'eco' } },
+  { value: 'No Pork', detail: 'All meats except pork products', icon: { ios: 'nosign', android: 'block' } },
+  { value: 'Diabetic Diet', detail: 'Low sugar & glycemic index focus', icon: { ios: 'drop.fill', android: 'water_drop' } },
+];
+
+/** The detail line for a stored activity level or diet ("Light" -> "1-2 days of light activity/week"), or ''. */
+export function optionDetail(options: ProfileOption[], value: string): string {
+  return options.find((option) => option.value === value)?.detail ?? '';
+}
+
+// ---- Allergies are stored as one text ("Peanuts, Shellfish" or "None"); the screens show them as chips.
+
+/** The allergy chips everyone is offered (Figma Step 7). */
+export const COMMON_ALLERGIES = ['Nuts', 'Dairy', 'Eggs', 'Seafood'];
+export const NO_ALLERGIES = 'None';
+
+/** "Peanuts, Shellfish" -> ['Peanuts', 'Shellfish']; empty -> []; any spelling of "none" -> ['None']. */
+export function allergyList(text: string): string[] {
+  const items = text.split(',').map((item) => item.trim()).filter(Boolean);
+  if (items.some((item) => item.toLowerCase() === 'none')) return [NO_ALLERGIES];
+  return items.filter((item, index) => items.findIndex((other) => other.toLowerCase() === item.toLowerCase()) === index);
+}
+
+/** Back to the stored text. */
+export function allergyText(list: string[]): string {
+  return list.join(', ');
+}
+
+/**
+ * Taps a chip (or adds a typed one). "None" can only be alone: choosing it clears the rest, and choosing anything
+ * else clears "None". Tapping a chosen chip removes it.
+ */
+export function toggleAllergy(list: string[], item: string): string[] {
+  const value = item.trim();
+  if (!value) return list;
+  if (value.toLowerCase() === 'none') return list.includes(NO_ALLERGIES) ? [] : [NO_ALLERGIES];
+  const rest = list.filter((existing) => existing !== NO_ALLERGIES);
+  const already = rest.find((existing) => existing.toLowerCase() === value.toLowerCase());
+  return already ? rest.filter((existing) => existing !== already) : [...rest, value];
 }
 
 /** Whether a stored allergy value counts as answered ("None" counts; empty or missing does not). */
