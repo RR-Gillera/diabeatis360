@@ -65,7 +65,7 @@ function EditForm({ profile, fallbackName, onDone }: { profile: HealthProfile; f
     setSaving(true);
     try {
       if (name.trim() !== startName.trim()) await updateDisplayName(name.trim());
-      for (const [key, value] of Object.entries(changedHealthFields(profile.form, form))) await saveOnboardingValue(email, key, value as string, uid);
+      for (const [key, value] of Object.entries(changedHealthFields(profile.stored, form))) await saveOnboardingValue(email, key, value as string, uid);
       onDone();
     } catch {
       setError(t('health.edit.saveFailed'));

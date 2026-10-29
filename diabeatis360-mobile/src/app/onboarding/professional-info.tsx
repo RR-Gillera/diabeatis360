@@ -27,7 +27,7 @@ const SPECIALIZATIONS = [
 
 export default function ProfessionalInfoScreen() {
   const router = useRouter();
-  const { email, uid, displayName } = useAuth();
+  const { email, uid, displayName, refreshSession } = useAuth();
   const { t } = useT();
   const [specialty, setSpecialty] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
@@ -84,6 +84,9 @@ export default function ProfessionalInfoScreen() {
       }
       await saveOnboardingValue(email, 'specialty', specialty, uid);
       await completeOnboarding(email, 'doctor', uid);
+      // The session began as a patient's (the account was made before choosing Doctor): read the role again, or the
+      // route guard would send the new doctor to the patient Home.
+      await refreshSession();
       resetTo(router, '/doctor');
     } catch {
       setError(t('setup.pro.failed'));

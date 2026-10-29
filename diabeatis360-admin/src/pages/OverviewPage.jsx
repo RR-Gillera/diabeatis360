@@ -81,7 +81,8 @@ export default function OverviewPage() {
       pending: providers.data.filter((doctor) => !doctor.is_verified && !doctor.rejection_reason).length,
       consultations: consults.length,
       consultationChange: percentChange(bookingsThis, bookingsLast),
-      weekdays: countPerWeekday(bookings.data.map((b) => toDate(b.scheduled_at)).filter(Boolean)),
+      // Same consultations as the card beside it (QA D-20).
+      weekdays: countPerWeekday(consults.map((b) => toDate(b.scheduled_at)).filter(Boolean)),
       revenue: revenueByPeriod(events, 'monthly'),
       feed: buildActivityFeed({ users: users.data, providers: providers.data, bookings: bookings.data, subscriptions: subscriptions.data, plans: plans.data, guardians: guardians.data }),
     }

@@ -23,6 +23,13 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
     consultationFee: Number(data.consultation_fee ?? 0),
     isVerified: Boolean(data.is_verified),
     isActive: data.is_active !== false,
+    // Judged on the stored values, not on the display defaults above ("Philippines", "Diabetes care").
+    profileComplete: isProfileComplete({
+      specialty: String(data.specialty ?? ''),
+      prcLicenseNumber: String(data.prc_license_number ?? ''),
+      city: String(data.city ?? ''),
+      consultationFee: Number(data.consultation_fee ?? 0),
+    }),
   };
 }
 
@@ -46,7 +53,7 @@ export function subscribeToBookableProviders(
 ) {
   return subscribeToProviders(
     // Only doctors patients can actually book: verified, active, and with a complete profile (city, fee...).
-    (providers) => onChange(providers.filter((provider) => provider.isVerified && provider.isActive && isProfileComplete(provider))),
+    (providers) => onChange(providers.filter((provider) => provider.isVerified && provider.isActive && provider.profileComplete)),
     onError,
   );
 }

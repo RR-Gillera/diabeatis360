@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { ACTIVITY_LEVELS, allergyList, DIETS, NO_ALLERGIES } from '@/features/auth/health-profile';
+import { COMMON_ALLERGIES, ACTIVITY_LEVELS, allergyList, DIETS, NO_ALLERGIES } from '@/features/auth/health-profile';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { BottomNav } from '@/features/home/home-ui';
 import { Chip, ChipRow, EditPill, InfoCard, InfoLine, ProfileTop, profileColors } from '@/features/profile/profile-ui';
@@ -68,7 +68,7 @@ export default function HealthProfileScreen() {
 
 /** A common allergy chip in the person's language ("Nuts" -> "Mani"); a typed one is shown as it was typed. */
 function allergyLabel(item: string, t: ReturnType<typeof useT>['t']) {
-  return ['Nuts', 'Dairy', 'Eggs', 'Seafood'].includes(item) ? t(`allergy.${item}` as MessageKey) : item;
+  return COMMON_ALLERGIES.includes(item) ? t(`allergy.${item}` as MessageKey) : item;
 }
 
 const styles = StyleSheet.create({

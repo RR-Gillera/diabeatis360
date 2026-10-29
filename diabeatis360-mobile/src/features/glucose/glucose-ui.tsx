@@ -41,9 +41,10 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [offline, setOffline] = useState(false);
-  // The sheet was closed while a save was still waiting for the connection: when it finishes later, do not open the
-  // result screen out of nowhere.
-  const closedWhileSaving = useRef(false);
+  // The save this sheet is waiting for. Closing the sheet (or Continue while offline) lets go of it: when that write
+  // finally reaches the server it changes nothing here, and never opens the result screen out of nowhere.
+  const activeSave = useRef(0);
+  const saveCount = useRef(0);
   // Delete asks first (QA D-13): the first tap turns the button into "Tap again to delete".
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Set after the first tap on Save for a rare value (20-39 or 401-600 mg/dL): the second tap saves it (D25).
@@ -68,28 +69,33 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   const livePreview = liveLevel ? { ...readingColors[liveLevel], label: label('interpretation', liveLevel) } : null;
 
   const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); setConfirming(false); setConfirmDelete(false); };
-  const close = () => { if (saving) closedWhileSaving.current = true; reset(); setOffline(false); onClose(); };
+  const letGoOfSave = () => { activeSave.current = 0; setSaving(false); setOffline(false); };
+  const close = () => { letGoOfSave(); reset(); onClose(); };
+  // Offline, the reading already shows on this phone: Continue opens the result screen now (it reads the reading kept
+  // on the phone), so a critical reading still gets its guidance and Call 911 without waiting for the connection.
+  const continueOffline = () => { letGoOfSave(); reset(); onSaved(0); };
 
   const save = async () => {
     if (!uid || !check?.ok) return;
     if (check.needsConfirmation && !confirming) { setConfirming(true); return; }
     setSaving(true); setError(''); setOffline(false);
-    closedWhileSaving.current = false;
-    const slow = setTimeout(() => setOffline(true), OFFLINE_NOTICE_MS);
+    const id = ++saveCount.current;
+    activeSave.current = id;
+    const slow = setTimeout(() => { if (activeSave.current === id) setOffline(true); }, OFFLINE_NOTICE_MS);
     try {
       let doctorsNotified = 0;
       if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
       else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date(), language)).doctorsNotified;
+      if (activeSave.current !== id) return;
       setOffline(false);
-      if (closedWhileSaving.current) return;
       reset();
       onSaved(doctorsNotified);
     } catch {
       // The value was checked on screen already, so a failure here is the connection or the database: one plain message.
-      setError(t('glucose.form.saveFailed'));
+      if (activeSave.current === id) setError(t('glucose.form.saveFailed'));
     } finally {
       clearTimeout(slow);
-      setSaving(false);
+      if (activeSave.current === id) { activeSave.current = 0; setSaving(false); }
     }
   };
 
@@ -142,7 +148,14 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
           <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
             <Text style={styles.saveButtonText}>{saving ? t('glucose.form.saving') : confirming ? t('glucose.form.confirmSave', { value: readingValue }) : editing ? t('glucose.form.saveChanges') : t('glucose.form.save')}</Text>
           </Pressable>
-          {offline ? <Text accessibilityLiveRegion="polite" style={styles.offline}>{t('glucose.form.offline')}</Text> : null}
+          {offline ? (
+            <View>
+              <Text accessibilityLiveRegion="polite" style={styles.offline}>{t('glucose.form.offline')}</Text>
+              <Pressable accessibilityRole="button" style={styles.offlineButton} onPress={continueOffline}>
+                <Text style={styles.offlineButtonText}>{t('common.continue')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {editing ? (
             <Pressable accessibilityRole="button" style={styles.deleteButton} onPress={remove} disabled={deleting}>
               <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : confirmDelete ? t('glucose.form.deleteConfirm') : t('glucose.form.delete')}</Text>
@@ -221,6 +234,8 @@ const styles = StyleSheet.create({
   saveButtonDisabled: { opacity: 0.55 },
   saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   offline: { color: '#475569', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' },
+  offlineButton: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', marginTop: 8, minHeight: 46 },
+  offlineButtonText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   deleteButton: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 8, minHeight: 46 },
   deleteButtonText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
 });

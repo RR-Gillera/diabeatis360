@@ -12,6 +12,7 @@ import { DAILY_CALORIE_REFERENCE, HIGH_SUGAR_PER_SERVING_G } from '@/constants/n
 import { Brand } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
 import type { Language, MessageKey } from '@/i18n/translate';
+import { COMMON_ALLERGIES } from '@/features/auth/health-profile';
 
 import type { LabelAnalysis } from '@/features/ai/types';
 
@@ -124,7 +125,7 @@ function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barco
 function allergenName(warning: string, language: Language, t: (key: MessageKey) => string) {
   const allergen = warning.replace(/^Contains\s+/i, '');
   if (language === 'English') return allergen;
-  const common = ['Nuts', 'Dairy', 'Eggs', 'Seafood'].find((item) => item.toLowerCase() === allergen.toLowerCase());
+  const common = COMMON_ALLERGIES.find((item) => item.toLowerCase() === allergen.toLowerCase());
   return common ? t(`allergy.${common}` as MessageKey).toLowerCase() : allergen;
 }
 

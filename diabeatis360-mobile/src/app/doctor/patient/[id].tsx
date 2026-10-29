@@ -18,7 +18,7 @@ import { glucoseDirection } from '@/constants/glucose';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { ageFrom, weeklyInsights } from '@/features/doctor/doctor-stats';
-import { ACTIVITY_LEVELS, DIETS } from '@/features/auth/health-profile';
+import { ACTIVITY_LEVELS, COMMON_ALLERGIES, DIETS } from '@/features/auth/health-profile';
 import { useT } from '@/i18n/language-context';
 import { shortDay, type MessageKey } from '@/i18n/translate';
 
@@ -45,7 +45,7 @@ function healthLabel(value: string, t: (key: MessageKey) => string) {
 
 /** A common allergy in the reader's language ("Nuts" -> "Mani"); one the patient typed is shown as typed. */
 function allergyLabel(item: string, t: (key: MessageKey) => string) {
-  return ['Nuts', 'Dairy', 'Eggs', 'Seafood'].includes(item) ? t(`allergy.${item}` as MessageKey) : item;
+  return COMMON_ALLERGIES.includes(item) ? t(`allergy.${item}` as MessageKey) : item;
 }
 
 function ProfileRow({ label, value }: { label: string; value: string }) {

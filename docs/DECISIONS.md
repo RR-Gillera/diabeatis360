@@ -573,3 +573,16 @@ From the 2026-10-18 QA run (`docs/reports/qa-2026-10-18.md`), the open defects t
 3. **Password minimum (D-27, F-PASSWORD-MIN).** Firebase's default is 6 characters; 8 or more is usual for health data. Changing it also changes the sign-up test rows.
 4. **Daily's own Leave button (F-VC-LEAVE).** It needs the video provider decision (Daily, which needs a credit card, or LiveKit) and a real account to test.
 **Left for later (Low):** F-MINOR-LATE-BLOCK, F-TOUCH-TARGETS, F-ERROR-PLACEMENT, F-VC-OVERLAY (needs the real Daily screen), F-AI-COLD (server cold start), F-ROUTER-WARNING (development console only).
+
+### D36 — Fixes from the fresh code review — CLOSED 2026-10-29 (Batch 6 of the team's "fix everything" request)
+A high-effort review of everything since D30 (`d3a2374..2700f18`) found 7 bugs and 3 cleanups. Fixed:
+1. **A new doctor finishing setup was sent to the patient Home** by the new route guard (D35): the session still held the patient role the account began with. The auth context now has `refreshSession()`, which setup calls after saving the doctor role.
+2. **Find a Doctor's "complete profile" rule ran on display defaults** ("Philippines" for a missing city, "Diabetes care" for a missing specialty), so a doctor-made record with no city was still listed. The rule now reads the stored values (`Provider.profileComplete`).
+3. **Offline, closing the reading sheet left it stuck on "Saving..."**, and a closed sheet skipped the result screen even for a critical reading. The offline note now has **Continue**, which opens the result at once (it reads the reading kept on the phone, so a critical reading still shows Call 911), and a save the sheet let go of changes nothing when it finally reaches the server.
+4. **The health-profile reader** could let an older snapshot overwrite a newer one, and could show the previous person's profile for a moment after a switch of accounts.
+5. **Answers kept only on the phone were never saved by the edit screen** (it compared against the phone-filled form). It now compares with what Firestore holds, so they reach Firestore and the AI stops refusing for missing allergies.
+6. **Admin Overview's weekday chart** counted every booking while the card beside it counted consultations; both count consultations now.
+7. **Language's Back** sent a doctor to the patient Profile; it now returns to the doctor's profile.
+Also: the common allergy list comes from `COMMON_ALLERGIES` everywhere.
+**Checked:** unit 128 (122 pass, 6 skipped); mobile and admin lint; a browser run of the fixes on the emulators, 5/5 (TEST_LOG 2026-10-29).
+**Left for later (cleanups, no behaviour change):** the reading colours are defined in four screens (`readingColors` could serve them all); `notification-settings` has its own copy of `clockTime`; the reminder texts live both in `reminder-plan.ts` (used by its tests) and in `en.ts` (used on the phone); several screens listen to `Users/{uid}` separately and read the phone's stored answers one by one.

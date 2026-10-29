@@ -143,3 +143,9 @@ Append newest at the bottom. Format:
 - **Found and fixed on the way:** the reading box overflowed the sheet on the web (the phone was fine); Find a Doctor showed "DJ" for "Dr. John Smith".
 - **Deliberate differences, recorded in FIGMA_MAP:** Exercise / Hydration cards (D34), no years of experience, no clock button on the reading sheet, initials instead of photos.
 - **Evidence:** `docs/reports/figma-2026-10-29`. Unit 128 (122 pass, 6 skipped), tsc and lint clean.
+
+## 2026-10-29 (later) — Claude Code — fresh code review and its fixes (D36)
+- **Reviewed** everything since D30 at high effort: 7 bugs and 3 cleanups. **Fixed** the 7 bugs (new doctors bounced by the route guard, the profile-complete check on display defaults, the offline sheet stuck on "Saving...", out-of-order profile snapshots, phone-only answers never saved, the admin weekday chart, Language's Back for doctors) and the shared allergy list.
+- **Files:** mobile `features/auth/{auth-context,use-health-profile}`, `app/onboarding/professional-info.tsx`, `features/booking/{types,booking-service}.ts`, `features/glucose/glucose-ui.tsx`, `app/health-profile/{edit,index}.tsx`, `app/language-settings.tsx`, `features/scanner/scan-result.tsx`, `app/doctor/patient/[id].tsx`; admin `pages/OverviewPage.jsx`.
+- **Verified:** unit 128 (122 pass, 6 skipped); lint clean; browser 5/5 on the emulators.
+- **Left for later:** the three cleanups listed in D36 (no behaviour change).

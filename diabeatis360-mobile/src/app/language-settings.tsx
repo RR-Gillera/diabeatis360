@@ -15,8 +15,9 @@ import type { Language } from '@/i18n/translate';
 // Profile > Language: the same two cards as setup (Figma Step 3). Saving writes Users.language_preference and switches
 // every screen at once (D33); the AI also answers in that language (functions/lib/prompts.js).
 export default function LanguageSettingsScreen() {
-  const goBack = useSafeBack('/profile');
-  const { uid, email } = useAuth();
+  const { uid, email, role } = useAuth();
+  // Doctors open Language from their own profile; the patient Profile is not theirs (route guard, QA D-15).
+  const goBack = useSafeBack(role === 'doctor' ? '/doctor/profile' : '/profile');
   const { t } = useT();
   const profile = useHealthProfile(uid, email);
   return (
