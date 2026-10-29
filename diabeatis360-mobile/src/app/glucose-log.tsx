@@ -9,6 +9,10 @@ import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose
 import { AddReadingModal } from '@/features/glucose/glucose-ui';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav, homeColors, WeeklyChart } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
+import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
+
+type Translate = ReturnType<typeof useT>['t'];
 
 // Purely a decorative "time of day" theme for the history list (sun/moon/fork
 // icon + matching badge color) — not a clinical read on the value, which is
@@ -20,15 +24,22 @@ function timeTheme(hour: number) {
   return { icon: 'fork.knife', iconAndroid: 'restaurant', iconBg: '#FFFBEB', iconColor: '#F59E0B', badgeBg: '#FEF3C7', badgeColor: '#B45309' } as const;
 }
 
-function groupLabel(date: Date) {
+const WEEKDAY_KEYS = ['weekday.Sun', 'weekday.Mon', 'weekday.Tue', 'weekday.Wed', 'weekday.Thu', 'weekday.Fri', 'weekday.Sat'] as const;
+
+/** "Sun, Oct 18" / "Lin, Okt 18" in the person's language. */
+function plainDay(date: Date, language: Language, t: Translate) {
+  return `${t(WEEKDAY_KEYS[date.getDay()])}, ${shortDay(date, language)}`;
+}
+
+function groupLabel(date: Date, language: Language, t: Translate) {
   const startOfDay = (value: Date) => { const copy = new Date(value); copy.setHours(0, 0, 0, 0); return copy; };
   const today = startOfDay(new Date());
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
   const target = startOfDay(date);
-  const shortDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  if (target.getTime() === today.getTime()) return `TODAY, ${shortDate}`.toUpperCase();
-  if (target.getTime() === yesterday.getTime()) return `YESTERDAY, ${shortDate}`.toUpperCase();
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase();
+  const shortDate = shortDay(date, language);
+  if (target.getTime() === today.getTime()) return t('glucose.today', { date: shortDate }).toUpperCase();
+  if (target.getTime() === yesterday.getTime()) return t('glucose.yesterday', { date: shortDate }).toUpperCase();
+  return plainDay(date, language, t).toUpperCase();
 }
 
 const HISTORY_PAGE_SIZE = 10;
@@ -40,6 +51,7 @@ function dayKey(date: Date) {
 
 export default function GlucoseLogScreen() {
   const router = useRouter();
+  const { t, label, language } = useT();
   const { uid } = useAuth();
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
   const [expanded, setExpanded] = useState(false);
@@ -65,10 +77,10 @@ export default function GlucoseLogScreen() {
       const key = dayKey(entry.loggedAt);
       const last = result[result.length - 1];
       if (last && last.key === key) last.count += 1;
-      else result.push({ key, label: groupLabel(entry.loggedAt), plain: entry.loggedAt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), count: 1 });
+      else result.push({ key, label: groupLabel(entry.loggedAt, language, t), plain: plainDay(entry.loggedAt, language, t), count: 1 });
     }
     return result;
-  }, [entries]);
+  }, [entries, language, t]);
   const dayLabel = daysWithReadings.find((option) => option.key === day)?.plain ?? null;
   const shown = useMemo(() => (day ? entries.filter((entry) => entry.loggedAt && dayKey(entry.loggedAt) === day) : entries), [entries, day]);
 
@@ -77,13 +89,13 @@ export default function GlucoseLogScreen() {
     const visible = expanded || day ? shown : shown.slice(0, HISTORY_PAGE_SIZE);
     const result: { label: string; items: GlucoseLogEntry[] }[] = [];
     for (const entry of visible) {
-      const label = entry.loggedAt ? groupLabel(entry.loggedAt) : 'UNDATED';
+      const heading = entry.loggedAt ? groupLabel(entry.loggedAt, language, t) : t('glucose.undated');
       const last = result[result.length - 1];
-      if (last && last.label === label) last.items.push(entry);
-      else result.push({ label, items: [entry] });
+      if (last && last.label === heading) last.items.push(entry);
+      else result.push({ label: heading, items: [entry] });
     }
     return result;
-  }, [shown, expanded, day]);
+  }, [shown, expanded, day, language, t]);
 
   // Editing an existing reading just closes the sheet — the interpretation
   // screen is for a reading the patient has only just taken.
@@ -98,11 +110,11 @@ export default function GlucoseLogScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Glucose Log</Text>
+        <Text accessibilityRole="header" style={styles.headerTitle}>{t('glucose.title')}</Text>
         {/* Figma P-07 / P-13: only the calendar button; the old "more" button is gone (DECISIONS D24). */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={dayLabel ? `Filter by date, showing ${dayLabel}` : 'Filter by date'}
+          accessibilityLabel={dayLabel ? t('glucose.filterShowing', { day: dayLabel }) : t('glucose.filter')}
           style={[styles.headerButton, day ? styles.headerButtonActive : null]}
           onPress={() => setPickingDay(true)}>
           <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor={day ? '#FFFFFF' : '#64748B'} />
@@ -115,36 +127,36 @@ export default function GlucoseLogScreen() {
           <View style={styles.emptyRing}><View style={styles.emptyCircle}>
             <SymbolView name={{ ios: 'drop.fill', android: 'water_drop', web: 'water_drop' }} size={34} tintColor="#FFFFFF" />
           </View></View>
-          <Text style={styles.emptyTitle}>No readings yet</Text>
-          <Text style={styles.emptyText}>Log your first blood sugar reading and your trends will show up here.</Text>
+          <Text style={styles.emptyTitle}>{t('glucose.empty.title')}</Text>
+          <Text style={styles.emptyText}>{t('glucose.empty.text')}</Text>
           <Pressable accessibilityRole="button" style={styles.emptyButton} onPress={() => { setEditing(null); setModalVisible(true); }}>
-            <Text style={styles.emptyButtonText}>Log your first reading</Text>
+            <Text style={styles.emptyButtonText}>{t('glucose.empty.button')}</Text>
           </Pressable>
         </View>
       ) : (
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Weekly Overview</Text>
+            <Text style={styles.cardTitle}>{t('glucose.weekly')}</Text>
             <View style={styles.avgRow}>
-              <Text style={styles.avgValue}>Avg: {weekAverage ?? '—'}</Text>
+              <Text style={styles.avgValue}>{t('glucose.avg', { value: weekAverage ?? '—' })}</Text>
               <Text style={styles.avgUnit}>mg/dL</Text>
             </View>
           </View>
-          <WeeklyChart days={weekDays} />
+          <WeeklyChart days={weekDays.map((item) => ({ ...item, label: t(`weekday.${item.label}` as MessageKey) }))} />
         </View>
 
         <View style={styles.historyHeader}>
-          <Text style={styles.historyTitle}>History</Text>
+          <Text style={styles.historyTitle}>{t('glucose.history')}</Text>
           {!expanded && !day && entries.length > HISTORY_PAGE_SIZE ? (
-            <Pressable onPress={() => setExpanded(true)}><Text style={styles.seeAll}>See All</Text></Pressable>
+            <Pressable accessibilityRole="button" onPress={() => setExpanded(true)}><Text style={styles.seeAll}>{t('glucose.seeAll')}</Text></Pressable>
           ) : null}
         </View>
 
         {dayLabel ? (
           <View style={styles.filterChip}>
-            <Text style={styles.filterText}>Showing {dayLabel}</Text>
-            <Pressable accessibilityRole="button" onPress={() => setDay(null)} hitSlop={8}><Text style={styles.filterClear}>Clear</Text></Pressable>
+            <Text style={styles.filterText}>{t('glucose.showing', { day: dayLabel })}</Text>
+            <Pressable accessibilityRole="button" onPress={() => setDay(null)} hitSlop={8}><Text style={styles.filterClear}>{t('glucose.clear')}</Text></Pressable>
           </View>
         ) : null}
 
@@ -161,11 +173,11 @@ export default function GlucoseLogScreen() {
                     </View>
                     <View>
                       <Text style={styles.entryReading}>{entry.readingMgdl} <Text style={styles.entryUnit}>mg/dL</Text></Text>
-                      <Text style={styles.entryTime}>{entry.loggedAt ? entry.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text>
+                      <Text style={styles.entryTime}>{entry.loggedAt ? clockTime(entry.loggedAt) : '—'}</Text>
                     </View>
                   </View>
                   <View style={[styles.entryBadge, { backgroundColor: theme.badgeBg }]}>
-                    <Text style={[styles.entryBadgeText, { color: theme.badgeColor }]}>{entry.context === 'after_meal' ? 'After Meal' : 'Before Meal'}</Text>
+                    <Text style={[styles.entryBadgeText, { color: theme.badgeColor }]}>{label('mealContext', entry.context)}</Text>
                   </View>
                 </Pressable>
               );
@@ -176,7 +188,7 @@ export default function GlucoseLogScreen() {
       )}
 
       {entries.length > 0 ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Add a reading" style={styles.fab} onPress={() => { setEditing(null); setModalVisible(true); }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('glucose.addA11y')} style={styles.fab} onPress={() => { setEditing(null); setModalVisible(true); }}>
           <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={24} tintColor="#FFF" />
         </Pressable>
       ) : null}
@@ -185,19 +197,19 @@ export default function GlucoseLogScreen() {
       <Modal visible={pickingDay} transparent animationType="fade" onRequestClose={() => setPickingDay(false)}>
         <Pressable style={styles.sheetBackdrop} onPress={() => setPickingDay(false)}>
           <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.sheetTitle}>Show readings from</Text>
+            <Text style={styles.sheetTitle}>{t('glucose.pickDay')}</Text>
             <ScrollView style={styles.sheetList}>
-              {[{ key: null as string | null, label: 'ALL DAYS', count: entries.length }, ...daysWithReadings].map((option) => (
+              {[{ key: null as string | null, label: t('glucose.allDays'), count: entries.length }, ...daysWithReadings].map((option) => (
                 <Pressable
                   key={option.key ?? 'all'}
                   accessibilityRole="button"
                   style={[styles.sheetRow, option.key === day ? styles.sheetRowActive : null]}
                   onPress={() => { setDay(option.key); setPickingDay(false); }}>
                   <Text style={[styles.sheetRowText, option.key === day ? styles.sheetRowTextActive : null]}>{option.label}</Text>
-                  <Text style={styles.sheetCount}>{option.count} {option.count === 1 ? 'reading' : 'readings'}</Text>
+                  <Text style={styles.sheetCount}>{option.count === 1 ? t('glucose.oneReading') : t('glucose.manyReadings', { count: option.count })}</Text>
                 </Pressable>
               ))}
-              {daysWithReadings.length === 0 ? <Text style={styles.sheetEmpty}>No readings yet.</Text> : null}
+              {daysWithReadings.length === 0 ? <Text style={styles.sheetEmpty}>{t('glucose.noReadings')}</Text> : null}
             </ScrollView>
           </Pressable>
         </Pressable>

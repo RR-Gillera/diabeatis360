@@ -6,6 +6,7 @@ import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, V
 import { AuthButton, authColors, authStyles, BrandMark } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { resetTo } from '@/lib/navigation';
+import { useT } from '@/i18n/language-context';
 import {
   CHECK_INTERVAL_MS, RESEND_COOLDOWN_SECONDS, errorCode, formatCountdown, verificationErrorMessage,
 } from '@/features/auth/verification';
@@ -22,6 +23,7 @@ import {
 //   no param they came from the login screen: an old email may be in their inbox, so no wait and no claim
 export default function VerifyEmailScreen() {
   const router = useRouter();
+  const { t, language } = useT();
   const { sent } = useLocalSearchParams<{ sent?: string }>();
   const { uid, email, checkEmailVerified, resendVerificationEmail, hasCompletedOnboarding, onboardingStartPath, signOut } = useAuth();
   const [message, setMessage] = useState('');
@@ -34,8 +36,8 @@ export default function VerifyEmailScreen() {
   const leaving = useRef(false); // the person chose to leave: do not also bounce them to Login
   // The functions from useAuth() get a new identity whenever the provider re-renders. Reading them through a ref keeps
   // check() (and so the timer below) stable instead of restarting the timer each time.
-  const latest = useRef({ checkEmailVerified, hasCompletedOnboarding, onboardingStartPath, email });
-  useEffect(() => { latest.current = { checkEmailVerified, hasCompletedOnboarding, onboardingStartPath, email }; });
+  const latest = useRef({ checkEmailVerified, hasCompletedOnboarding, onboardingStartPath, email, t, language });
+  useEffect(() => { latest.current = { checkEmailVerified, hasCompletedOnboarding, onboardingStartPath, email, t, language }; });
 
   // Nobody is signed in (the session ended, or Firebase is still restoring it after a restart): nothing to verify here.
   // The restore takes a moment, so wait a few seconds before sending the person to Login.
@@ -69,17 +71,17 @@ export default function VerifyEmailScreen() {
       if (role) {
         const finished = address ? await onboardingDone(address) : false;
         setError('');
-        setMessage('Email verified! Taking you to the next step...');
+        setMessage(latest.current.t('verify.done'));
         setConfirmed(finished ? (role === 'doctor' ? '/doctor' : '/user-home') : address ? await startPath(address) : '/onboarding/language');
       } else if (byTap) {
-        setError('We cannot see your confirmation yet. Open the link in the email we sent you, then tap this button again.');
+        setError(latest.current.t('verify.notSeen'));
       }
     } catch (value) {
       if (errorCode(value) === 'app/account-deactivated') {
         leaving.current = true; // they were signed out: keep this message on screen instead of bouncing to Login
-        setError('This account has been deactivated. Please contact support.');
+        setError(latest.current.t('auth.error.deactivated'));
       } else if (byTap) {
-        setError(verificationErrorMessage(errorCode(value)));
+        setError(verificationErrorMessage(errorCode(value), latest.current.language));
       }
     } finally {
       working.current = false;
@@ -102,9 +104,9 @@ export default function VerifyEmailScreen() {
     try {
       await resendVerificationEmail();
       setSecondsLeft(RESEND_COOLDOWN_SECONDS);
-      setMessage('A new email is on its way. Check your inbox, and your Spam folder too.');
+      setMessage(t('verify.newEmail'));
     } catch (value) {
-      setError(verificationErrorMessage(errorCode(value)));
+      setError(verificationErrorMessage(errorCode(value), language));
     } finally {
       setResending(false);
     }
@@ -117,41 +119,41 @@ export default function VerifyEmailScreen() {
   };
 
   const description = sent === '0'
-    ? 'Your account was created, but we could not send the email just now. Tap Resend email to try again.'
+    ? t('verify.sentFailed')
     : sent === '1'
-      ? 'We sent a verification link to the email address below. Open the email and tap the link to confirm it is yours.'
-      : 'Your email address is not confirmed yet. Open the link in the email we sent you, or tap Resend email to get a new one.';
+      ? t('verify.sent')
+      : t('verify.notYet');
 
   return <ScrollView style={authStyles.screen} contentContainerStyle={styles.scroll}>
-    <View style={styles.progress}><Text style={styles.progressLabel}>INITIAL SETUP</Text><Text style={styles.progressStep}>Step 2 of 3</Text></View>
+    <View style={styles.progress}><Text style={styles.progressLabel}>{t('verify.section')}</Text><Text style={styles.progressStep}>{t('verify.step')}</Text></View>
     <View style={styles.progressTrack}><View style={styles.progressFill} /></View>
-    <View style={styles.heading}><BrandMark /><Text style={styles.title}>Verify Your{`\n`}Account</Text></View>
+    <View style={styles.heading}><BrandMark /><Text style={styles.title}>{t('verify.title')}</Text></View>
     <Text style={styles.description}>{description}</Text>
 
     <View style={styles.mailCard}>
       <View style={styles.mailIcon}><SymbolView name={{ ios: 'envelope.fill', android: 'mail', web: 'mail' }} size={22} tintColor={authColors.green} /></View>
       <View style={styles.mailText}>
-        <Text style={styles.mailLabel}>EMAIL ADDRESS</Text>
+        <Text style={styles.mailLabel}>{t('verify.emailLabel')}</Text>
         <Text style={styles.mailAddress} numberOfLines={2}>{email ?? ''}</Text>
       </View>
     </View>
-    <Text style={styles.hint}>Can&apos;t find it? Look in your Spam or Junk folder. This screen updates by itself once you tap the link.</Text>
+    <Text style={styles.hint}>{t('verify.spamHint')}</Text>
 
-    {confirmed ? null : <View style={styles.waiting}><ActivityIndicator size="small" color={authColors.green} /><Text style={styles.waitingText}>Waiting for you to tap the link...</Text></View>}
+    {confirmed ? null : <View style={styles.waiting}><ActivityIndicator size="small" color={authColors.green} /><Text style={styles.waitingText}>{t('verify.waiting')}</Text></View>}
 
     <View style={styles.resendBlock}>
-      <Pressable disabled={resending || secondsLeft > 0} onPress={resend}>
-        <Text style={styles.resend}>Didn&apos;t receive the email? <Text style={secondsLeft > 0 || resending ? styles.muted : styles.green}>{resending ? 'Sending...' : 'Resend email'}</Text></Text>
+      <Pressable accessibilityRole="button" disabled={resending || secondsLeft > 0} onPress={resend}>
+        <Text style={styles.resend}>{t('verify.noEmail')} <Text style={secondsLeft > 0 || resending ? styles.muted : styles.green}>{resending ? t('verify.sending') : t('verify.resend')}</Text></Text>
       </Pressable>
-      {secondsLeft > 0 ? <Text style={styles.timer}>Resend email in {formatCountdown(secondsLeft)}</Text> : null}
+      {secondsLeft > 0 ? <Text style={styles.timer}>{t('verify.resendIn', { time: formatCountdown(secondsLeft) })}</Text> : null}
     </View>
 
     {error ? <Text style={styles.error}>{error}</Text> : null}
     {message ? <Text style={styles.success}>{message}</Text> : null}
-    <AuthButton title={checking ? 'Checking...' : "I've verified my email  ✓"} onPress={() => { void check(true); }} disabled={checking || Boolean(confirmed)} />
-    <Text style={styles.footer}>SECURE VERIFICATION PORTAL</Text>
-    <Pressable onPress={() => leave('/sign-up')}><Text style={styles.back}>Wrong email? <Text style={styles.green}>Sign up again</Text></Text></Pressable>
-    <Pressable onPress={() => leave('/login')}><Text style={styles.back}>Back to Login</Text></Pressable>
+    <AuthButton title={checking ? t('verify.checking') : t('verify.button')} icon={checking ? undefined : 'done'} onPress={() => { void check(true); }} disabled={checking || Boolean(confirmed)} />
+    <Text style={styles.footer}>{t('verify.portal')}</Text>
+    <Pressable accessibilityRole="button" onPress={() => leave('/sign-up')}><Text style={styles.back}>{t('verify.wrongEmail')} <Text style={styles.green}>{t('verify.signUpAgain')}</Text></Text></Pressable>
+    <Pressable accessibilityRole="button" onPress={() => leave('/login')}><Text style={styles.back}>{t('verify.backToLogin')}</Text></Pressable>
   </ScrollView>;
 }
 

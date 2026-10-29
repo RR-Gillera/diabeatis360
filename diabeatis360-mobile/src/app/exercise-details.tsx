@@ -11,10 +11,12 @@ import { subscribeToSuggestion } from '@/features/ai/ai-service';
 import type { ExerciseSuggestion, SavedSuggestion } from '@/features/ai/types';
 import { BottomNav } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Exercise Details (Figma 195:1599). Generated together with the suggestion, so no new AI call. The design's
 // "Start Activity" button is left out: there is no activity-tracking module in Table 24.
 export default function ExerciseDetailsScreen() {
+  const { t } = useT();
   const goBack = useSafeBack('/exercise-tips');
   const { id, index } = useLocalSearchParams<{ id?: string; index?: string }>();
   const [saved, setSaved] = useState<SavedSuggestion<ExerciseSuggestion> | null | undefined>(undefined);
@@ -30,14 +32,14 @@ export default function ExerciseDetailsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
             <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={Brand.colors.primary} />
           </Pressable>
-          <AppText weight="extraBold" style={styles.title}>Exercise Details</AppText>
+          <AppText weight="extraBold" accessibilityRole="header" style={styles.title}>{t('exercise.detailsTitle')}</AppText>
         </View>
 
         {saved === undefined ? <ActivityIndicator color={Brand.colors.primary} style={styles.loader} /> : null}
-        {saved !== undefined && !exercise ? <AppText style={styles.empty}>This exercise is no longer available. Go back and generate new suggestions.</AppText> : null}
+        {saved !== undefined && !exercise ? <AppText style={styles.empty}>{t('exercise.gone')}</AppText> : null}
 
         {exercise ? (
           <View style={styles.pad}>
@@ -51,18 +53,18 @@ export default function ExerciseDetailsScreen() {
 
             <View style={styles.tiles}>
               <Card style={styles.tile}>
-                <AppText weight="bold" style={styles.tileLabel}>RECOMMENDED ACTIVITY</AppText>
-                <AppText weight="extraBold" style={styles.tileValue}>{`${exercise.duration_minutes} minutes`}</AppText>
+                <AppText weight="bold" style={styles.tileLabel}>{t('exercise.recommended')}</AppText>
+                <AppText weight="extraBold" style={styles.tileValue}>{t('exercise.minutes', { count: exercise.duration_minutes })}</AppText>
               </Card>
               <Card style={styles.tile}>
-                <AppText weight="bold" style={styles.tileLabel}>INTENSITY</AppText>
-                <AppText weight="extraBold" style={styles.tileValue}>{exercise.intensity === 'moderate' ? 'Moderate' : 'Light'}</AppText>
+                <AppText weight="bold" style={styles.tileLabel}>{t('exercise.intensity')}</AppText>
+                <AppText weight="extraBold" style={styles.tileValue}>{exercise.intensity === 'moderate' ? t('exercise.moderate') : t('exercise.light')}</AppText>
               </Card>
             </View>
 
             {exercise.benefits.length ? (
               <>
-                <AppText weight="bold" style={styles.section}>Benefits</AppText>
+                <AppText weight="bold" style={styles.section}>{t('exercise.benefits')}</AppText>
                 <Card style={styles.list}>
                   {exercise.benefits.map((benefit, position) => (
                     <View key={`${benefit}-${position}`} style={[styles.row, position > 0 && styles.rowBorder]}>

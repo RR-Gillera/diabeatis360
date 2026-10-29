@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 
 import { useAuth } from './auth-context';
 import { isCancelled, socialErrorMessage, type SocialProvider } from './social-types';
+import { useT } from '@/i18n/language-context';
 
 /**
  * The Google and Facebook buttons, shared by the Login and Sign Up screens (DECISIONS.md D23). `start(provider)` runs the
@@ -14,6 +15,7 @@ import { isCancelled, socialErrorMessage, type SocialProvider } from './social-t
 export function useSocialSignIn(showError: (message: string) => void) {
   const router = useRouter();
   const { signInWithProvider, hasCompletedOnboarding, onboardingStartPath } = useAuth();
+  const { language } = useT();
   const [busy, setBusy] = useState<SocialProvider | null>(null);
 
   const start = async (provider: SocialProvider) => {
@@ -33,7 +35,7 @@ export function useSocialSignIn(showError: (message: string) => void) {
       }
     } catch (value) {
       // Closing Google's or Facebook's window is the person's choice, not an error.
-      if (!isCancelled(value)) showError(socialErrorMessage(value, provider));
+      if (!isCancelled(value)) showError(socialErrorMessage(value, provider, language));
     } finally {
       setBusy(null);
     }

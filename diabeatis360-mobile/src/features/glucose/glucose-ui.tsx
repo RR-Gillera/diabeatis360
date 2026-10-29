@@ -9,19 +9,16 @@ import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
 import { checkReading, interpretGlucose, READING_LIMITS } from '@/constants/glucose';
 import { addGlucoseLog, deleteGlucoseLog, updateGlucoseLog } from './glucose-service';
-import { enumLabel } from '@/constants/enums';
+import { useT } from '@/i18n/language-context';
 import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
 
-const contexts: { value: MealContext; label: string }[] = [
-  { value: 'before_meal', label: enumLabel('mealContext', 'before_meal') },
-  { value: 'after_meal', label: enumLabel('mealContext', 'after_meal') },
-];
+const contexts: MealContext[] = ['before_meal', 'after_meal'];
 
-const livePreviewCopy: Record<Interpretation, { label: string; color: string; background: string }> = {
-  low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
-  normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
-  high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
-  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
+const livePreviewCopy: Record<Interpretation, { color: string; background: string }> = {
+  low: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
+  normal: { color: homeColors.green, background: homeColors.greenTint },
+  high: { color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { color: '#FFFFFF', background: homeColors.red },
 };
 
 // Shared "Add a Reading" bottom sheet — used from the Log tab's FAB and from
@@ -31,6 +28,7 @@ const livePreviewCopy: Record<Interpretation, { label: string; color: string; ba
 export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: (doctorsNotified: number) => void; entry?: GlucoseLogEntry | null }) {
   const editing = Boolean(entry);
   const { uid } = useAuth();
+  const { t, label, language } = useT();
   const [reading, setReading] = useState('');
   const [context, setContext] = useState<MealContext>('before_meal');
   const [notes, setNotes] = useState('');
@@ -55,7 +53,8 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   // Impossible values are refused with the reason shown under the field; rare ones ask for a check first (D25).
   const check = reading.trim() !== '' ? checkReading(readingValue) : null;
   const isValidReading = check?.ok === true;
-  const livePreview = isValidReading ? livePreviewCopy[interpretGlucose(readingValue, context)] : null;
+  const liveLevel = isValidReading ? interpretGlucose(readingValue, context) : null;
+  const livePreview = liveLevel ? { ...livePreviewCopy[liveLevel], label: label('interpretation', liveLevel) } : null;
 
   const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); setConfirming(false); };
   const close = () => { reset(); onClose(); };
@@ -67,11 +66,11 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
     try {
       let doctorsNotified = 0;
       if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
-      else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date())).doctorsNotified;
+      else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date(), language)).doctorsNotified;
       reset();
       onSaved(doctorsNotified);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save this reading.');
+      setError(value instanceof Error ? value.message : t('glucose.form.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -85,7 +84,7 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
       reset();
       onSaved(0);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to delete this reading.');
+      setError(value instanceof Error ? value.message : t('glucose.form.deleteFailed'));
     } finally {
       setDeleting(false);
     }
@@ -96,38 +95,38 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>{editing ? 'Edit Reading' : 'Add a Reading'}</Text>
-            <Pressable onPress={close} hitSlop={10}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" /></Pressable>
+            <Text style={styles.title}>{editing ? t('glucose.form.edit') : t('glucose.form.add')}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={close} hitSlop={10}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" /></Pressable>
           </View>
           <View style={styles.readingRow}>
-            <TextInput value={reading} onChangeText={(value) => { setReading(value); setConfirming(false); }} placeholder="0" accessibilityLabel="Blood sugar reading in mg/dL" keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
+            <TextInput value={reading} onChangeText={(value) => { setReading(value); setConfirming(false); }} placeholder="0" accessibilityLabel={t('glucose.form.inputA11y')} keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
             <Text style={styles.readingUnit}>mg/dL</Text>
             {livePreview ? <View style={[styles.previewBadge, { backgroundColor: livePreview.background }]}><Text style={[styles.previewBadgeText, { color: livePreview.color }]}>{livePreview.label}</Text></View> : null}
           </View>
-          {check && !check.ok ? <Text style={styles.hint}>{check.message}</Text> : null}
+          {check && !check.ok ? <Text style={styles.hint}>{check.reason === 'range' ? t('glucose.check.range', { min: READING_LIMITS.min, max: READING_LIMITS.max }) : t(check.reason === 'decimal' ? 'glucose.check.decimal' : 'glucose.check.notNumber')}</Text> : null}
           <View style={styles.contextRow}>
             {contexts.map((item) => (
-              <Pressable key={item.value} onPress={() => setContext(item.value)} style={[styles.contextPill, context === item.value && styles.contextPillActive]}>
-                <Text style={[styles.contextText, context === item.value && styles.contextTextActive]}>{item.label}</Text>
+              <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: context === item }} onPress={() => setContext(item)} style={[styles.contextPill, context === item && styles.contextPillActive]}>
+                <Text style={[styles.contextText, context === item && styles.contextTextActive]}>{label('mealContext', item)}</Text>
               </Pressable>
             ))}
           </View>
-          <TextInput value={notes} onChangeText={setNotes} placeholder="Notes (optional)" style={styles.notesInput} multiline />
+          <TextInput value={notes} onChangeText={setNotes} placeholder={t('glucose.form.notes')} accessibilityLabel={t('glucose.form.notes')} style={styles.notesInput} multiline />
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {confirming ? (
             <View style={styles.confirmBox}>
-              <Text style={styles.confirmTitle}>Is {readingValue} mg/dL right?</Text>
+              <Text style={styles.confirmTitle}>{t('glucose.form.confirmTitle', { value: readingValue })}</Text>
               <Text style={styles.confirmText}>
-                {readingValue < READING_LIMITS.confirmBelow ? 'Readings this low are rare.' : 'Readings this high are rare.'} Please check the number on your meter before saving.
+                {readingValue < READING_LIMITS.confirmBelow ? t('glucose.form.rareLow') : t('glucose.form.rareHigh')}{t('glucose.form.checkMeter')}
               </Text>
             </View>
           ) : null}
           <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
-            <Text style={styles.saveButtonText}>{saving ? 'Saving...' : confirming ? `Yes, save ${readingValue} mg/dL` : editing ? 'Save Changes' : 'Save Reading'}</Text>
+            <Text style={styles.saveButtonText}>{saving ? t('glucose.form.saving') : confirming ? t('glucose.form.confirmSave', { value: readingValue }) : editing ? t('glucose.form.saveChanges') : t('glucose.form.save')}</Text>
           </Pressable>
           {editing ? (
             <Pressable style={styles.deleteButton} onPress={remove} disabled={deleting}>
-              <Text style={styles.deleteButtonText}>{deleting ? 'Deleting...' : 'Delete Reading'}</Text>
+              <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : t('glucose.form.delete')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -136,45 +135,27 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   );
 }
 
-// No live AI/Gemini call is wired up yet — these are curated, interpretation-aware
-// talking points standing in for the real recommendation engine. Shown on both
-// the post-log result screen and the Home dashboard (once a reading exists).
-const guidance: Record<Interpretation, { meal: string; exercise: string }> = {
-  normal: {
-    meal: 'Keep up your current balanced eating pattern — nothing to change based on this reading.',
-    exercise: 'A short walk or light physical activity is a great way to help maintain this level.',
-  },
-  high: {
-    meal: 'Consider choosing your next meal to be lower in added sugar and refined carbohydrates.',
-    exercise: 'A short walk or light physical activity, if appropriate for you, can help bring levels down.',
-  },
-  low: {
-    meal: 'A small snack with fast-acting carbohydrates (like fruit juice or a glucose tablet) can help raise your level.',
-    exercise: 'Hold off on strenuous exercise until your level stabilizes and you re-check your next reading.',
-  },
-  critical: {
-    meal: 'Your reading is in a dangerous range. Follow the alert above and contact your doctor or seek emergency care now.',
-    exercise: 'Do not exercise right now. Contact your doctor or seek emergency care.',
-  },
-};
+// Fixed guidance for the reading's level (the text is in en.ts / fil.ts, "guidance.*"). It is NOT written by the AI, so
+// the section is called "Recommendations" (it used to say "AI Recommendations", D34); its two buttons open the real AI
+// screens. Shown on the result screen and on Home (once a reading exists).
 
 export function AiRecommendations({ interpretation }: { interpretation: Interpretation }) {
   const router = useRouter();
-  const copy = guidance[interpretation];
+  const { t } = useT();
   return (
     <View style={recStyles.section}>
-      <Text style={recStyles.sectionTitle}>AI Recommendations</Text>
+      <Text accessibilityRole="header" style={recStyles.sectionTitle}>{t('guidance.title')}</Text>
 
       <View style={recStyles.card}>
         <View style={recStyles.cardTop}>
           <View style={recStyles.iconWrap}><SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={20} tintColor={homeColors.green} /></View>
           <View style={recStyles.copy}>
-            <Text style={recStyles.cardTitle}>Meal Recommendation</Text>
-            <Text style={recStyles.cardText}>{copy.meal}</Text>
+            <Text style={recStyles.cardTitle}>{t('guidance.meal')}</Text>
+            <Text style={recStyles.cardText}>{t(`guidance.${interpretation}.meal`)}</Text>
           </View>
         </View>
         <Pressable style={recStyles.button} onPress={() => router.push('/meal-suggestions')}>
-          <Text style={recStyles.buttonText}>View Meal Suggestions</Text>
+          <Text style={recStyles.buttonText}>{t('guidance.viewMeals')}</Text>
         </Pressable>
       </View>
 
@@ -182,12 +163,12 @@ export function AiRecommendations({ interpretation }: { interpretation: Interpre
         <View style={recStyles.cardTop}>
           <View style={recStyles.iconWrap}><SymbolView name={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} size={20} tintColor={homeColors.green} /></View>
           <View style={recStyles.copy}>
-            <Text style={recStyles.cardTitle}>Exercise Recommendation</Text>
-            <Text style={recStyles.cardText}>{copy.exercise}</Text>
+            <Text style={recStyles.cardTitle}>{t('guidance.exercise')}</Text>
+            <Text style={recStyles.cardText}>{t(`guidance.${interpretation}.exercise`)}</Text>
           </View>
         </View>
         <Pressable style={recStyles.button} onPress={() => router.push('/exercise-tips')}>
-          <Text style={recStyles.buttonText}>View Exercise Tips</Text>
+          <Text style={recStyles.buttonText}>{t('guidance.viewExercise')}</Text>
         </Pressable>
       </View>
       <AiDisclaimer />

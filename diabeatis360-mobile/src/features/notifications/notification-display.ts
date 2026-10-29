@@ -1,6 +1,7 @@
 // How a notification is shown on the Notifications screen (Figma P-22): which filter tab it belongs to, its bold
-// title and its short time ("2m", "1h", "Yesterday"). No imports on purpose, so plain Node can test it
-// (notification-display.test.mjs).
+// title and its short time ("2m", "1h", "Yesterday"). No Firebase or React imports, so plain Node can test it
+// (notification-display.test.mjs). Every function takes the person's language (D33); English is the default.
+import { shortDay, translate, type Language, type MessageKey } from '@/i18n/translate';
 
 /** Same values as NotificationType in notification-service.ts (kept as plain strings so this file has no imports). */
 type Kind = 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification' | 'doctor_verification';
@@ -32,20 +33,26 @@ const TITLES: Record<Kind, string> = {
   doctor_verification: 'Account verification',
 };
 
-export function notificationTitle(kind: Kind) {
-  return TITLES[kind] ?? 'Notification';
+export function notificationTitle(kind: Kind, language: Language = 'English') {
+  if (language === 'English') return TITLES[kind] ?? 'Notification';
+  return TITLES[kind] ? translate(language, `notif.kind.${kind}` as MessageKey) : translate(language, 'notif.kind.other');
+}
+
+/** A filter tab's label in the person's language. */
+export function filterLabel(filter: NotificationFilter, language: Language = 'English') {
+  return translate(language, `notif.tab.${filter}`);
 }
 
 /** "Just now", "5m", "3h", "Yesterday", then "Oct 16" (with the year when it is not this year). */
-export function shortTime(sentAt: Date | null, now: Date = new Date()) {
-  if (!sentAt) return 'Just now';
+export function shortTime(sentAt: Date | null, now: Date = new Date(), language: Language = 'English') {
+  if (!sentAt) return translate(language, 'time.justNow');
   const minutes = Math.floor((now.getTime() - sentAt.getTime()) / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1) return translate(language, 'time.justNow');
+  if (minutes < 60) return translate(language, 'time.minutes', { count: minutes });
   const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-  if (sentAt >= startOfToday) return `${Math.floor(minutes / 60)}h`;
+  if (sentAt >= startOfToday) return translate(language, 'time.hours', { count: Math.floor(minutes / 60) });
   const startOfYesterday = new Date(startOfToday); startOfYesterday.setDate(startOfToday.getDate() - 1);
-  if (sentAt >= startOfYesterday) return 'Yesterday';
+  if (sentAt >= startOfYesterday) return translate(language, 'time.yesterday');
   const sameYear = sentAt.getFullYear() === now.getFullYear();
-  return sentAt.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  return sameYear ? shortDay(sentAt, language) : `${shortDay(sentAt, language)}, ${sentAt.getFullYear()}`;
 }

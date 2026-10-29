@@ -20,6 +20,20 @@ export function translate(language: Language, key: MessageKey, vars?: Record<str
 const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTHS_FIL = ['Enero', 'Pebrero', 'Marso', 'Abril', 'Mayo', 'Hunyo', 'Hulyo', 'Agosto', 'Setyembre', 'Oktubre', 'Nobyembre', 'Disyembre'];
 
+const SHORT_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SHORT_FIL = ['Ene', 'Peb', 'Mar', 'Abr', 'May', 'Hun', 'Hul', 'Ago', 'Set', 'Okt', 'Nob', 'Dis'];
+
+/** "Oct 29" / "Okt 29": a short day label in the person's language. */
+export function shortDay(date: Date, language: Language): string {
+  return `${(language === 'Filipino' ? SHORT_FIL : SHORT_EN)[date.getMonth()]} ${date.getDate()}`;
+}
+
+/** "3:40 PM" (the same in both languages, as used in the Philippines). */
+export function clockTime(date: Date): string {
+  const hour = date.getHours();
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${String(date.getMinutes()).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
 /** Month names in the person's language. */
 export function monthNames(language: Language): string[] {
   return language === 'Filipino' ? MONTHS_FIL : MONTHS_EN;

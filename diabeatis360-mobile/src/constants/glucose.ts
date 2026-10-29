@@ -55,15 +55,16 @@ export const READING_LIMITS = {
 } as const;
 
 export type ReadingCheck =
-  | { ok: false; message: string }
+  // `reason` lets the screen say it in the person's language (D33); `message` is the English text.
+  | { ok: false; reason: 'notNumber' | 'decimal' | 'range'; message: string }
   | { ok: true; needsConfirmation: boolean };
 
 /** Checks a typed reading before it is saved. Whole numbers only: meters show mg/dL without decimals. */
 export function checkReading(value: number): ReadingCheck {
-  if (!Number.isFinite(value)) return { ok: false, message: 'Enter your reading as a number.' };
-  if (!Number.isInteger(value)) return { ok: false, message: 'Enter a whole number (meters show mg/dL without decimals).' };
+  if (!Number.isFinite(value)) return { ok: false, reason: 'notNumber', message: 'Enter your reading as a number.' };
+  if (!Number.isInteger(value)) return { ok: false, reason: 'decimal', message: 'Enter a whole number (meters show mg/dL without decimals).' };
   if (value < READING_LIMITS.min || value > READING_LIMITS.max) {
-    return { ok: false, message: `Enter a reading from ${READING_LIMITS.min} to ${READING_LIMITS.max} mg/dL. Check the number on your meter.` };
+    return { ok: false, reason: 'range', message: `Enter a reading from ${READING_LIMITS.min} to ${READING_LIMITS.max} mg/dL. Check the number on your meter.` };
   }
   return { ok: true, needsConfirmation: value < READING_LIMITS.confirmBelow || value > READING_LIMITS.confirmAbove };
 }

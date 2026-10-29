@@ -11,6 +11,7 @@ import { subscribeToSuggestion } from '@/features/ai/ai-service';
 import type { MealSuggestion, SavedSuggestion } from '@/features/ai/types';
 import { BottomNav } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 function Tile({ label, value, unit, accent, wide }: { label: string; value: number; unit: string; accent?: boolean; wide?: boolean }) {
   return (
@@ -25,6 +26,7 @@ function Tile({ label, value, unit, accent, wide }: { label: string; value: numb
 // new AI call. The design's photo and "Add to Meal Log" button are left out: no image storage (D2) and no meal log
 // module in Table 24.
 export default function MealDetailsScreen() {
+  const { t } = useT();
   const goBack = useSafeBack('/meal-suggestions');
   const { id, index } = useLocalSearchParams<{ id?: string; index?: string }>();
   const [saved, setSaved] = useState<SavedSuggestion<MealSuggestion> | null | undefined>(undefined);
@@ -40,14 +42,14 @@ export default function MealDetailsScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
             <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={Brand.colors.primary} />
           </Pressable>
-          <AppText weight="extraBold" style={styles.title}>Meal Details</AppText>
+          <AppText weight="extraBold" accessibilityRole="header" style={styles.title}>{t('meal.detailsTitle')}</AppText>
         </View>
 
         {saved === undefined ? <ActivityIndicator color={Brand.colors.primary} style={styles.loader} /> : null}
-        {saved !== undefined && !meal ? <AppText style={styles.empty}>This meal is no longer available. Go back and generate new suggestions.</AppText> : null}
+        {saved !== undefined && !meal ? <AppText style={styles.empty}>{t('meal.gone')}</AppText> : null}
 
         {meal ? (
           <>
@@ -58,13 +60,13 @@ export default function MealDetailsScreen() {
               <AppText weight="extraBold" style={styles.name}>{meal.name}</AppText>
               <AppText style={styles.tagline}>{meal.tagline}</AppText>
 
-              <AppText weight="bold" style={styles.section}>Nutrition Information</AppText>
+              <AppText weight="bold" style={styles.section}>{t('meal.nutrition')}</AppText>
               <View style={styles.grid}>
-                <Tile label="Calories" value={meal.calories} unit="kcal" accent />
-                <Tile label="Protein" value={meal.protein_g} unit="g" accent />
-                <Tile label="Carbs" value={meal.carbs_g} unit="g" />
-                <Tile label="Fiber" value={meal.fiber_g} unit="g" />
-                <Tile label="Sugar" value={meal.sugar_g} unit="g" wide />
+                <Tile label={t('meal.calories')} value={meal.calories} unit="kcal" accent />
+                <Tile label={t('meal.protein')} value={meal.protein_g} unit="g" accent />
+                <Tile label={t('meal.carbs')} value={meal.carbs_g} unit="g" />
+                <Tile label={t('meal.fiber')} value={meal.fiber_g} unit="g" />
+                <Tile label={t('meal.sugar')} value={meal.sugar_g} unit="g" wide />
               </View>
 
               {meal.insight ? (
@@ -73,7 +75,7 @@ export default function MealDetailsScreen() {
                     <SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} size={18} tintColor={Brand.colors.primary} />
                   </View>
                   <View style={styles.insightCopy}>
-                    <AppText weight="bold" style={styles.insightTitle}>AI Insight</AppText>
+                    <AppText weight="bold" style={styles.insightTitle}>{t('meal.insight')}</AppText>
                     <AppText style={styles.insightText}>{meal.insight}</AppText>
                   </View>
                 </View>
@@ -81,7 +83,7 @@ export default function MealDetailsScreen() {
 
               {meal.ingredients.length ? (
                 <>
-                  <AppText weight="bold" style={styles.section}>Ingredients</AppText>
+                  <AppText weight="bold" style={styles.section}>{t('meal.ingredients')}</AppText>
                   <Card style={styles.ingredients}>
                     {meal.ingredients.map((ingredient, position) => (
                       <View key={`${ingredient}-${position}`} style={[styles.ingredient, position > 0 && styles.ingredientBorder]}>

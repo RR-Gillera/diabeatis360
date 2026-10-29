@@ -18,6 +18,9 @@ import { BottomNav } from '@/features/home/home-ui';
 import { canUseFeature } from '@/features/subscription/subscription-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { AiError } from '@/lib/ai';
+import { aiErrorText } from '@/lib/ai-error-text';
+import { useT } from '@/i18n/language-context';
+import { clockTime, shortDay } from '@/i18n/translate';
 
 import { subscribeToLatestSuggestion } from './ai-service';
 import type { RecommendationResult, SavedSuggestion, SuggestionKind } from './types';
@@ -44,13 +47,14 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
   const router = useRouter();
   const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [saved, setSaved] = useState<SavedSuggestion<T> | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [latest, setLatest] = useState<GlucoseLogEntry | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AiError | null>(null);
   const [notice, setNotice] = useState('');
-  const [usage, setUsage] = useState('');
+  const [usage, setUsage] = useState<{ premium: boolean; left: number; limit: number } | null>(null);
   // The Free plan's daily limit is used up (Figma P-15). Known from the count before anyone taps, or from the server's
   // answer when they do.
   const [freeLimit, setFreeLimit] = useState<number | null>(null);
@@ -74,10 +78,11 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
     canUseFeature(uid, 'ai')
       .then((value) => {
         if (cancelled) return;
-        setUsage(value.premium ? 'Premium: unlimited suggestions' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} left today`);
+        // Kept as numbers; the sentence is built when drawing, so it follows the person's language.
+        setUsage({ premium: value.premium, left: Math.max(0, (value.limit ?? 0) - value.used), limit: value.limit ?? 0 });
         setFreeLimit(!value.premium && !value.allowed ? value.limit : null);
       })
-      .catch(() => { if (!cancelled) setUsage(''); });
+      .catch(() => { if (!cancelled) setUsage(null); });
     return () => { cancelled = true; };
   }, [uid, usageTick]);
 
@@ -90,7 +95,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
       const result = await request();
       if (result.blocked) setNotice(result.message ?? '');
     } catch (value) {
-      setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
+      setError(value instanceof AiError ? value : new AiError('unknown', t('ai.error.unknown')));
     } finally {
       setBusy(false);
       refreshUsage();
@@ -106,7 +111,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={() => goBack()} hitSlop={8}>
             <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={Brand.colors.primary} />
           </Pressable>
           <AppText weight="extraBold" style={styles.title}>{title}</AppText>
@@ -120,9 +125,9 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
           <View style={styles.pad}>
             <LimitReached
               icon={{ ios: 'sparkle', android: 'auto_awesome', web: 'auto_awesome' }}
-              title={`You've used ${limitCount} of ${limitCount} free suggestions today`}
-              text="Premium gives you unlimited AI suggestions."
-              footer="Come back tomorrow"
+              title={t('ai.limit.title', { count: limitCount })}
+              text={t('ai.limit.text')}
+              footer={t('ai.limit.footer')}
               onUpgrade={() => router.push('/subscription')}
               onFooter={() => goBack()}
             />
@@ -131,17 +136,17 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
 
         {!critical && !limitReached ? (
           <View style={styles.pad}>
-            <PrimaryButton title={saved ? 'Generate new suggestions' : 'Generate suggestions'} onPress={generate} loading={busy} />
-            {usage ? <AppText style={styles.usage}>{usage}</AppText> : null}
+            <PrimaryButton title={saved ? t('ai.generateNew') : t('ai.generate')} onPress={generate} loading={busy} />
+            {usage ? <AppText style={styles.usage}>{usage.premium ? t('ai.usage.premium') : t('ai.usage.free', { left: usage.left, limit: usage.limit })}</AppText> : null}
             {error?.code === 'feature-unavailable' ? (
-              <AppText style={styles.unavailable}>{error.message}</AppText>
+              <AppText style={styles.unavailable}>{aiErrorText(error, language)}</AppText>
             ) : error ? (
               <View style={styles.errorBox}>
-                <AppText style={styles.errorText}>{error.message}</AppText>
+                <AppText style={styles.errorText}>{aiErrorText(error, language)}</AppText>
                 {error.code === 'limit' ? (
-                  <PrimaryButton title="Upgrade to Premium" variant="outline" onPress={() => router.push('/subscription')} style={styles.upgrade} />
+                  <PrimaryButton title={t('ai.upgrade')} variant="outline" onPress={() => router.push('/subscription')} style={styles.upgrade} />
                 ) : error.code === 'allergies-missing' ? (
-                  <PrimaryButton title="Add my allergies" variant="outline" onPress={() => router.push('/profile')} style={styles.upgrade} />
+                  <PrimaryButton title={t('ai.addAllergies')} variant="outline" onPress={() => router.push('/health-profile/edit')} style={styles.upgrade} />
                 ) : null}
               </View>
             ) : null}
@@ -155,7 +160,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
           <View style={styles.pad}>
             <View style={styles.preparing}>
               <SymbolView name={{ ios: 'sparkle', android: 'auto_awesome', web: 'auto_awesome' }} size={18} tintColor={Brand.colors.primary} />
-              <AppText weight="bold" style={styles.preparingText}>Preparing your suggestions...</AppText>
+              <AppText weight="bold" style={styles.preparingText}>{t('ai.preparing')}</AppText>
             </View>
             {[0, 1, 2].map((row) => (
               <Card key={row} style={styles.skeleton}>
@@ -174,14 +179,14 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
         ) : null}
 
         {loaded && !saved && !critical && !busy && !limitReached ? (
-          <AppText style={styles.empty}>No suggestions yet. Tap Generate to get ideas based on your health profile and latest reading.</AppText>
+          <AppText style={styles.empty}>{t('ai.empty')}</AppText>
         ) : null}
 
         {!critical && saved && !busy ? (
           <>
             {saved.generatedAt ? (
               <AppText style={styles.when}>
-                {`Generated ${saved.generatedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${saved.generatedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                {t('ai.generatedAt', { date: shortDay(saved.generatedAt, language), time: clockTime(saved.generatedAt) })}
               </AppText>
             ) : null}
             {saved.items.map((item, index) => {

@@ -10,7 +10,8 @@ import { PrimaryButton } from '@/components/ui/primary-button';
 import { StatusPill } from '@/components/ui/status-pill';
 import { DAILY_CALORIE_REFERENCE, HIGH_SUGAR_PER_SERVING_G } from '@/constants/nutrition';
 import { Brand } from '@/constants/theme';
-import { enumLabel } from '@/constants/enums';
+import { useT } from '@/i18n/language-context';
+import type { Language, MessageKey } from '@/i18n/translate';
 
 import type { LabelAnalysis } from '@/features/ai/types';
 
@@ -34,6 +35,7 @@ function Nutrient({ label, value, unit, flag }: { label: string; value: number; 
 }
 
 function DailyRing({ percent }: { percent: number }) {
+  const { t } = useT();
   const radius = 22;
   const circumference = 2 * Math.PI * radius;
   const shown = Math.min(100, Math.max(0, percent));
@@ -49,7 +51,7 @@ function DailyRing({ percent }: { percent: number }) {
         </Svg>
         <View style={styles.ringLabel}><AppText weight="bold" style={styles.ringText}>{`${Math.round(percent)}%`}</AppText></View>
       </View>
-      <AppText style={styles.tileLabel}>DAILY TARGET</AppText>
+      <AppText style={styles.tileLabel}>{t('scan.dailyTarget')}</AppText>
     </Card>
   );
 }
@@ -63,8 +65,9 @@ function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barco
   const [name, setName] = useState(analysis.product_name);
   const [brand, setBrand] = useState(analysis.brand);
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const { t } = useT();
   if (state === 'saved') {
-    return <AppText style={styles.shareDone}>Thank you! This product is now shared with other patients (not yet verified).</AppText>;
+    return <AppText style={styles.shareDone}>{t('share.thanks')}</AppText>;
   }
   const save = async () => {
     setState('saving');
@@ -80,7 +83,7 @@ function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barco
       <AppText style={styles.fieldLabel}>{label}</AppText>
       <View style={styles.fieldBox}>
         <TextInput accessibilityLabel={label} style={styles.fieldInput} value={value} onChangeText={onChange} placeholder={label} placeholderTextColor={Brand.colors.textFaint} maxLength={maxLength} />
-        {value && value === original ? <View style={styles.fromScan}><AppText weight="bold" style={styles.fromScanText}>From scan</AppText></View> : null}
+        {value && value === original ? <View style={styles.fromScan}><AppText weight="bold" style={styles.fromScanText}>{t('share.fromScan')}</AppText></View> : null}
       </View>
     </View>
   );
@@ -89,16 +92,16 @@ function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barco
       <View style={styles.shareHead}>
         <View style={styles.shareIcon}><SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={26} tintColor={Brand.colors.primary} /></View>
         <View style={styles.shareHeadText}>
-          <AppText weight="bold" style={styles.shareTitle}>We don&apos;t know this product yet</AppText>
-          <AppText style={styles.shareSub}>Add it so others can scan it too.</AppText>
+          <AppText weight="bold" style={styles.shareTitle}>{t('share.title')}</AppText>
+          <AppText style={styles.shareSub}>{t('share.sub')}</AppText>
         </View>
       </View>
       <Card style={styles.shareCard}>
-        {field('Product name', name, analysis.product_name, setName, 100)}
-        {field('Brand', brand, analysis.brand, setBrand, 80)}
+        {field(t('share.name'), name, analysis.product_name, setName, 100)}
+        {field(t('share.brand'), brand, analysis.brand, setBrand, 80)}
         {barcode ? (
           <View style={styles.fieldGroup}>
-            <AppText style={styles.fieldLabel}>Barcode</AppText>
+            <AppText style={styles.fieldLabel}>{t('share.barcode')}</AppText>
             <View style={[styles.fieldBox, styles.fieldLocked]}>
               <SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={16} tintColor={Brand.colors.textMuted} />
               <AppText style={styles.lockedText}>{barcode}</AppText>
@@ -106,34 +109,47 @@ function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barco
           </View>
         ) : null}
       </Card>
-      {state === 'failed' ? <AppText style={styles.shareError}>We could not share it. Someone may have shared it already.</AppText> : null}
-      <PrimaryButton title="Save and share with others" loading={state === 'saving'} disabled={!name.trim()} onPress={save} />
-      <AppText style={styles.shareNote}>Shared products are reviewed by an admin.</AppText>
+      {state === 'failed' ? <AppText style={styles.shareError}>{t('share.failed')}</AppText> : null}
+      <PrimaryButton title={t('share.save')} loading={state === 'saving'} disabled={!name.trim()} onPress={save} />
+      <AppText style={styles.shareNote}>{t('share.note')}</AppText>
     </View>
   );
+}
+
+/**
+ * The server writes each allergy warning in English ("Contains nuts", functions/lib/prompts.js). The card says the
+ * whole sentence in the person's language, so only the allergen is taken from it: a common allergy is translated as
+ * on the Health Profile ("nuts" -> "mani"), and one the person typed is shown as typed.
+ */
+function allergenName(warning: string, language: Language, t: (key: MessageKey) => string) {
+  const allergen = warning.replace(/^Contains\s+/i, '');
+  if (language === 'English') return allergen;
+  const common = ['Nuts', 'Dairy', 'Eggs', 'Seafood'].find((item) => item.toLowerCase() === allergen.toLowerCase());
+  return common ? t(`allergy.${common}` as MessageKey).toLowerCase() : allergen;
 }
 
 /** The analysis of one scanned label (Figma 195:2908). onShare is set only for a new product that has a barcode. */
 export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, barcode }: {
   analysis: Readable; onAlternatives: () => void; onScanAgain: () => void; onShare?: (name: string, brand: string) => Promise<void>; barcode?: string;
 }) {
+  const { t, label, language } = useT();
   const percent = (analysis.calories / DAILY_CALORIE_REFERENCE) * 100;
   return (
     <View>
       <Card style={styles.product}>
         <View style={styles.productTop}>
-          <AppText weight="bold" style={styles.small}>SCANNED PRODUCT</AppText>
-          <StatusPill label={enumLabel('healthRating', analysis.health_rating).toUpperCase()} tone={tones[analysis.health_rating]} />
+          <AppText weight="bold" style={styles.small}>{t('scan.product')}</AppText>
+          <StatusPill label={label('healthRating', analysis.health_rating).toUpperCase()} tone={tones[analysis.health_rating]} />
         </View>
         {analysis.from_memory ? (
-          <AppText style={styles.memory}>{analysis.verified ? 'Shared product, verified by an admin' : 'Shared product, not yet verified'}</AppText>
+          <AppText style={styles.memory}>{analysis.verified ? t('scan.sharedVerified') : t('scan.sharedUnverified')}</AppText>
         ) : null}
         <AppText weight="extraBold" style={styles.name}>{analysis.product_name}</AppText>
         {analysis.brand ? <AppText style={styles.brand}>{analysis.brand}</AppText> : null}
         <View style={styles.kcalRow}>
           <AppText weight="extraBold" style={styles.kcal}>{analysis.calories}</AppText>
           <AppText style={styles.kcalUnit}> kcal</AppText>
-          <AppText style={styles.serving}>{analysis.serving_size ? `per serving (${analysis.serving_size})` : 'per serving'}</AppText>
+          <AppText style={styles.serving}>{analysis.serving_size ? t('scan.perServingSize', { size: analysis.serving_size }) : t('scan.perServing')}</AppText>
         </View>
       </Card>
 
@@ -141,18 +157,18 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, bar
         <View style={styles.allergen}>
           <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={18} tintColor={Brand.colors.danger} />
           <View style={styles.allergenCopy}>
-            <AppText weight="bold" style={styles.allergenTitle}>Allergy warning</AppText>
-            {analysis.allergen_warnings.map((warning) => <AppText key={warning} style={styles.allergenText}>{warning}, which is on your allergy list.</AppText>)}
+            <AppText weight="bold" style={styles.allergenTitle}>{t('scan.allergyTitle')}</AppText>
+            {analysis.allergen_warnings.map((warning) => <AppText key={warning} style={styles.allergenText}>{t('scan.allergyLine', { allergen: allergenName(warning, language, t) })}</AppText>)}
           </View>
         </View>
       ) : null}
 
       <View style={styles.grid}>
-        <Nutrient label="Total Carbohydrates" value={analysis.carbs_g} unit="g" />
-        <Nutrient label="Sugar" value={analysis.sugar_g} unit="g" flag={analysis.sugar_g >= HIGH_SUGAR_PER_SERVING_G} />
-        <Nutrient label="Fiber" value={analysis.fiber_g} unit="g" />
-        <Nutrient label="Protein" value={analysis.protein_g} unit="g" />
-        <Nutrient label="Sodium" value={analysis.sodium_mg} unit="mg" />
+        <Nutrient label={t('scan.totalCarbs')} value={analysis.carbs_g} unit="g" />
+        <Nutrient label={t('meal.sugar')} value={analysis.sugar_g} unit="g" flag={analysis.sugar_g >= HIGH_SUGAR_PER_SERVING_G} />
+        <Nutrient label={t('meal.fiber')} value={analysis.fiber_g} unit="g" />
+        <Nutrient label={t('meal.protein')} value={analysis.protein_g} unit="g" />
+        <Nutrient label={t('scan.sodium')} value={analysis.sodium_mg} unit="mg" />
         <DailyRing percent={percent} />
       </View>
 
@@ -162,7 +178,7 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, bar
             <View style={styles.insightIcon}>
               <SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} size={16} tintColor={Brand.colors.primary} />
             </View>
-            <AppText weight="bold" style={styles.insightTitle}>{analysis.from_memory ? 'Personalized Insight' : 'AI Personalized Insight'}</AppText>
+            <AppText weight="bold" style={styles.insightTitle}>{analysis.from_memory ? t('scan.insight') : t('scan.aiInsight')}</AppText>
           </View>
           <AppText style={styles.insightText}>{analysis.insight}</AppText>
         </Card>
@@ -170,8 +186,8 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, bar
 
       {onShare ? <ShareProduct analysis={analysis} barcode={barcode} onSave={onShare} /> : null}
 
-      {analysis.alternatives.length ? <PrimaryButton title="View Healthier Alternatives" onPress={onAlternatives} style={styles.button} /> : null}
-      <PrimaryButton title="Scan Another Product" variant="outline" onPress={onScanAgain} style={styles.button} />
+      {analysis.alternatives.length ? <PrimaryButton title={t('scan.viewAlternatives')} onPress={onAlternatives} style={styles.button} /> : null}
+      <PrimaryButton title={t('scan.another')} variant="outline" onPress={onScanAgain} style={styles.button} />
       <AiDisclaimer />
     </View>
   );

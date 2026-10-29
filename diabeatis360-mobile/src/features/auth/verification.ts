@@ -1,5 +1,6 @@
-// Small helpers for the "Check your email" step (DECISIONS.md D21). They have no imports on purpose, so plain Node can
+// Small helpers for the "Check your email" step (DECISIONS.md D21). No Firebase or React imports, so plain Node can
 // test them (verification.test.mjs); the Firebase calls themselves live in auth-context.tsx.
+import { translate, type Language } from '@/i18n/translate';
 
 /** Seconds the "Resend email" button waits after an email went out, so a second tap cannot send a second one. */
 export const RESEND_COOLDOWN_SECONDS = 60;
@@ -47,18 +48,18 @@ export function firstLocale(...candidates: (string | undefined | null)[]) {
 }
 
 /** A plain-language reason for a failed send or check, from the Firebase error code. */
-export function verificationErrorMessage(code: string | undefined) {
+export function verificationErrorMessage(code: string | undefined, language: Language = 'English') {
   switch (code) {
     case 'auth/too-many-requests':
-      return 'We have sent a few emails already. Please wait a few minutes before asking for another one.';
+      return translate(language, 'verify.error.tooMany');
     case 'auth/network-request-failed':
-      return 'No internet connection. Check your connection and try again.';
+      return translate(language, 'verify.error.offline');
     case 'auth/user-token-expired':
     case 'auth/requires-recent-login':
     case 'auth/user-not-found':
-      return 'Your sign-in has expired. Please go back and log in again.';
+      return translate(language, 'verify.error.expired');
     default:
-      return 'We could not do that. Please try again.';
+      return translate(language, 'verify.error.generic');
   }
 }
 

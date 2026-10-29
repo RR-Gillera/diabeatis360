@@ -70,3 +70,10 @@ test('errorCode reads the code of a thrown Firebase error and tolerates anything
   assert.equal(errorCode(null), undefined);
   assert.equal(errorCode(undefined), undefined);
 });
+
+test('the verification reasons in Filipino (D33)', async () => {
+  const { verificationErrorMessage } = await import('./verification.ts');
+  assert.match(verificationErrorMessage('auth/too-many-requests', 'Filipino'), /Maghintay ng ilang minuto/);
+  assert.match(verificationErrorMessage('something-else', 'Filipino'), /Pakisubukang muli/);
+  assert.match(verificationErrorMessage('auth/too-many-requests'), /wait a few minutes/, 'English stays the default');
+});

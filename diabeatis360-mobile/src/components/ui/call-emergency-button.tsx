@@ -2,6 +2,7 @@ import { Linking, Pressable, StyleSheet, Text } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
 
 /** The Philippines' national emergency hotline (one number for police, fire and ambulance). */
 export const EMERGENCY_NUMBER = '911';
@@ -11,14 +12,15 @@ export const EMERGENCY_NUMBER = '911';
  * with the number already typed; the person still presses call, so a stray tap never starts a call by itself.
  */
 export function CallEmergencyButton({ compact = false }: { compact?: boolean }) {
+  const { t } = useT();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Call ${EMERGENCY_NUMBER}, emergency hotline`}
+      accessibilityLabel={t('emergency.callA11y', { number: EMERGENCY_NUMBER })}
       onPress={() => { Linking.openURL(`tel:${EMERGENCY_NUMBER}`).catch(() => {}); }}
       style={({ pressed }) => [styles.button, compact && styles.compact, pressed && styles.pressed]}>
       <SymbolView name={{ ios: 'phone.fill', android: 'call', web: 'call' }} size={16} tintColor="#FFFFFF" />
-      <Text style={styles.text}>Call {EMERGENCY_NUMBER}</Text>
+      <Text style={styles.text}>{t('emergency.call', { number: EMERGENCY_NUMBER })}</Text>
     </Pressable>
   );
 }

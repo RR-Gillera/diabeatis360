@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
 
 import { AppText } from './app-text';
 
@@ -9,11 +10,9 @@ import { AppText } from './app-text';
  * never a diagnosis, a medication change or an insulin dose.
  */
 export function AiDisclaimer() {
+  const { t } = useT();
   return (
-    <AppText style={styles.text}>
-      AI suggestions are guidance only and not a substitute for your doctor. If you feel unwell or your reading is
-      dangerously high or low, contact your doctor or seek emergency care.
-    </AppText>
+    <AppText style={styles.text}>{t('ai.disclaimer')}</AppText>
   );
 }
 

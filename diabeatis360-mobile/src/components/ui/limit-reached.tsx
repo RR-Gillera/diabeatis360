@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
 
 import { AppText } from './app-text';
 import { PrimaryButton } from './primary-button';
@@ -19,12 +20,13 @@ export function LimitReached({ icon, title, text, footer, onUpgrade, onFooter }:
   /** Makes the footer a link (P-15 "Come back tomorrow"); without it the footer is plain text (P-20). */
   onFooter?: () => void;
 }) {
+  const { t } = useT();
   return (
     <View style={styles.wrap}>
       <View style={styles.circle}><SymbolView name={icon} size={40} tintColor="#F59E0B" /></View>
       <AppText weight="extraBold" style={styles.title}>{title}</AppText>
       <AppText style={styles.text}>{text}</AppText>
-      <PrimaryButton title="Upgrade to Premium" onPress={onUpgrade} style={styles.button} />
+      <PrimaryButton title={t('ai.upgrade')} onPress={onUpgrade} style={styles.button} />
       {onFooter ? (
         <Pressable accessibilityRole="button" onPress={onFooter} hitSlop={8}><AppText weight="bold" style={styles.footerLink}>{footer}</AppText></Pressable>
       ) : (
