@@ -182,6 +182,7 @@ Say once, above Table 6: the dictionary uses SQL types, but in Firestore each "P
   - Google and Facebook sign-in (D23) work only in the installed Android app (not Expo Go, a browser or an iPhone). Facebook works only for team members while its Meta app is in Development mode, unless the team publishes it. A Facebook account that shares no email address cannot sign in this way, and the app cannot join two sign-in methods that share an email (it asks the person to use the first one).
   - A doctor keeps seeing a patient's profile and readings after a consultation has ended, until the patient removes the share (the system allows it; the app has no button for it yet). A declined or cancelled booking removes the share at once. (Fixed by D22: before 2026-10-17 any verified doctor could read any patient, and any signed-in user could read every booking; do not write that as a limitation any more.)
   - The product health-rating cut-offs and the display reference values are rule-based and still need adviser or dietitian confirmation (`functions/lib/rating.js`, `constants/nutrition.ts`).
+  - The app is in English and Filipino (D33), but the Privacy Policy and Terms of Service, the admin panel, notification messages written by another person's app, and food and product names stay in English.
 
 - [ ] **E4. Safety design, worth stating because it is built:** a critical reading (below 54 mg/dL, or 250 mg/dL and above) blocks AI suggestions and shows "contact your doctor / seek emergency care"; every AI screen shows a disclaimer; every AI prompt carries the diabetes type and declared allergies, and the output is filtered for those allergens; the AI is told never to diagnose, change medication or give insulin doses.
 
@@ -192,6 +193,8 @@ Say once, above Table 6: the dictionary uses SQL types, but in Firestore each "P
 - [ ] **E7. Added scope [ADVISER]:** video call signaling (D11) and product memory (D12) are not in Table 24. Ask whether to add them to the List of Modules or describe them as extra features. Table 24 and its 23-point total stay as they are unless the adviser formally changes them.
 
 - [ ] **E8. Sign-in methods and the storyboard (D7, D23).** The system offers email and password, Google and Facebook. Apple was never built: Figma frames 25:2528 and 25:99 show an Apple button, and the build has Facebook there. Press Ctrl+F for "Apple" and for "Google" in the .docx: change "Apple" to "Facebook" in any storyboard caption or text, and describe Google and Facebook sign-in once in the Technology Stack (Google and Meta as sign-in providers, reached through Firebase Authentication) and in the privacy paragraph (E2). **[ADVISER]** The adviser credits a module only when it matches its frame (D17), so mention the Facebook-for-Apple swap when you show the Login screen.
+
+- [ ] **E9. Language (D33).** The mobile app is bilingual: every patient and doctor screen follows the language chosen in setup or in Profile > Language, and the AI answers in it too. Say this wherever the manuscript describes the language step ("Content will adapt" is now true). Suggested test row under **Update Health Profile**: "the patient changes the language to Filipino; every screen, the reminders and the AI answers switch to Filipino; the stored health values stay the same." What stays English is listed in E3.
 
 ---
 
