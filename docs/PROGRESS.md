@@ -137,3 +137,9 @@ Append newest at the bottom. Format:
 - **Files:** mobile `app/_layout.tsx`, `app/doctor/{_layout,index}.tsx`, `app/{glucose-log,user-home}.tsx`, `app/onboarding/{guardian,professional-info}.tsx`, `app/video-call/[id].tsx`, new `features/auth/{route-rules,route-guard}`, new `features/doctor/profile-complete`, `features/glucose/glucose-ui.tsx`, `features/booking/booking-service.ts`, `features/consultation/doctor-notes-form.tsx`, `components/ui/primary-button.tsx`; admin `pages/{Overview,Providers,Login}Page.jsx`; `functions/package.json`.
 - **Verified:** unit 128 (122 pass, 6 skipped); functions 83/83; admin lint and build; browser re-check 13/13 on the emulators.
 - **Waiting for the team:** on-site earnings and revenue versus D3; the brand-green contrast; the password minimum; Daily's Leave button (needs the video provider decision). Reduce-motion and large text need a phone check.
+
+## 2026-10-29 (later) — Claude Code — Figma pass of the remaining screens
+- **Compared** the 2026-10-18 design notes and fresh screenshots with the PNG exports in `FIGMA/` (the Figma connector's monthly reads are used up). Fixed where the frame is right: Home's 7-DAY AVERAGE left-aligned; the reading sheet says "Add New Log" / "Save Log"; Find a Doctor's green map pin; the incoming-call screen now follows P-26 / D-08.
+- **Found and fixed on the way:** the reading box overflowed the sheet on the web (the phone was fine); Find a Doctor showed "DJ" for "Dr. John Smith".
+- **Deliberate differences, recorded in FIGMA_MAP:** Exercise / Hydration cards (D34), no years of experience, no clock button on the reading sheet, initials instead of photos.
+- **Evidence:** `docs/reports/figma-2026-10-29`. Unit 128 (122 pass, 6 skipped), tsc and lint clean.

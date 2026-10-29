@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { AppText } from '@/components/ui/app-text';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
+import { initialsOf } from '@/features/booking/appointment-tabs';
 import { useT } from '@/i18n/language-context';
 
 import { answerCall, fetchDisplayName, STALE_RING_MS, subscribeToIncomingCalls, type CallRecord } from './call-service';
@@ -19,7 +20,7 @@ import { ensureCallPermissions } from './video-room';
  */
 export function IncomingCallHost() {
   const router = useRouter();
-  const { uid } = useAuth();
+  const { uid, role } = useAuth();
   const { t, language } = useT();
   const [call, setCall] = useState<CallRecord | null>(null);
   const [callerName, setCallerName] = useState('');
@@ -75,48 +76,48 @@ export function IncomingCallHost() {
     }
   };
 
+  // Figma D-08 / P-26. The caller is the other side of the booking: a doctor rings a patient, and the other way round.
+  const callerRole = role === 'doctor' ? t('summary.patient') : t('appt.doctor');
   return (
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => respond(false)}>
       <View style={styles.screen}>
         <View style={styles.top}>
-          <AppText weight="medium" style={styles.label}>{t('call.incoming')}</AppText>
-          <View style={styles.avatar}>
-            <AppText weight="extraBold" style={styles.avatarText}>{(callerName || '?').replace(/^dr\.?\s+/i, '').charAt(0).toUpperCase()}</AppText>
-          </View>
-          <AppText weight="extraBold" style={styles.name}>{callerName || t('call.someone')}</AppText>
-          <AppText style={styles.sub}>{t('call.appConsultation')}</AppText>
+          <View style={styles.ringOuter}><View style={styles.ringInner}>
+            <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{initialsOf(callerName)}</AppText></View>
+          </View></View>
+          <AppText accessibilityRole="header" weight="extraBold" style={styles.name}>{callerName ? t('call.isCalling', { name: callerName }) : t('call.incoming')}</AppText>
+          <AppText style={styles.sub}>{`${t('call.videoConsultation')} · ${callerRole}`}</AppText>
           {notice ? <AppText accessibilityLiveRegion="polite" style={styles.notice}>{notice}</AppText> : null}
         </View>
         <View style={styles.buttons}>
-          <View style={styles.choice}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('call.decline')} style={[styles.round, { backgroundColor: Brand.colors.danger }]} onPress={() => respond(false)}>
-              <SymbolView name={{ ios: 'phone.down.fill', android: 'call_end', web: 'call_end' }} size={28} tintColor="#FFF" />
-            </Pressable>
-            <AppText style={styles.choiceLabel}>{t('call.decline')}</AppText>
-          </View>
-          <View style={styles.choice}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('call.accept')} style={[styles.round, { backgroundColor: Brand.colors.primary }]} onPress={() => respond(true)}>
-              <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={28} tintColor="#FFF" />
-            </Pressable>
-            <AppText style={styles.choiceLabel}>{t('call.accept')}</AppText>
-          </View>
+          <Pressable accessibilityRole="button" style={[styles.button, styles.decline]} onPress={() => respond(false)}>
+            <SymbolView name={{ ios: 'phone.down.fill', android: 'call_end', web: 'call_end' }} size={20} tintColor="#FFF" />
+            <AppText weight="bold" style={styles.buttonText}>{t('call.decline')}</AppText>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={[styles.button, styles.accept]} onPress={() => respond(true)}>
+            <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={20} tintColor="#FFF" />
+            <AppText weight="bold" style={styles.buttonText}>{t('call.accept')}</AppText>
+          </Pressable>
         </View>
       </View>
     </Modal>
   );
 }
 
+// The same look as the ringing state of the call screen (app/video-call/[id].tsx).
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#0F1F0A', flex: 1, justifyContent: 'space-between', paddingBottom: 72, paddingTop: 110 },
-  top: { alignItems: 'center', gap: 10 },
-  label: { color: '#C6E3A7', fontSize: 15, letterSpacing: 0.8 },
-  avatar: { alignItems: 'center', backgroundColor: Brand.colors.primary, borderRadius: 60, height: 120, justifyContent: 'center', marginVertical: 18, width: 120 },
-  avatarText: { color: '#FFF', fontSize: 52 },
-  name: { color: '#FFF', fontSize: 28, textAlign: 'center' },
-  sub: { color: '#9FB88A', fontSize: 15 },
+  screen: { backgroundColor: '#172030', flex: 1, justifyContent: 'space-between', paddingBottom: 48, paddingHorizontal: 24, paddingTop: 110 },
+  top: { alignItems: 'center', gap: 12 },
+  ringOuter: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 125, height: 250, justifyContent: 'center', marginBottom: 8, width: 250 },
+  ringInner: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 95, height: 190, justifyContent: 'center', width: 190 },
+  avatar: { alignItems: 'center', backgroundColor: '#DCF2A9', borderRadius: 32, height: 120, justifyContent: 'center', width: 120 },
+  avatarText: { color: Brand.colors.primary, fontSize: 40 },
+  name: { color: '#FFF', fontSize: 24, textAlign: 'center' },
+  sub: { color: '#94A3B8', fontSize: 15, textAlign: 'center' },
   notice: { color: '#FCA5A5', fontSize: 15, lineHeight: 22, marginTop: 12, paddingHorizontal: 32, textAlign: 'center' },
-  buttons: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 32 },
-  choice: { alignItems: 'center', gap: 10 },
-  round: { alignItems: 'center', borderRadius: 40, height: 80, justifyContent: 'center', width: 80 },
-  choiceLabel: { color: '#FFF', fontSize: 15 },
+  buttons: { flexDirection: 'row', gap: 14 },
+  button: { alignItems: 'center', borderRadius: 18, flex: 1, flexDirection: 'row', gap: 10, height: 64, justifyContent: 'center' },
+  decline: { backgroundColor: '#EF4444' },
+  accept: { backgroundColor: Brand.colors.primary },
+  buttonText: { color: '#FFF', fontSize: 18 },
 });

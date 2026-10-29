@@ -201,7 +201,8 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
   readingRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
-  readingInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 28, fontWeight: '800', paddingHorizontal: 16, paddingVertical: 10 },
+  // minWidth 0 lets the box shrink beside "mg/dL" and the class badge on the web too (a web text box keeps its own width).
+  readingInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', flex: 1, minWidth: 0, fontFamily: Fonts.sans, fontSize: 28, fontWeight: '800', paddingHorizontal: 16, paddingVertical: 10 },
   readingUnit: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
   previewBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   previewBadgeText: { fontFamily: Fonts.sans, fontSize: 12, fontWeight: '800' },

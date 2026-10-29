@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { BookingMoreMenu, bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { initialsOf } from '@/features/booking/appointment-tabs';
 import { AppointmentHistoryList } from '@/features/booking/booking-history';
 import { subscribeToBookableProviders } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
@@ -73,7 +74,7 @@ export default function FindDoctorScreen() {
         {visibleProviders.map((provider) => (
           <View key={provider.id} style={ui.card}>
             <View style={styles.doctorTop}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{provider.fullName.split(' ').map((part) => part[0]).slice(0, 2).join('')}</Text></View>
+              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(provider.fullName)}</Text></View>
               <View style={styles.doctorCopy}>
                 <Text style={styles.doctorName}>{provider.fullName}</Text>
                 <Text style={styles.specialty}>{provider.specialty}</Text>
@@ -81,7 +82,7 @@ export default function FindDoctorScreen() {
               </View>
             </View>
             <View style={styles.detailsRow}>
-              <View><Text style={styles.label}>{t('doctors.location')}</Text><Text style={styles.value}>📍 {provider.city}</Text></View>
+              <View><Text style={styles.label}>{t('doctors.location')}</Text><View style={styles.cityRow}><SymbolView name={{ ios: 'mappin.circle.fill', android: 'location_on', web: 'location_on' }} size={14} tintColor={bookingColors.green} /><Text style={[styles.value, styles.valueInline]}>{provider.city}</Text></View></View>
               <View><Text style={styles.label}>{t('doctors.fee')}</Text><Text style={styles.value}>{formatFee(provider.consultationFee)}</Text></View>
             </View>
             <View style={styles.actions}>
@@ -126,6 +127,8 @@ const styles = StyleSheet.create({
   detailsRow: { borderBottomColor: bookingColors.border, borderBottomWidth: 1, borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, paddingVertical: 14 },
   label: { color: '#8C9DB6', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   value: { color: bookingColors.navy, fontSize: 14, fontWeight: '700', marginTop: 5 },
+  cityRow: { alignItems: 'center', flexDirection: 'row', gap: 4, marginTop: 5 },
+  valueInline: { marginTop: 0 },
   actions: { flexDirection: 'row', gap: 12, marginTop: 16 },
   secondaryButton: { alignItems: 'center', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 14 },
   secondaryText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' },

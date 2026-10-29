@@ -166,7 +166,7 @@ export default function UserHomeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>{t('home.average')}</Text>
+          <Text style={[styles.cardLabel, styles.cardLabelStart]}>{t('home.average')}</Text>
           <View style={styles.avgRow}>
             <Text style={styles.avgValue}>{average ?? '—'}</Text>
             <Text style={styles.avgUnit}>mg/dL</Text>
@@ -273,6 +273,8 @@ const styles = StyleSheet.create({
   bannerText: { flex: 1, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '600' },
   card: { backgroundColor: homeColors.card, borderColor: '#F9FAFB', borderRadius: 32, borderWidth: 1, marginHorizontal: 24, marginTop: 24, paddingHorizontal: 24, paddingVertical: 32, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   cardLabel: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '500', letterSpacing: 0.7, textAlign: 'center', textTransform: 'uppercase' },
+  // The 7-day card reads left to right, label above its number (Dashboard frame).
+  cardLabelStart: { textAlign: 'left' },
   readingRow: { alignItems: 'baseline', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 16 },
   readingValue: { color: homeColors.textDark, fontFamily: Fonts.sans, fontSize: 64, fontWeight: '800', letterSpacing: -2 },
   readingUnit: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '700' },

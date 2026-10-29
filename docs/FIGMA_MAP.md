@@ -32,8 +32,8 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | Profile Setup Step 6 / 7 — Condition / Allergies | 67:8 / 68:90 | Health Profile — `app/onboarding/condition.tsx`, `allergies.tsx` (setup kit, D31). Figma's section labels kept (Condition says DIETARY PROFILE, Allergies PERSONAL DETAILS). Allergies adds a "None" chip (required answer, D25) and typed allergies. |
 | Profile Setup Step 8 — Activity level | 25:462 | Health Profile — `app/onboarding/activity.tsx` (setup kit, icons as in the frame, D31) |
 | Profile Setup Step 9 / 10 — Dietary profile + Complete | 25:552 / 68:205 | Health Profile — Step 9 `app/onboarding/dietary.tsx` is the last step (100%, Complete Setup). **Step 10 Notification Setup is not built (D29: reminders always on).** |
-| Dashboard (Home) | 3:229 | Blood Sugar / Gamification |
-| Log Blood Sugar (history + add sheet) | 4:1480 | Blood Sugar |
+| Dashboard (Home) | 3:229 | Blood Sugar / Gamification — 7-DAY AVERAGE left-aligned as in the frame (2026-10-29). **Deliberate difference (D34):** the Exercise and Hydration cards show the reminder times and open Exercise Tips / the reminder settings instead of the frame's made-up progress numbers; the insight comes from the patient's own week. |
+| Log Blood Sugar (history + add sheet) | 4:1480 | Blood Sugar — the sheet says "Add New Log" / "Save Log" as in the frame (2026-10-29); each history row also shows its class (QA D-22). The frame's clock button (log a reading at another time) is not built: readings are logged now. |
 | View Blood Trends | 23:526 | Blood Sugar |
 | Blood Sugar Interpretation | 194:264 | Blood Sugar |
 | Meal Suggestions / Meal Details | 195:923 / 195:1011 | AI Assistant |
@@ -41,7 +41,7 @@ primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` 
 | AI Diabetes Risk Prediction | 195:1959 | Dashboard (manuscript scope) |
 | AI Nutrition Scanner Camera View | 25:1092, 195:2908 | Nutrition Scanner |
 | Healthier Alternatives | 195:2960 | Nutrition Scanner |
-| Doctors Tab (directory) | 25:1472 | Appointment |
+| Doctors Tab (directory) | 25:1472 | Appointment — green map pin as in the frame (2026-10-29). Initials (title skipped) instead of photos (no Storage on Spark, D18); no years of experience, because nothing in the data holds it (D34). |
 | Select Date & Time | 196:3110 | Appointment |
 | Payment Screen (mock GCash/Maya/Card) | 196:3245 | Appointment |
 | Payment Success | 196:3425 | Appointment |
@@ -65,7 +65,7 @@ name. Built in batch 1 (patient):
 | [P-22] Notifications | `app/notifications.tsx` |
 | [P-23] Chat menu and confirm, [P-24] Chat ended | `app/consultation/[id].tsx` |
 | [P-25] Consultation Summary (and None Yet) | `app/consultation/summary/[id].tsx` (Doctor's notes, Advice and Follow-up, batch 3) |
-| [P-26] to [P-29] Video call | `app/video-call/[id].tsx` |
+| [P-26] to [P-29] Video call | `app/video-call/[id].tsx`; the full-screen incoming call on top of any screen (`features/calls/incoming-call-host.tsx`) follows P-26 / D-08 since 2026-10-29: initials in a rounded square inside two rings, "<name> is calling", "Video consultation · <role>", wide Decline / Accept |
 | [P-30] to [P-32] Subscription | `app/subscription.tsx` ("Premium until", never "renews": payments are a demo) |
 Already matching in earlier work: P-04 to P-06, P-08 to P-12 (P-10 Interpretation - Critical got its Call 911 button in D25; P-11/P-12 Health Profile rebuilt as the read-only cards + Edit of the frames in D31: `app/health-profile/index.tsx`, `app/health-profile/edit.tsx`). Built in batch 2 (doctor and admin):
 
