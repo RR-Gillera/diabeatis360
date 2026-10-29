@@ -6,9 +6,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
-import { submitGuardianVerification, subscribeToGuardianVerification } from '@/features/auth/guardian-service';
-import { enumLabel, GUARDIAN_RELATIONSHIPS, type GuardianRelationship } from '@/constants/enums';
+import { GUARDIAN_UPLOAD_UNAVAILABLE, submitGuardianVerification, subscribeToGuardianVerification } from '@/features/auth/guardian-service';
+import { GUARDIAN_RELATIONSHIPS, type GuardianRelationship } from '@/constants/enums';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 /**
  * The guardian's details for a pediatric account (DECISIONS.md D16, UT-005): reached from
@@ -19,6 +20,7 @@ export default function GuardianScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/profile');
   const { uid, email } = useAuth();
+  const { t, label, language } = useT();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isResubmit = mode === 'resubmit';
 
@@ -72,7 +74,9 @@ export default function GuardianScreen() {
         router.push('/onboarding/date-of-birth');
       }
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'We could not submit this. Please try again.');
+      // The service words its errors in English; in Filipino the same cases are said in Filipino (D33).
+      const message = value instanceof Error ? value.message : '';
+      setError(message === GUARDIAN_UPLOAD_UNAVAILABLE ? t('setup.guardian.uploadOff') : language === 'English' && message ? message : t('setup.guardian.failed'));
     } finally {
       setSubmitting(false);
     }
@@ -83,11 +87,11 @@ export default function GuardianScreen() {
       <View style={styles.camera}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         <View style={styles.cameraFrame} pointerEvents="none">
-          <Text style={styles.cameraHint}>Fit the guardian’s ID inside the frame</Text>
+          <Text style={styles.cameraHint}>{t('setup.guardian.cameraHint')}</Text>
         </View>
         <View style={styles.cameraBar}>
-          <Pressable style={styles.cameraCancel} onPress={() => setShowCamera(false)}><Text style={styles.cameraCancelText}>Cancel</Text></Pressable>
-          <Pressable style={styles.shutter} onPress={capture}><View style={styles.shutterInner} /></Pressable>
+          <Pressable accessibilityRole="button" style={styles.cameraCancel} onPress={() => setShowCamera(false)}><Text style={styles.cameraCancelText}>{t('common.cancel')}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('scan.shutter')} style={styles.shutter} onPress={capture}><View style={styles.shutterInner} /></Pressable>
           <View style={styles.cameraCancel} />
         </View>
       </View>
@@ -97,39 +101,35 @@ export default function GuardianScreen() {
   return (
     <View style={[authStyles.screen, styles.screen]}>
       {isResubmit ? null : <>
-        <View style={styles.progress}><Text style={styles.progressLabel}>PERSONAL DETAILS</Text><Text style={styles.step}>35% Complete</Text></View>
+        <View style={styles.progress}><Text style={styles.progressLabel}>{t('setup.guardian.progress')}</Text><Text style={styles.step}>{t('common.percentComplete', { percent: 35 })}</Text></View>
         <View style={styles.track}><View style={styles.fill} /></View>
       </>}
-      <Text style={styles.back} onPress={() => goBack()}>‹  Back</Text>
-      <Text style={styles.title}>{isResubmit ? 'Resubmit guardian details' : "Guardian's details"}</Text>
-      <Text style={styles.subtitle}>
-        {isResubmit
-          ? 'Update the details below and submit again for review.'
-          : "Since this account is for a child, we need a parent or legal guardian's information before continuing."}
-      </Text>
+      <Text accessibilityRole="button" style={styles.back} onPress={() => goBack()}>{`‹  ${t('common.back')}`}</Text>
+      <Text accessibilityRole="header" style={styles.title}>{isResubmit ? t('setup.guardian.resubmitTitle') : t('setup.guardian.title')}</Text>
+      <Text style={styles.subtitle}>{isResubmit ? t('setup.guardian.resubmitText') : t('setup.guardian.text')}</Text>
 
-      <Text style={styles.label}>GUARDIAN’S FULL NAME</Text>
-      <TextInput value={name} onChangeText={setName} placeholder="e.g. Maria Dela Cruz" placeholderTextColor="#A7B8CD" style={styles.input} />
+      <Text style={styles.label}>{t('setup.guardian.name')}</Text>
+      <TextInput accessibilityLabel={t('setup.guardian.name')} value={name} onChangeText={setName} placeholder={t('setup.guardian.namePlaceholder')} placeholderTextColor="#A7B8CD" style={styles.input} />
 
-      <Text style={styles.label}>RELATIONSHIP TO THE CHILD</Text>
+      <Text style={styles.label}>{t('setup.guardian.relationship')}</Text>
       <View style={styles.chipRow}>
         {GUARDIAN_RELATIONSHIPS.map((code) => (
-          <Pressable key={code} onPress={() => setRelationship(code)} style={[styles.chip, relationship === code && styles.chipActive]}>
-            <Text style={[styles.chipText, relationship === code && styles.chipTextActive]}>{enumLabel('guardianRelationship', code)}</Text>
+          <Pressable key={code} accessibilityRole="radio" accessibilityState={{ checked: relationship === code }} onPress={() => setRelationship(code)} style={[styles.chip, relationship === code && styles.chipActive]}>
+            <Text style={[styles.chipText, relationship === code && styles.chipTextActive]}>{label('guardianRelationship', code)}</Text>
           </Pressable>
         ))}
       </View>
 
-      <Text style={styles.label}>GUARDIAN’S ID PHOTO</Text>
-      <Text style={styles.idHint}>A government-issued ID (any type) that shows the guardian’s full name. Used only to verify this account; an admin reviews it.</Text>
+      <Text style={styles.label}>{t('setup.guardian.photo')}</Text>
+      <Text style={styles.idHint}>{t('setup.guardian.photoHint')}</Text>
       {photoPreview ? (
         <Pressable onPress={openCamera} style={styles.photoPreviewWrap}>
           <Image source={{ uri: photoPreview }} style={styles.photoPreview} resizeMode="cover" />
-          <Text style={styles.retake}>Retake photo</Text>
+          <Text style={styles.retake}>{t('scan.retake')}</Text>
         </Pressable>
       ) : (
         <Pressable onPress={openCamera} style={styles.photoButton}>
-          <Text style={styles.photoButtonText}>📷  Take a photo of the ID</Text>
+          <Text style={styles.photoButtonText}>{t('setup.guardian.takePhoto')}</Text>
         </Pressable>
       )}
 
@@ -137,7 +137,7 @@ export default function GuardianScreen() {
 
       <View style={styles.bottom}>
         {submitting ? <ActivityIndicator color={authColors.green} /> : (
-          <AuthButton title={isResubmit ? 'Resubmit for Review' : 'Continue'} onPress={submit} disabled={!name.trim() || !photoPreview} />
+          <AuthButton title={isResubmit ? t('setup.guardian.resubmit') : t('common.continue')} onPress={submit} disabled={!name.trim() || !photoPreview} />
         )}
       </View>
     </View>

@@ -31,11 +31,12 @@ export default function NotificationsScreen() {
   const [entries, setEntries] = useState<NotificationEntry[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToNotifications(uid, setEntries, (value) => setError(value.message));
+    return subscribeToNotifications(uid, setEntries, () => setLoadFailed(true));
   }, [uid]);
 
   const shown = useMemo(() => entries.filter((entry) => matchesFilter(entry.type, filter)), [entries, filter]);
@@ -84,7 +85,7 @@ export default function NotificationsScreen() {
       </ScrollView>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error || loadFailed ? <Text style={styles.error}>{error || t('notif.loadFailed')}</Text> : null}
         {shown.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>

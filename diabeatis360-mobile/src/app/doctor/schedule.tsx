@@ -12,9 +12,11 @@ import { formatFee } from '@/features/booking/booking-ui';
 import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 const DEFAULT_RANGE: TimeRange = { start: '09:00 AM', end: '12:00 PM' };
-const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+// Monday first, the order availableDays is stored in (0 = Monday).
+const DAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 // Manage Schedule (Figma D-05, DECISIONS D24). One set of hours applies to every working day (that is how availability is
 // stored), so each day row shows the same hours; the frame's different hours per day would need a data change. The
@@ -24,6 +26,7 @@ export default function DoctorScheduleScreen() {
   const goBack = useSafeBack('/doctor/profile');
   const router = useRouter();
   const { uid } = useAuth();
+  const { t } = useT();
   const [fee, setFee] = useState<number | null>(null);
   const [days, setDays] = useState<number[]>([]);
   const [ranges, setRanges] = useState<TimeRange[]>([]);
@@ -32,6 +35,7 @@ export default function DoctorScheduleScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -43,7 +47,7 @@ export default function DoctorScheduleScreen() {
       seeded.current = true;
       setDays(profile.availableDays);
       setRanges(profile.availableRanges);
-    }, (value) => setError(value.message));
+    }, () => setLoadFailed(true));
   }, [uid]);
 
   const toggleDay = (index: number) => {
@@ -84,8 +88,8 @@ export default function DoctorScheduleScreen() {
     try {
       await updateDoctorAvailability(uid, days, ranges);
       setSaved(true);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save your schedule.');
+    } catch {
+      setError(t('doctor.schedule.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -98,28 +102,29 @@ export default function DoctorScheduleScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Manage Schedule" subtitle="Set the hours patients can book" onBack={() => goBack()} />
+      <DoctorHeader title={t('doctor.manageSchedule')} subtitle={t('doctor.schedule.subtitle')} onBack={() => goBack()} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         <View style={styles.notice}>
           <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={15} tintColor={homeColors.green} />
           <Text style={styles.noticeText}>
             {nothingSet
-              ? 'Until you set working days and at least one time window, patients can request any day and time.'
-              : `Patients will be offered ${generatedSlots.length} slot${generatedSlots.length === 1 ? '' : 's'} on your working days.`}
+              ? t('doctor.schedule.nothingSet')
+              : generatedSlots.length === 1 ? t('doctor.schedule.slot') : t('doctor.schedule.slots', { count: generatedSlots.length })}
           </Text>
         </View>
 
         <View style={[doctorStyles.card, styles.daysCard]}>
-          {DAY_NAMES.map((name, index) => {
+          {DAY_KEYS.map((day, index) => {
             const on = days.includes(index);
+            const name = t(`weekday.long.${day}`);
             return (
-              <View key={name} style={[styles.dayLine, index > 0 && styles.dayDivider]}>
+              <View key={day} style={[styles.dayLine, index > 0 && styles.dayDivider]}>
                 <View style={styles.dayCopy}>
                   <Text style={[styles.dayName, !on && styles.dayOff]}>{name}</Text>
-                  <Text style={styles.dayHours}>{on ? (hoursText || 'Add hours below') : 'Off'}</Text>
+                  <Text style={styles.dayHours}>{on ? (hoursText || t('doctor.schedule.addHours')) : t('doctor.schedule.off')}</Text>
                 </View>
                 <Switch
-                  accessibilityLabel={`${name} ${on ? 'on' : 'off'}`}
+                  accessibilityLabel={name}
                   value={on}
                   onValueChange={() => toggleDay(index)}
                   trackColor={{ false: '#D1D5DB', true: homeColors.green }}
@@ -130,59 +135,59 @@ export default function DoctorScheduleScreen() {
           })}
         </View>
 
-        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Working Hours</Text>
-        <Text style={styles.hoursNote}>The same hours apply to every day that is switched on.</Text>
+        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>{t('doctor.schedule.hours')}</Text>
+        <Text style={styles.hoursNote}>{t('doctor.schedule.hoursNote')}</Text>
         <View style={[doctorStyles.card, styles.card]}>
           {ranges.length === 0 ? (
-            <Text style={styles.emptyRanges}>No hours set yet. Add a window like 7:00 PM to 9:00 PM.</Text>
+            <Text style={styles.emptyRanges}>{t('doctor.schedule.noHours')}</Text>
           ) : ranges.map((range, index) => (
             <View key={`${range.start}-${range.end}-${index}`} style={styles.rangeRow}>
-              <Pressable style={styles.timeButton} onPress={() => setPicker({ index, edge: 'start' })}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${t('doctor.schedule.startTime')}: ${range.start}`} style={styles.timeButton} onPress={() => setPicker({ index, edge: 'start' })}>
                 <Text style={styles.timeButtonText}>{range.start}</Text>
               </Pressable>
-              <Text style={styles.rangeDash}>to</Text>
-              <Pressable style={styles.timeButton} onPress={() => setPicker({ index, edge: 'end' })}>
+              <Text style={styles.rangeDash}>{t('doctor.schedule.to')}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${t('doctor.schedule.endTime')}: ${range.end}`} style={styles.timeButton} onPress={() => setPicker({ index, edge: 'end' })}>
                 <Text style={styles.timeButtonText}>{range.end}</Text>
               </Pressable>
-              <Pressable style={styles.removeButton} onPress={() => removeRange(index)} hitSlop={8}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('doctor.schedule.remove')} style={styles.removeButton} onPress={() => removeRange(index)} hitSlop={8}>
                 <SymbolView name={{ ios: 'trash.fill', android: 'delete', web: 'delete' }} size={15} tintColor="#D9364F" />
               </Pressable>
             </View>
           ))}
 
-          <Pressable style={styles.addButton} onPress={addRange}>
+          <Pressable accessibilityRole="button" style={styles.addButton} onPress={addRange}>
             <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={15} tintColor={homeColors.green} />
-            <Text style={styles.addButtonText}>Add time window</Text>
+            <Text style={styles.addButtonText}>{t('doctor.schedule.add')}</Text>
           </Pressable>
         </View>
 
         <View style={[doctorStyles.card, styles.feeCard]}>
           <View style={styles.feeLine}>
-            <Text style={styles.feeLabel}>Slot length</Text>
-            <Text style={styles.feeValue}>{SLOT_INTERVAL_MINUTES} minutes</Text>
+            <Text style={styles.feeLabel}>{t('doctor.schedule.slotLength')}</Text>
+            <Text style={styles.feeValue}>{t('exercise.minutes', { count: SLOT_INTERVAL_MINUTES })}</Text>
           </View>
           <View style={styles.feeDivider} />
           <View style={styles.feeLine}>
             <View>
-              <Text style={styles.feeLabelSmall}>Consultation fee</Text>
+              <Text style={styles.feeLabelSmall}>{t('doctor.schedule.fee')}</Text>
               <Text style={styles.feeAmount}>{fee !== null ? formatFee(fee) : '—'}</Text>
             </View>
             <Pressable accessibilityRole="button" onPress={() => router.push('/doctor/fee' as never)} hitSlop={8}>
-              <Text style={styles.modify}>Modify fee</Text>
+              <Text style={styles.modify}>{t('doctor.schedule.modify')}</Text>
             </Pressable>
           </View>
         </View>
 
-        {error ? <Text style={[doctorStyles.error, styles.sectionSpacing]}>{error}</Text> : null}
+        {error || loadFailed ? <Text style={[doctorStyles.error, styles.sectionSpacing]}>{error || t('doctor.schedule.loadFailed')}</Text> : null}
 
-        <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={save} disabled={saving}>
-          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : saved ? 'Schedule saved ✓' : 'Save schedule'}</Text>
+        <Pressable accessibilityRole="button" style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={save} disabled={saving}>
+          <Text style={styles.saveButtonText}>{saving ? t('common.saving') : saved ? t('doctor.schedule.saved') : t('doctor.schedule.save')}</Text>
         </Pressable>
       </ScrollView>
 
       <TimePickerSheet
         visible={picker !== null}
-        title={picker?.edge === 'end' ? 'End time' : 'Start time'}
+        title={picker?.edge === 'end' ? t('doctor.schedule.endTime') : t('doctor.schedule.startTime')}
         value={picker ? ranges[picker.index]?.[picker.edge] ?? DEFAULT_RANGE.start : DEFAULT_RANGE.start}
         onCancel={() => setPicker(null)}
         onConfirm={pickTime}

@@ -9,17 +9,20 @@ import { subscribeToDoctorPatients } from '@/features/doctor/doctor-service';
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { PatientSummary } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
+import { shortDay } from '@/i18n/translate';
 
 export default function DoctorPatientsScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [patients, setPatients] = useState<PatientSummary[]>([]);
   const [search, setSearch] = useState('');
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToDoctorPatients(uid, setPatients, (value) => setError(value.message));
+    return subscribeToDoctorPatients(uid, setPatients, () => setFailed(true));
   }, [uid]);
 
   const visible = useMemo(
@@ -29,30 +32,30 @@ export default function DoctorPatientsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="My Patients" subtitle="Patients who have booked with you" />
+      <DoctorHeader title={t('doctor.myPatients')} subtitle={t('doctor.patients.subtitle')} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         <View style={styles.searchBox}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor="#0F172A" />
-          <TextInput value={search} onChangeText={setSearch} placeholder="Search patients..." placeholderTextColor="#8796AD" style={styles.searchInput} />
+          <TextInput accessibilityLabel={t('doctor.patients.search')} value={search} onChangeText={setSearch} placeholder={t('doctor.patients.search')} placeholderTextColor="#8796AD" style={styles.searchInput} />
         </View>
 
-        {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
+        {failed ? <Text style={doctorStyles.error}>{t('doctor.patients.loadFailed')}</Text> : null}
 
         {visible.length === 0 ? (
           <EmptyState
             icon="person.2.fill"
             iconAndroid="person_search"
-            title={patients.length === 0 ? 'No patients yet' : 'No patients match your search'}
-            detail={patients.length === 0 ? 'Once a patient books an appointment with you, they will appear here with their health records.' : undefined}
+            title={patients.length === 0 ? t('doctor.patients.none') : t('doctor.patients.noMatch')}
+            detail={patients.length === 0 ? t('doctor.patients.noneText') : undefined}
           />
         ) : visible.map((patient) => (
-          <Pressable key={patient.id} style={[doctorStyles.card, styles.card]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: patient.id } })}>
+          <Pressable key={patient.id} accessibilityRole="button" style={[doctorStyles.card, styles.card]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: patient.id } })}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{patient.fullName.trim().charAt(0).toUpperCase() || '?'}</Text></View>
               <View style={styles.copy}>
                 <Text style={styles.name}>{patient.fullName}</Text>
                 <Text style={styles.meta}>
-                  {patient.appointmentCount} appointment{patient.appointmentCount === 1 ? '' : 's'}
-                  {patient.lastAppointmentAt ? ` · last ${patient.lastAppointmentAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}
+                  {patient.appointmentCount === 1 ? t('doctor.patients.one') : t('doctor.patients.many', { count: patient.appointmentCount })}
+                  {patient.lastAppointmentAt ? ` · ${t('doctor.patients.last', { date: shortDay(patient.lastAppointmentAt, language) })}` : ''}
                 </Text>
               </View>
               {patient.hasPendingRequest ? <View style={styles.pendingDot} /> : null}

@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { formatFee } from '@/features/booking/booking-ui';
+import { formatDate, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { durationLabel } from '@/features/consultation/consultation-format';
 import { saveConsultationNotes, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
@@ -13,6 +13,7 @@ import { DoctorNotesForm } from '@/features/consultation/doctor-notes-form';
 import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 /** Consultation_Notes holds at most this many characters (firestore.rules, D22). */
 const NOTES_LIMIT = 5000;
@@ -24,6 +25,7 @@ export default function ConsultationDetailsScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/doctor/history' as never);
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { t, label, language } = useT();
   const [booking, setBooking] = useState<AppointmentHistoryEntry | null | undefined>(undefined);
   const [consultation, setConsultation] = useState<ConsultationState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -32,10 +34,11 @@ export default function ConsultationDetailsScreen() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    return subscribeToBooking(id, setBooking, (value) => { setError(value.message); setBooking(null); });
+    return subscribeToBooking(id, setBooking, () => { setLoadFailed(true); setBooking(null); });
   }, [id]);
   useEffect(() => {
     if (!id) return;
@@ -52,15 +55,15 @@ export default function ConsultationDetailsScreen() {
     const added = draft.trim();
     if (!id || !added || saving) return;
     const combined = notes ? `${notes}\n\n${added}` : added;
-    if (combined.length > NOTES_LIMIT) { setError(`Notes can be at most ${NOTES_LIMIT} characters in total.`); return; }
+    if (combined.length > NOTES_LIMIT) { setError(t('doctor.consult.tooLong', { limit: NOTES_LIMIT })); return; }
     setSaving(true); setError(''); setMessage('');
     try {
       // Only the Diagnosis notes grow; the Advice and Follow-up stay as they are.
       await saveConsultationNotes(id, { summary: combined, advice: consultation?.advice ?? '', followUpAt: consultation?.followUpAt ?? null });
       setDraft('');
-      setMessage('Notes saved. The patient can read them in their Consultation Summary.');
+      setMessage(t('doctor.consult.saved'));
     } catch {
-      setError('We could not save the notes. Please try again.');
+      setError(t('chat.notesFailed'));
     } finally {
       setSaving(false);
     }
@@ -72,54 +75,55 @@ export default function ConsultationDetailsScreen() {
     try {
       await saveConsultationNotes(id, edited);
       setEditing(false);
-      setMessage('Notes saved. The patient can read them in their Consultation Summary.');
+      setMessage(t('doctor.consult.saved'));
     } catch {
-      setError('We could not save the notes. Please try again.');
+      setError(t('chat.notesFailed'));
     } finally {
       setSaving(false);
     }
   };
 
-  const duration = durationLabel(messages[0]?.sentAt ?? null, consultation?.endedAt ?? null);
+  const duration = durationLabel(messages[0]?.sentAt ?? null, consultation?.endedAt ?? null, language);
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Consultation Details" onBack={() => goBack()} />
+      <DoctorHeader title={t('doctor.consult.title')} onBack={() => goBack()} />
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {booking === undefined ? <ActivityIndicator color={homeColors.green} /> : null}
-        {booking === null ? <Text style={doctorStyles.error}>{error || 'This consultation no longer exists.'}</Text> : null}
+        {booking === null ? <Text style={doctorStyles.error}>{loadFailed ? t('appt.loadFailed') : t('doctor.consult.gone')}</Text> : null}
         {booking ? (
           <>
             <View style={[doctorStyles.card, styles.card]}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(booking.patientName)}</Text></View>
-              <Text style={styles.name}>{booking.patientName || 'Patient'}</Text>
-              <View style={styles.pill}><Text style={styles.pillText}>{booking.status === 'completed' ? '✓ COMPLETED' : booking.status.toUpperCase()}</Text></View>
+              <Text style={styles.name}>{booking.patientName || t('summary.patient')}</Text>
+              <View style={styles.pill}><Text style={styles.pillText}>{booking.status === 'completed' ? `✓ ${label('bookingStatus', 'completed').toUpperCase()}` : label('bookingStatus', booking.status).toUpperCase()}</Text></View>
               <View style={styles.divider} />
               <View style={styles.grid}>
-                <View style={styles.cell}><Text style={styles.label}>DATE</Text><Text style={styles.value}>{booking.scheduledAt ? booking.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>DURATION</Text><Text style={styles.value}>{duration ?? '—'}</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>CONSULTATION FEE</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>BOOKING REF</Text><Text style={styles.value} selectable>#{booking.id.slice(-6).toUpperCase()}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatDate(booking.scheduledAt, language) : '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('doctor.consult.duration')}</Text><Text style={styles.value}>{duration ?? '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('booking.fee')}</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('doctor.consult.ref')}</Text><Text style={styles.value} selectable>#{booking.id.slice(-6).toUpperCase()}</Text></View>
               </View>
             </View>
 
             <View style={[doctorStyles.card, styles.notesCard]}>
-              <Text style={styles.notesTitle}>CONSULTATION NOTES</Text>
+              <Text style={styles.notesTitle}>{t('doctor.consult.notes')}</Text>
               <View style={styles.notesBox}>
-                <Text style={notes ? styles.notesText : styles.notesEmpty}>{notes || 'No notes yet. Add them below; the patient sees them in their Consultation Summary.'}</Text>
+                <Text style={notes ? styles.notesText : styles.notesEmpty}>{notes || t('doctor.consult.noNotes')}</Text>
               </View>
               {consultation?.advice ? (
-                <View style={styles.extra}><Text style={styles.label}>ADVICE</Text><Text style={styles.notesText}>{consultation.advice}</Text></View>
+                <View style={styles.extra}><Text style={styles.label}>{t('doctor.consult.advice')}</Text><Text style={styles.notesText}>{consultation.advice}</Text></View>
               ) : null}
               <View style={styles.extra}>
-                <Text style={styles.label}>FOLLOW-UP</Text>
-                <Text style={styles.notesText}>{consultation?.followUpAt ? consultation.followUpAt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'None set'}</Text>
+                <Text style={styles.label}>{t('doctor.consult.followUp')}</Text>
+                <Text style={styles.notesText}>{consultation?.followUpAt ? `${formatDate(consultation.followUpAt, language)}, ${consultation.followUpAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : t('doctor.consult.noneSet')}</Text>
               </View>
-              <Pressable accessibilityRole="button" onPress={() => setEditing(true)} hitSlop={8}><Text style={styles.edit}>Edit notes, advice and follow-up</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => setEditing(true)} hitSlop={8}><Text style={styles.edit}>{t('doctor.consult.edit')}</Text></Pressable>
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
-                placeholder="Add more consultation notes..."
+                accessibilityLabel={t('doctor.consult.morePlaceholder')}
+                placeholder={t('doctor.consult.morePlaceholder')}
                 placeholderTextColor="#94A3B8"
                 style={styles.input}
                 multiline
@@ -128,16 +132,16 @@ export default function ConsultationDetailsScreen() {
               {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
               {message ? <Text style={styles.success}>{message}</Text> : null}
               <Pressable accessibilityRole="button" style={[styles.save, (!draft.trim() || saving) && styles.disabled]} disabled={!draft.trim() || saving} onPress={save}>
-                <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save Notes'}</Text>
+                <Text style={styles.saveText}>{saving ? t('common.saving') : t('doctor.consult.save')}</Text>
               </Pressable>
             </View>
 
             <View style={styles.links}>
               <Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: booking.id } })}>
-                <Text style={styles.linkText}>Open chat</Text>
+                <Text style={styles.linkText}>{t('call.openChat')}</Text>
               </Pressable>
               <Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: booking.patientId } })}>
-                <Text style={styles.linkText}>Patient records</Text>
+                <Text style={styles.linkText}>{t('doctor.req.records')}</Text>
               </Pressable>
             </View>
           </>
@@ -146,10 +150,10 @@ export default function ConsultationDetailsScreen() {
       {booking ? (
         <DoctorNotesForm
           visible={editing}
-          title="Consultation notes"
-          patientName={booking.patientName || 'the patient'}
+          title={t('chat.notesTitle')}
+          patientName={booking.patientName || t('doctor.consult.thePatient')}
           initial={consultation ?? undefined}
-          submitLabel="Save notes"
+          submitLabel={t('chat.saveNotes')}
           busy={saving}
           error={error}
           onSubmit={saveEdited}

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 
+import { useT } from '@/i18n/language-context';
+
 export type MoreMenuItem = {
   label: string;
   icon: SymbolViewProps['name'];
@@ -16,9 +18,10 @@ export type MoreMenuItem = {
  */
 export function MoreMenu({ items, style, tint = '#64748B' }: { items: MoreMenuItem[]; style?: StyleProp<ViewStyle>; tint?: string }) {
   const [open, setOpen] = useState(false);
+  const { t } = useT();
   return (
     <>
-      <Pressable accessibilityRole="button" accessibilityLabel="More options" hitSlop={8} style={style} onPress={() => setOpen(true)}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('common.moreOptions')} hitSlop={8} style={style} onPress={() => setOpen(true)}>
         <SymbolView name={{ ios: 'ellipsis', android: 'more_vert', web: 'more_vert' }} size={16} tintColor={tint} />
       </Pressable>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>

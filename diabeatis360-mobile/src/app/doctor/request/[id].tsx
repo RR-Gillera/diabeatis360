@@ -6,7 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { DECLINE_REASON_LIMIT, subscribeToBooking, updateBookingStatus } from '@/features/booking/booking-service';
-import { formatFee } from '@/features/booking/booking-ui';
+import { formatDate, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { ageFrom } from '@/features/doctor/doctor-stats';
@@ -14,6 +14,7 @@ import { DoctorHeader, doctorStyles, StatusPill } from '@/features/doctor/doctor
 import type { PatientProfile } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Request Details (doctor Figma frames "Request Details" and "if declined (modal)", DECISIONS D24): who is asking, when, and
 // Accept / Decline. The patient's profile is readable because booking shared it with this doctor (Care_Links, D22). The
@@ -23,16 +24,18 @@ export default function RequestDetailsScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/doctor/appointments');
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { t, label, language } = useT();
   const [booking, setBooking] = useState<AppointmentHistoryEntry | null | undefined>(undefined);
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [confirmDecline, setConfirmDecline] = useState(false);
   const [reason, setReason] = useState('');
   const [working, setWorking] = useState<'accept' | 'decline' | null>(null);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    return subscribeToBooking(id, setBooking, (value) => { setError(value.message); setBooking(null); });
+    return subscribeToBooking(id, setBooking, () => { setLoadFailed(true); setBooking(null); });
   }, [id]);
   const patientId = booking?.patientId;
   useEffect(() => {
@@ -48,7 +51,7 @@ export default function RequestDetailsScreen() {
       setConfirmDecline(false);
       router.replace('/doctor/appointments');
     } catch {
-      setError('We could not save your decision. Please try again.');
+      setError(t('doctor.request.saveFailed'));
     } finally {
       setWorking(null);
     }
@@ -56,44 +59,44 @@ export default function RequestDetailsScreen() {
 
   const [openedAt] = useState(() => new Date());
   const age = ageFrom(patient?.birthdate ?? null, openedAt);
-  const name = booking?.patientName || patient?.fullName || 'Patient';
+  const name = booking?.patientName || patient?.fullName || t('summary.patient');
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Request Details" onBack={() => goBack()} />
+      <DoctorHeader title={t('doctor.request.title')} onBack={() => goBack()} />
       <ScrollView contentContainerStyle={styles.scroll}>
         {booking === undefined ? <ActivityIndicator color={homeColors.green} /> : null}
-        {booking === null ? <Text style={doctorStyles.error}>{error || 'This request no longer exists.'}</Text> : null}
+        {booking === null ? <Text style={doctorStyles.error}>{loadFailed ? t('appt.loadFailed') : t('doctor.request.gone')}</Text> : null}
         {booking ? (
           <>
             <View style={[doctorStyles.card, styles.card]}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View>
               <Text style={styles.name}>{name}</Text>
-              <Text style={styles.age}>{age !== null ? `Age: ${age}` : 'Age not provided'}</Text>
+              <Text style={styles.age}>{age !== null ? t('doctor.request.age', { age }) : t('doctor.request.noAge')}</Text>
               <View style={styles.divider} />
               <View style={styles.grid}>
-                <View style={styles.cell}><Text style={styles.label}>DATE</Text><Text style={styles.value}>{booking.scheduledAt ? booking.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>TIME</Text><Text style={styles.value}>{booking.scheduledAt ? booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>TYPE</Text><Text style={[styles.value, styles.green]}>Online</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>FEE</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatDate(booking.scheduledAt, language) : '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('appt.time')}</Text><Text style={styles.value}>{booking.scheduledAt ? booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('doctor.request.type')}</Text><Text style={[styles.value, styles.green]}>{t('doctor.request.online')}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('doctors.fee')}</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
               </View>
               <View style={styles.statusRow}><StatusPill status={booking.status as never} /></View>
             </View>
 
             <View style={[doctorStyles.card, styles.concernCard]}>
-              <Text style={styles.concernTitle}>PATIENT&apos;S CONCERN</Text>
+              <Text style={styles.concernTitle}>{t('doctor.request.concern')}</Text>
               {booking.concern ? (
                 <View style={styles.concernBox}><Text style={styles.concernText}>&ldquo;{booking.concern}&rdquo;</Text></View>
               ) : (
-                <Text style={styles.concernNone}>The patient did not add a note with this request.</Text>
+                <Text style={styles.concernNone}>{t('doctor.request.noConcern')}</Text>
               )}
             </View>
 
             <Pressable accessibilityRole="button" style={[doctorStyles.card, styles.link]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: booking.patientId } })}>
               <View style={styles.linkIcon}><SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={18} tintColor={homeColors.green} /></View>
               <View style={styles.linkCopy}>
-                <Text style={styles.linkTitle}>Health profile and readings</Text>
-                <Text style={styles.linkText}>Shared with you because this patient booked you</Text>
+                <Text style={styles.linkTitle}>{t('doctor.request.healthLink')}</Text>
+                <Text style={styles.linkText}>{t('doctor.request.shared')}</Text>
               </View>
               <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={homeColors.textFaint} />
             </Pressable>
@@ -103,14 +106,14 @@ export default function RequestDetailsScreen() {
             {booking.status === 'pending' ? (
               <>
                 <Pressable accessibilityRole="button" style={[styles.accept, working !== null && styles.disabled]} disabled={working !== null} onPress={() => decide('confirmed')}>
-                  <Text style={styles.acceptText}>{working === 'accept' ? 'Accepting...' : 'Accept Appointment'}</Text>
+                  <Text style={styles.acceptText}>{working === 'accept' ? t('doctor.request.accepting') : t('doctor.request.accept')}</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" style={styles.decline} disabled={working !== null} onPress={() => setConfirmDecline(true)}>
-                  <Text style={styles.declineText}>Decline Appointment</Text>
+                  <Text style={styles.declineText}>{t('doctor.request.decline')}</Text>
                 </Pressable>
               </>
             ) : (
-              <Text style={styles.decided}>This request is already {booking.status === 'confirmed' ? 'accepted' : booking.status}.</Text>
+              <Text style={styles.decided}>{t('doctor.request.already', { status: booking.status === 'confirmed' ? t('doctor.req.tab.accepted').toLowerCase() : label('bookingStatus', booking.status).toLowerCase() })}</Text>
             )}
           </>
         ) : null}
@@ -119,24 +122,24 @@ export default function RequestDetailsScreen() {
       <Modal visible={confirmDecline} transparent animationType="fade" onRequestClose={() => setConfirmDecline(false)}>
         <View style={styles.overlay}>
           <View style={styles.dialog}>
-            <Text style={styles.dialogTitle}>Decline Appointment</Text>
-            <Text style={styles.dialogText}>Are you sure you want to decline this appointment? This can&apos;t be undone.</Text>
+            <Text style={styles.dialogTitle}>{t('doctor.request.decline')}</Text>
+            <Text style={styles.dialogText}>{t('doctor.request.declineConfirm')}</Text>
             <TextInput
-              accessibilityLabel="Reason for declining (optional)"
+              accessibilityLabel={t('doctor.request.reasonLabel')}
               value={reason}
               onChangeText={setReason}
-              placeholder="Add a reason..."
+              placeholder={t('doctor.request.reasonPlaceholder')}
               placeholderTextColor="#94A3B8"
               style={styles.reason}
               multiline
               maxLength={DECLINE_REASON_LIMIT}
             />
-            <Text style={styles.reasonHint}>Optional. The patient sees it with the declined request.</Text>
+            <Text style={styles.reasonHint}>{t('doctor.request.reasonHint')}</Text>
             <Pressable accessibilityRole="button" style={[styles.dialogConfirm, working !== null && styles.disabled]} disabled={working !== null} onPress={() => decide('declined')}>
-              <Text style={styles.dialogConfirmText}>{working === 'decline' ? 'Declining...' : 'Confirm'}</Text>
+              <Text style={styles.dialogConfirmText}>{working === 'decline' ? t('doctor.request.declining') : t('doctor.request.confirm')}</Text>
             </Pressable>
             <Pressable accessibilityRole="button" style={styles.dialogCancel} onPress={() => setConfirmDecline(false)}>
-              <Text style={styles.dialogCancelText}>Keep request</Text>
+              <Text style={styles.dialogCancelText}>{t('doctor.request.keep')}</Text>
             </Pressable>
           </View>
         </View>
