@@ -9,7 +9,7 @@ import { AppText } from '@/components/ui/app-text';
 import { LimitReached } from '@/components/ui/limit-reached';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { RoundBackButton } from '@/components/ui/round-back-button';
-import { FREE_LIMITS } from '@/constants/plans';
+import { FREE_LIMITS, PREMIUM_FAIR_USE } from '@/constants/plans';
 import { Brand } from '@/constants/theme';
 import type { LabelAnalysis } from '@/features/ai/types';
 import { useAuth } from '@/features/auth/auth-context';
@@ -76,8 +76,8 @@ export default function ScannerScreen() {
       .catch(() => { if (!cancelled) setUsage(null); });
     return () => { cancelled = true; };
   }, [uid, usageTick]);
-  // Premium has a fair-use cap too (D20), so it says "more scans", never "unlimited".
-  const usageText = usage ? (usage.premium ? t('scan.usage.premium') : t('scan.usage.free', { left: usage.left, limit: usage.limit })) : '';
+  // Premium is unlimited with a fair-use ceiling (D20); the ceiling is said next to the word.
+  const usageText = usage ? (usage.premium ? t('scan.usage.premium', { limit: PREMIUM_FAIR_USE.scan }) : t('scan.usage.free', { left: usage.left, limit: usage.limit })) : '';
 
   const scanAgain = () => {
     setPhase('camera');
@@ -182,7 +182,7 @@ export default function ScannerScreen() {
         <LimitReached
           icon={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }}
           title={t('scan.limit.title', { count: FREE_LIMITS.scan })}
-          text={t('scan.limit.text')}
+          text={t('scan.limit.text', { limit: PREMIUM_FAIR_USE.scan })}
           footer={t('scan.limit.footer')}
           onUpgrade={() => router.push('/subscription')}
         />
@@ -273,7 +273,7 @@ export default function ScannerScreen() {
             <View style={styles.shutterInner} />
           </Pressable>
         ) : (
-          <PrimaryButton title={t('scan.upgradeMore')} onPress={() => router.push('/subscription')} style={styles.upgrade} />
+          <PrimaryButton title={t('scan.upgrade')} onPress={() => router.push('/subscription')} style={styles.upgrade} />
         )}
       </View>
 

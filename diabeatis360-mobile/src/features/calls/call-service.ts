@@ -2,6 +2,9 @@ import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Ti
 
 import { db } from '@/firebase';
 import { createNotification } from '@/features/notifications/notification-service';
+import { translate, type Language } from '@/i18n/translate';
+
+import { CallError } from './join-error';
 
 // Video call signaling (DECISIONS.md D11). One document per booking, Calls/{bookingId}, describes the CURRENT call:
 //   ringing -> accepted -> ended          (normal call)
@@ -68,10 +71,10 @@ export async function fetchDisplayName(userId: string) {
  * Rings the other person on this booking. The rules only allow it on a confirmed booking. A leftover call from earlier
  * (the other app was closed) is cleaned up first; a fresh call in either direction is never overwritten.
  */
-export async function startCall(bookingId: string, callerId: string) {
+export async function startCall(bookingId: string, callerId: string, language: Language = 'English') {
   const booking = await getDoc(doc(db, 'Bookings', bookingId));
   const data = booking.data();
-  if (!data) throw new Error('This appointment no longer exists.');
+  if (!data) throw new CallError(translate(language, 'call.error.appointmentGone'));
   const calleeId = data.patient_id === callerId ? String(data.provider_id) : String(data.patient_id);
 
   const existing = await getDoc(doc(db, 'Calls', bookingId));
@@ -80,7 +83,7 @@ export async function startCall(bookingId: string, callerId: string) {
     const age = call.createdAt ? Date.now() - call.createdAt.getTime() : 0;
     if (call.status === 'accepted') await endCall(bookingId);
     else if (call.status === 'ringing') {
-      if (age < STALE_RING_MS) throw new Error(call.callerId === callerId ? 'You are already calling. Please wait for an answer.' : 'They are calling you right now. Answer the incoming call instead.');
+      if (age < STALE_RING_MS) throw new CallError(translate(language, call.callerId === callerId ? 'call.error.alreadyCalling' : 'call.error.beingCalled'));
       if (call.callerId === callerId) await updateDoc(doc(db, 'Calls', bookingId), { status: 'missed', ended_at: serverTimestamp() });
       else await answerCall(bookingId, false);
     }

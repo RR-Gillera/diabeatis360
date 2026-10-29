@@ -8,7 +8,7 @@ import { AppText } from '@/components/ui/app-text';
 import { Card } from '@/components/ui/card';
 import { LimitReached } from '@/components/ui/limit-reached';
 import { PrimaryButton } from '@/components/ui/primary-button';
-import { FREE_LIMITS } from '@/constants/plans';
+import { FREE_LIMITS, PREMIUM_FAIR_USE } from '@/constants/plans';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { CriticalNotice } from '@/features/glucose/critical-notice';
@@ -126,7 +126,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
             <LimitReached
               icon={{ ios: 'sparkle', android: 'auto_awesome', web: 'auto_awesome' }}
               title={t('ai.limit.title', { count: limitCount })}
-              text={t('ai.limit.text')}
+              text={t('ai.limit.text', { limit: PREMIUM_FAIR_USE.ai })}
               footer={t('ai.limit.footer')}
               onUpgrade={() => router.push('/subscription')}
               onFooter={() => goBack()}
@@ -137,7 +137,7 @@ export function SuggestionScreen<T>({ kind, title, subtitle, request, card, butt
         {!critical && !limitReached ? (
           <View style={styles.pad}>
             <PrimaryButton title={saved ? t('ai.generateNew') : t('ai.generate')} onPress={generate} loading={busy} />
-            {usage ? <AppText style={styles.usage}>{usage.premium ? t('ai.usage.premium') : t('ai.usage.free', { left: usage.left, limit: usage.limit })}</AppText> : null}
+            {usage ? <AppText style={styles.usage}>{usage.premium ? t('ai.usage.premium', { limit: PREMIUM_FAIR_USE.ai }) : t('ai.usage.free', { left: usage.left, limit: usage.limit })}</AppText> : null}
             {error?.code === 'feature-unavailable' ? (
               <AppText style={styles.unavailable}>{aiErrorText(error, language)}</AppText>
             ) : error ? (

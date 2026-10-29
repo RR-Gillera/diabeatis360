@@ -4,7 +4,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
 import { RoundBackButton } from '@/components/ui/round-back-button';
-import { FREE_LIMITS } from '@/constants/plans';
+import { FREE_LIMITS, PREMIUM_FAIR_USE } from '@/constants/plans';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
@@ -19,6 +19,8 @@ import {
   type Subscription,
 } from '@/features/subscription/subscription-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
+import { shortDay, type Language } from '@/i18n/translate';
 
 // Premium, in three steps that follow the frames (DECISIONS D5, D20, D24):
 //   no Premium      -> "Go Premium": Free vs Premium and the plan picker (Figma P-30)
@@ -27,13 +29,14 @@ import { useSafeBack } from '@/hooks/use-safe-back';
 // Payments are a demo and nothing renews, so the status says when Premium ends instead of "renews".
 type PaymentChoice = 'GCash' | 'Maya' | 'Card';
 
-function longDate(date: Date | null) {
-  return date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+function longDate(date: Date | null, language: Language) {
+  return date ? `${shortDay(date, language)}, ${date.getFullYear()}` : '—';
 }
 
 export default function SubscriptionScreen() {
   const goBack = useSafeBack('/profile');
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [plans, setPlans] = useState<MembershipPlan[] | null>(null); // null until the plans have loaded
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,11 +45,12 @@ export default function SubscriptionScreen() {
   const [paying, setPaying] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => subscribeToPlans(setPlans, (value) => setError(value.message)), []);
+  useEffect(() => subscribeToPlans(setPlans, () => setLoadFailed(true)), []);
   useEffect(() => {
     if (!uid) return;
-    return subscribeToSubscriptions(uid, setSubscriptions, (value) => setError(value.message));
+    return subscribeToSubscriptions(uid, setSubscriptions, () => setLoadFailed(true));
   }, [uid]);
 
   const active = useMemo(() => activeSubscription(subscriptions), [subscriptions]);
@@ -69,9 +73,7 @@ export default function SubscriptionScreen() {
       // The rules refuse a subscription whose dates do not match the server's clock (DECISIONS D20), which in practice
       // means a phone with the wrong date or time.
       const refused = typeof value === 'object' && value !== null && (value as { code?: string }).code === 'permission-denied';
-      setError(refused
-        ? 'We could not start this subscription. Please check that your phone\'s date and time are set automatically, then try again.'
-        : 'We could not start this subscription. Please try again.');
+      setError(refused ? t('premium.error.clock') : t('premium.error.start'));
     } finally {
       setPaying(false);
     }
@@ -80,49 +82,49 @@ export default function SubscriptionScreen() {
   const cancel = async () => {
     if (!active) return;
     setConfirmCancel(false);
-    try { await cancelSubscription(active.id); } catch { setError('We could not cancel this subscription. Please try again.'); }
+    try { await cancelSubscription(active.id); } catch { setError(t('premium.error.cancel')); }
   };
 
   // ---- Premium active (P-32)
   if (active) {
-    const label = planLabel(activePlan?.durationDays ?? 30);
+    const label = planLabel(activePlan?.durationDays ?? 30, language);
     const cancelled = active.status === 'cancelled';
     return (
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <RoundBackButton onPress={goBack} />
-          <Text style={styles.title}>Premium</Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Text accessibilityRole="header" style={styles.title}>{t('premium.title')}</Text>
+          {error || loadFailed ? <Text style={styles.error}>{error || t('premium.loadFailed')}</Text> : null}
           <View style={styles.hero}>
             <View style={styles.heroTop}>
               <View style={styles.crownCircle}><SymbolView name={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }} size={20} tintColor={homeColors.green} /></View>
-              <View style={styles.activePill}><Text style={styles.activePillText}>{cancelled ? 'Cancelled' : 'Active'}</Text></View>
+              <View style={styles.activePill}><Text style={styles.activePillText}>{cancelled ? t('premium.cancelled') : t('premium.active')}</Text></View>
             </View>
-            <Text style={styles.heroTitle}>Premium until {longDate(active.expiresAt)}</Text>
-            <Text style={styles.heroSub}>{label.name} plan · {activePlan ? peso(activePlan.price) : ''}</Text>
+            <Text style={styles.heroTitle}>{t('premium.until', { date: longDate(active.expiresAt, language) })}</Text>
+            <Text style={styles.heroSub}>{t('premium.planLine', { plan: label.name, price: activePlan ? peso(activePlan.price) : '' })}</Text>
           </View>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{cancelled ? 'Cancelled' : 'Plan end'}</Text>
+            <Text style={styles.cardTitle}>{cancelled ? t('premium.cancelled') : t('premium.planEnd')}</Text>
             <Text style={styles.cardText}>
               {cancelled
-                ? `You cancelled this plan. Premium stays active until ${longDate(active.expiresAt)}, then your account returns to Free.`
-                : `Premium ends on ${longDate(active.expiresAt)}. Payments in this version are a demo, so nothing renews or charges you automatically.`}
+                ? t('premium.cancelledText', { date: longDate(active.expiresAt, language) })
+                : t('premium.endsText', { date: longDate(active.expiresAt, language) })}
             </Text>
           </View>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Your Premium benefits</Text>
-            {['Unlimited AI suggestions', 'Unlimited label scans', 'Logging and charts'].map((benefit) => (
+            <Text style={styles.cardTitle}>{t('premium.benefits')}</Text>
+            {[t('premium.benefit.ai'), t('premium.benefit.scan'), t('premium.benefit.logging')].map((benefit) => (
               <View key={benefit} style={styles.benefit}>
                 <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={16} tintColor={homeColors.green} />
                 <Text style={styles.benefitText}>{benefit}</Text>
               </View>
             ))}
-            <Text style={styles.fairUse}>Unlimited for normal use, with a fair-use ceiling of 30 a day each.</Text>
+            <Text style={styles.fairUse}>{t('premium.fairUse', { limit: PREMIUM_FAIR_USE.ai })}</Text>
           </View>
         </ScrollView>
         {!cancelled ? (
           <Pressable accessibilityRole="button" style={styles.cancelLink} onPress={() => setConfirmCancel(true)}>
-            <Text style={styles.cancelLinkText}>Cancel subscription</Text>
+            <Text style={styles.cancelLinkText}>{t('premium.cancel')}</Text>
           </Pressable>
         ) : null}
 
@@ -130,10 +132,10 @@ export default function SubscriptionScreen() {
           <View style={styles.overlay}>
             <View style={styles.dialog}>
               <View style={styles.dialogIcon}><SymbolView name={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }} size={26} tintColor="#F59E0B" /></View>
-              <Text style={styles.dialogTitle}>Cancel subscription?</Text>
-              <Text style={styles.dialogText}>Premium stays active until {longDate(active.expiresAt)}. It will not continue after that date.</Text>
-              <Pressable accessibilityRole="button" style={styles.dialogDanger} onPress={cancel}><Text style={styles.dialogDangerText}>Cancel subscription</Text></Pressable>
-              <Pressable accessibilityRole="button" style={styles.dialogKeep} onPress={() => setConfirmCancel(false)}><Text style={styles.dialogKeepText}>Keep Premium</Text></Pressable>
+              <Text style={styles.dialogTitle}>{t('premium.cancelTitle')}</Text>
+              <Text style={styles.dialogText}>{t('premium.cancelText', { date: longDate(active.expiresAt, language) })}</Text>
+              <Pressable accessibilityRole="button" style={styles.dialogDanger} onPress={cancel}><Text style={styles.dialogDangerText}>{t('premium.cancel')}</Text></Pressable>
+              <Pressable accessibilityRole="button" style={styles.dialogKeep} onPress={() => setConfirmCancel(false)}><Text style={styles.dialogKeepText}>{t('premium.keep')}</Text></Pressable>
             </View>
           </View>
         </Modal>
@@ -143,7 +145,7 @@ export default function SubscriptionScreen() {
 
   // ---- Checkout (P-31)
   if (checkout && chosen) {
-    const label = planLabel(chosen.durationDays);
+    const label = planLabel(chosen.durationDays, language);
     const methods: { key: PaymentChoice; icon: { ios: 'iphone' | 'wallet.pass.fill' | 'creditcard.fill'; android: string; web: string } }[] = [
       { key: 'GCash', icon: { ios: 'iphone', android: 'smartphone', web: 'smartphone' } },
       { key: 'Maya', icon: { ios: 'wallet.pass.fill', android: 'account_balance_wallet', web: 'account_balance_wallet' } },
@@ -153,34 +155,34 @@ export default function SubscriptionScreen() {
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <RoundBackButton onPress={() => setCheckout(false)} />
-          <Text style={styles.title}>Checkout</Text>
+          <Text accessibilityRole="header" style={styles.title}>{t('premium.checkout')}</Text>
           <View style={styles.card}>
             <View style={styles.productRow}>
               <View style={styles.crownTile}><SymbolView name={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }} size={22} tintColor={homeColors.green} /></View>
               <View>
-                <Text style={styles.productName}>Diabeatis360 Premium</Text>
-                <Text style={styles.productSub}>{label.name} plan</Text>
+                <Text style={styles.productName}>{t('premium.product')}</Text>
+                <Text style={styles.productSub}>{t('premium.plan', { plan: label.name })}</Text>
               </View>
             </View>
             <View style={styles.divider} />
-            <View style={styles.line}><Text style={styles.lineLabel}>{label.name} plan</Text><Text style={styles.lineValue}>{peso(chosen.price)}</Text></View>
-            <View style={styles.line}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{peso(chosen.price)}</Text></View>
+            <View style={styles.line}><Text style={styles.lineLabel}>{t('premium.plan', { plan: label.name })}</Text><Text style={styles.lineValue}>{peso(chosen.price)}</Text></View>
+            <View style={styles.line}><Text style={styles.totalLabel}>{t('premium.total')}</Text><Text style={styles.totalValue}>{peso(chosen.price)}</Text></View>
           </View>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Payment method</Text>
+            <Text style={styles.cardTitle}>{t('premium.method')}</Text>
             {methods.map((option) => (
               <Pressable key={option.key} accessibilityRole="radio" accessibilityState={{ checked: method === option.key }} style={[styles.method, method === option.key && styles.methodOn]} onPress={() => setMethod(option.key)}>
                 <View style={styles.methodIcon}><SymbolView name={option.icon as never} size={18} tintColor={homeColors.green} /></View>
-                <Text style={styles.methodText}>{option.key}</Text>
+                <Text style={styles.methodText}>{option.key === 'Card' ? t('premium.methodCard') : option.key}</Text>
                 <View style={[styles.radio, method === option.key && styles.radioOn]}>{method === option.key ? <View style={styles.radioDot} /> : null}</View>
               </Pressable>
             ))}
           </View>
           <DemoPaymentNote />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error || loadFailed ? <Text style={styles.error}>{error || t('premium.loadFailed')}</Text> : null}
         </ScrollView>
         <Pressable accessibilityRole="button" style={[styles.primary, paying && styles.disabled]} onPress={pay} disabled={paying}>
-          <Text style={styles.primaryText}>{paying ? 'Processing...' : 'Pay now'}</Text>
+          <Text style={styles.primaryText}>{paying ? t('premium.processing') : t('premium.payNow')}</Text>
         </Pressable>
       </View>
     );
@@ -191,19 +193,19 @@ export default function SubscriptionScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <RoundBackButton onPress={goBack} />
-        <Text style={styles.title}>Go Premium</Text>
-        <Text style={styles.subtitle}>Get more from Diabeatis360</Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Text accessibilityRole="header" style={styles.title}>{t('premium.go')}</Text>
+        <Text style={styles.subtitle}>{t('premium.subtitle')}</Text>
+        {error || loadFailed ? <Text style={styles.error}>{error || t('premium.loadFailed')}</Text> : null}
         <View style={styles.card}>
           <View style={styles.tableRow}>
-            <Text style={[styles.tableHead, styles.tableFeature]}>FEATURES</Text>
-            <Text style={[styles.tableHead, styles.tableCell]}>Free</Text>
-            <Text style={[styles.tableHead, styles.tableCell, styles.green]}>Premium</Text>
+            <Text style={[styles.tableHead, styles.tableFeature]}>{t('premium.features')}</Text>
+            <Text style={[styles.tableHead, styles.tableCell]}>{t('premium.free')}</Text>
+            <Text style={[styles.tableHead, styles.tableCell, styles.green]}>{t('premium.title')}</Text>
           </View>
           {[
-            { feature: 'Logging and charts', free: '✓', premium: '✓' },
-            { feature: 'AI suggestions', free: `${FREE_LIMITS.ai} per day`, premium: 'Unlimited' },
-            { feature: 'Label scans', free: `${FREE_LIMITS.scan} per day`, premium: 'Unlimited' },
+            { feature: t('premium.benefit.logging'), free: '✓', premium: '✓' },
+            { feature: t('premium.row.ai'), free: t('premium.perDay', { count: FREE_LIMITS.ai }), premium: t('premium.unlimited') },
+            { feature: t('premium.row.scan'), free: t('premium.perDay', { count: FREE_LIMITS.scan }), premium: t('premium.unlimited') },
           ].map((row) => (
             <View key={row.feature} style={[styles.tableRow, styles.tableDivider]}>
               <Text style={[styles.tableFeature, styles.tableFeatureText]}>{row.feature}</Text>
@@ -211,12 +213,13 @@ export default function SubscriptionScreen() {
               <Text style={[styles.tableCell, styles.tablePremium]}>{row.premium}</Text>
             </View>
           ))}
+          <Text style={styles.fairUse}>{t('premium.fairUse', { limit: PREMIUM_FAIR_USE.ai })}</Text>
         </View>
 
         {plans === null ? <ActivityIndicator color={homeColors.green} /> : null}
-        {plans !== null && paidPlans.length === 0 ? <Text style={styles.cardText}>No membership plans are available yet.</Text> : null}
+        {plans !== null && paidPlans.length === 0 ? <Text style={styles.cardText}>{t('premium.noPlans')}</Text> : null}
         {paidPlans.map((plan, index) => {
-          const label = planLabel(plan.durationDays);
+          const label = planLabel(plan.durationDays, language);
           const isChosen = plan.id === chosen?.id;
           return (
             <Pressable key={plan.id} accessibilityRole="radio" accessibilityState={{ checked: isChosen }} style={[styles.plan, isChosen && styles.planOn]} onPress={() => setSelectedId(plan.id)}>
@@ -224,9 +227,9 @@ export default function SubscriptionScreen() {
               <View style={styles.planName}>
                 <View style={styles.planNameRow}>
                   <Text style={styles.planTitle}>{label.name}</Text>
-                  {savings[index] > 0 ? <View style={styles.save}><Text style={styles.saveText}>Save {savings[index]}%</Text></View> : null}
+                  {savings[index] > 0 ? <View style={styles.save}><Text style={styles.saveText}>{t('premium.save', { percent: savings[index] })}</Text></View> : null}
                 </View>
-                {plan.id === bestValueId ? <View style={styles.best}><Text style={styles.bestText}>Best value</Text></View> : null}
+                {plan.id === bestValueId ? <View style={styles.best}><Text style={styles.bestText}>{t('premium.best')}</Text></View> : null}
               </View>
               <Text style={[styles.planPrice, isChosen && styles.green]}>{pesoShort(plan.price)} <Text style={styles.planUnit}>{label.unit}</Text></Text>
             </Pressable>
@@ -234,7 +237,7 @@ export default function SubscriptionScreen() {
         })}
       </ScrollView>
       <Pressable accessibilityRole="button" style={[styles.primary, !chosen && styles.disabled]} onPress={() => { setError(''); setCheckout(true); }} disabled={!chosen}>
-        <Text style={styles.primaryText}>Continue</Text>
+        <Text style={styles.primaryText}>{t('premium.continue')}</Text>
       </Pressable>
     </View>
   );

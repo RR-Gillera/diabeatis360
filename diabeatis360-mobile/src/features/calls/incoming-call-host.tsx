@@ -6,8 +6,10 @@ import { SymbolView } from 'expo-symbols';
 import { AppText } from '@/components/ui/app-text';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
+import { useT } from '@/i18n/language-context';
 
 import { answerCall, fetchDisplayName, STALE_RING_MS, subscribeToIncomingCalls, type CallRecord } from './call-service';
+import { CallError } from './join-error';
 import { ensureCallPermissions } from './video-room';
 
 /**
@@ -18,6 +20,7 @@ import { ensureCallPermissions } from './video-room';
 export function IncomingCallHost() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [call, setCall] = useState<CallRecord | null>(null);
   const [callerName, setCallerName] = useState('');
   // Shown on the ringing screen when the camera or microphone was not allowed (the call keeps ringing).
@@ -57,9 +60,9 @@ export function IncomingCallHost() {
     if (accept) {
       // Asked before answering: on Android the call frame can only use what the app is already allowed (video-room.ts).
       try {
-        await ensureCallPermissions();
+        await ensureCallPermissions(language);
       } catch (value) {
-        setNotice(value instanceof Error ? value.message : 'Allow camera and microphone to use video calls.');
+        setNotice(value instanceof CallError ? value.message : t('call.error.permissions'));
         return;
       }
     }
@@ -76,26 +79,26 @@ export function IncomingCallHost() {
     <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => respond(false)}>
       <View style={styles.screen}>
         <View style={styles.top}>
-          <AppText weight="medium" style={styles.label}>Incoming video call</AppText>
+          <AppText weight="medium" style={styles.label}>{t('call.incoming')}</AppText>
           <View style={styles.avatar}>
             <AppText weight="extraBold" style={styles.avatarText}>{(callerName || '?').replace(/^dr\.?\s+/i, '').charAt(0).toUpperCase()}</AppText>
           </View>
-          <AppText weight="extraBold" style={styles.name}>{callerName || 'Someone'}</AppText>
-          <AppText style={styles.sub}>Diabeatis360 consultation</AppText>
+          <AppText weight="extraBold" style={styles.name}>{callerName || t('call.someone')}</AppText>
+          <AppText style={styles.sub}>{t('call.appConsultation')}</AppText>
           {notice ? <AppText accessibilityLiveRegion="polite" style={styles.notice}>{notice}</AppText> : null}
         </View>
         <View style={styles.buttons}>
           <View style={styles.choice}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Decline" style={[styles.round, { backgroundColor: Brand.colors.danger }]} onPress={() => respond(false)}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('call.decline')} style={[styles.round, { backgroundColor: Brand.colors.danger }]} onPress={() => respond(false)}>
               <SymbolView name={{ ios: 'phone.down.fill', android: 'call_end', web: 'call_end' }} size={28} tintColor="#FFF" />
             </Pressable>
-            <AppText style={styles.choiceLabel}>Decline</AppText>
+            <AppText style={styles.choiceLabel}>{t('call.decline')}</AppText>
           </View>
           <View style={styles.choice}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Accept" style={[styles.round, { backgroundColor: Brand.colors.primary }]} onPress={() => respond(true)}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('call.accept')} style={[styles.round, { backgroundColor: Brand.colors.primary }]} onPress={() => respond(true)}>
               <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={28} tintColor="#FFF" />
             </Pressable>
-            <AppText style={styles.choiceLabel}>Accept</AppText>
+            <AppText style={styles.choiceLabel}>{t('call.accept')}</AppText>
           </View>
         </View>
       </View>

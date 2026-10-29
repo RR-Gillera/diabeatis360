@@ -23,3 +23,9 @@ test('pesos are written like the frame', () => {
   assert.equal(pesoShort(899), '₱899');
   assert.equal(pesoShort(99.5), '₱99.50');
 });
+
+test('plan names are said in Filipino too (D33)', () => {
+  assert.deepEqual(planLabel(30, 'Filipino'), { name: 'Buwanan', unit: '/ buwan' });
+  assert.deepEqual(planLabel(182, 'Filipino'), { name: '6 na Buwan', unit: '/ 6 na buwan' });
+  assert.deepEqual(planLabel(365, 'Filipino'), { name: 'Taunan', unit: '/ taon' });
+});
