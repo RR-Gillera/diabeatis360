@@ -2,53 +2,57 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { BookingHeader, bookingColors, formatDate, formatFee, styles as ui } from '@/features/booking/booking-ui';
+import { BookingHeader, bookingColors, formatDate, formatFee, paymentMethodLabel, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, BookingStatus, PaymentStatus } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
-import { enumLabel, isChatAvailable } from '@/constants/enums';
+import { isChatAvailable } from '@/constants/enums';
+import { useT } from '@/i18n/language-context';
+import type { MessageKey } from '@/i18n/translate';
 
-const statusCopy: Record<BookingStatus, { label: string; color: string; background: string }> = {
-  pending: { label: enumLabel('bookingStatus', 'pending').toUpperCase(), color: '#B45309', background: '#FEF3C7' },
-  confirmed: { label: enumLabel('bookingStatus', 'confirmed').toUpperCase(), color: bookingColors.green, background: '#E9F6ED' },
-  completed: { label: enumLabel('bookingStatus', 'completed').toUpperCase(), color: '#475569', background: '#F1F5F9' },
-  declined: { label: enumLabel('bookingStatus', 'declined').toUpperCase(), color: '#D9364F', background: '#FBE6E9' },
-  cancelled: { label: enumLabel('bookingStatus', 'cancelled').toUpperCase(), color: '#D9364F', background: '#FBE6E9' },
+// The badge colours per status; the words come from constants/enums.ts in the person's language.
+const statusCopy: Record<BookingStatus, { color: string; background: string }> = {
+  pending: { color: '#B45309', background: '#FEF3C7' },
+  confirmed: { color: bookingColors.green, background: '#E9F6ED' },
+  completed: { color: '#475569', background: '#F1F5F9' },
+  declined: { color: '#D9364F', background: '#FBE6E9' },
+  cancelled: { color: '#D9364F', background: '#FBE6E9' },
 };
 
-const paymentCopy: Record<PaymentStatus, { label: string; color: string }> = {
-  unpaid: { label: 'Not paid yet', color: '#B45309' },
-  paid: { label: 'Paid online (demo)', color: bookingColors.green },
-  onsite: { label: 'Paying on-site', color: bookingColors.green },
+const paymentCopy: Record<PaymentStatus, { label: MessageKey; color: string }> = {
+  unpaid: { label: 'appt.payment.unpaid', color: '#B45309' },
+  paid: { label: 'appt.payment.paid', color: bookingColors.green },
+  onsite: { label: 'appt.payment.onsite', color: bookingColors.green },
 };
 
 export default function AppointmentScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/profile');
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { t, label, language } = useT();
   const [entry, setEntry] = useState<AppointmentHistoryEntry | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    return subscribeToBooking(id, (value) => { setEntry(value); setLoading(false); }, (value) => { setError(value.message); setLoading(false); });
+    return subscribeToBooking(id, (value) => { setEntry(value); setLoading(false); }, () => { setFailed(true); setLoading(false); });
   }, [id]);
 
   return (
     <View style={ui.screen}>
-      <BookingHeader title="Appointment Details" onBack={() => goBack()} />
+      <BookingHeader title={t('appt.detailsTitle')} onBack={() => goBack()} />
       <View style={ui.content}>
         {!id ? (
-          <Text style={styles.empty}>Appointment details are unavailable.</Text>
+          <Text style={styles.empty}>{t('appt.unavailable')}</Text>
         ) : loading ? (
           <ActivityIndicator color={bookingColors.green} />
-        ) : error ? (
-          <Text style={styles.empty}>{error}</Text>
+        ) : failed ? (
+          <Text style={styles.empty}>{t('appt.loadFailed')}</Text>
         ) : entry && entry.provider ? (
           <View style={ui.card}>
             <View style={[styles.status, { backgroundColor: statusCopy[entry.status as BookingStatus]?.background }]}>
-              <Text style={[styles.statusText, { color: statusCopy[entry.status as BookingStatus]?.color }]}>{statusCopy[entry.status as BookingStatus]?.label ?? entry.status.toUpperCase()}</Text>
+              <Text style={[styles.statusText, { color: statusCopy[entry.status as BookingStatus]?.color }]}>{label('bookingStatus', entry.status).toUpperCase()}</Text>
             </View>
             <Text style={styles.name}>{entry.provider.fullName}</Text>
             <Text style={styles.specialty}>{entry.provider.specialty}</Text>
@@ -59,49 +63,49 @@ export default function AppointmentScreen() {
                 actually stands rather than what they were first told. */}
             {entry.status === 'confirmed' && entry.queueNumber ? (
               <View style={styles.queue}>
-                <Text style={styles.queueLabel}>YOUR QUEUE NUMBER</Text>
+                <Text style={styles.queueLabel}>{t('appt.queueNumber')}</Text>
                 <Text style={styles.queueValue}>{entry.queueNumber}</Text>
-                <Text style={styles.queueHint}>Your place in the doctor&apos;s queue for this day, by appointment time.</Text>
+                <Text style={styles.queueHint}>{t('appt.queueHint')}</Text>
               </View>
             ) : null}
-            <View style={styles.line}><Text style={styles.label}>DATE</Text><Text style={styles.value}>{entry.scheduledAt ? formatDate(entry.scheduledAt) : '—'}</Text></View>
-            <View style={styles.line}><Text style={styles.label}>TIME</Text><Text style={styles.value}>{entry.scheduledAt ? entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text></View>
-            <View style={styles.line}><Text style={styles.label}>CONSULTATION FEE</Text><Text style={styles.value}>{formatFee(entry.fee)}</Text></View>
+            <View style={styles.line}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'}</Text></View>
+            <View style={styles.line}><Text style={styles.label}>{t('appt.time')}</Text><Text style={styles.value}>{entry.scheduledAt ? entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text></View>
+            <View style={styles.line}><Text style={styles.label}>{t('booking.fee')}</Text><Text style={styles.value}>{formatFee(entry.fee)}</Text></View>
             <View style={styles.line}>
-              <Text style={styles.label}>PAYMENT</Text>
+              <Text style={styles.label}>{t('appt.payment')}</Text>
               <Text style={[styles.value, { color: paymentCopy[entry.paymentStatus].color }]}>
-                {paymentCopy[entry.paymentStatus].label}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}
+                {t(paymentCopy[entry.paymentStatus].label)}{entry.paymentMethod ? ` · ${paymentMethodLabel(entry.paymentMethod, t)}` : ''}
               </Text>
             </View>
 
             {entry.concern ? (
-              <View style={styles.line}><Text style={styles.label}>YOUR NOTE TO THE DOCTOR</Text></View>
+              <View style={styles.line}><Text style={styles.label}>{t('appt.note')}</Text></View>
             ) : null}
             {entry.concern ? <Text style={styles.note}>{entry.concern}</Text> : null}
             {entry.status === 'declined' && entry.declineReason ? (
-              <View style={styles.declined}><Text style={styles.declinedLabel}>DOCTOR&apos;S REASON</Text><Text style={styles.note}>{entry.declineReason}</Text></View>
+              <View style={styles.declined}><Text style={styles.declinedLabel}>{t('appt.reasonCaps')}</Text><Text style={styles.note}>{entry.declineReason}</Text></View>
             ) : null}
 
             {entry.status === 'confirmed' && entry.paymentStatus === 'unpaid' ? (
-              <Pressable style={styles.payButton} onPress={() => router.push({ pathname: '/booking/consultation-fee', params: { id: entry.id } })}>
-                <Text style={styles.payButtonText}>Pay Now</Text>
+              <Pressable accessibilityRole="button" style={styles.payButton} onPress={() => router.push({ pathname: '/booking/consultation-fee', params: { id: entry.id } })}>
+                <Text style={styles.payButtonText}>{t('appt.payNow')}</Text>
               </Pressable>
             ) : null}
 
             {isChatAvailable(entry.status) && entry.paymentStatus !== 'unpaid' ? (
-              <Pressable style={styles.chatButton} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
-                <Text style={styles.chatButtonText}>Open Chat</Text>
+              <Pressable accessibilityRole="button" style={styles.chatButton} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
+                <Text style={styles.chatButtonText}>{t('appt.openChat')}</Text>
               </Pressable>
             ) : null}
 
             {entry.status === 'pending' ? (
-              <Text style={styles.waitingNote}>Waiting for the doctor to accept. You will be able to pay once they do.</Text>
+              <Text style={styles.waitingNote}>{t('appt.waiting')}</Text>
             ) : null}
 
-            <Text style={styles.reference} selectable>Booking ID: {entry.id}</Text>
+            <Text style={styles.reference} selectable>{t('appt.bookingId', { id: entry.id })}</Text>
           </View>
         ) : (
-          <Text style={styles.empty}>Appointment details are unavailable.</Text>
+          <Text style={styles.empty}>{t('appt.unavailable')}</Text>
         )}
       </View>
     </View>

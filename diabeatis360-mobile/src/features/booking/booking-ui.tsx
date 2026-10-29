@@ -5,8 +5,11 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 import { MoreMenu } from '@/components/ui/more-menu';
 import { Brand, Fonts, Spacing } from '@/constants/theme';
 import { NotificationBell } from '@/features/notifications/notification-bell';
+import { useT } from '@/i18n/language-context';
+import { shortDay, type Language, type MessageKey } from '@/i18n/translate';
 
 import { slotInstant } from './manila-time';
+import type { PaymentMethod } from './types';
 
 export const bookingColors = {
   navy: '#10182D',
@@ -18,16 +21,17 @@ export const bookingColors = {
 };
 
 export function BookingHeader({ title, subtitle, onBack, actions }: { title: string; subtitle?: string; onBack?: () => void; actions?: React.ReactNode }) {
+  const { t } = useT();
   return (
     <View style={styles.header}>
       <View style={styles.headerRow}>
         {onBack ? (
-          <Pressable onPress={onBack} hitSlop={12} style={styles.backButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} onPress={onBack} hitSlop={12} style={styles.backButton}>
             <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={20} tintColor={bookingColors.navy} />
           </Pressable>
         ) : null}
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>{title}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
         {actions}
@@ -51,16 +55,18 @@ export function BookingHeaderActions() {
 /** The three-dots menu on the patient's booking screens (DECISIONS D24): My appointments and Notifications. */
 export function BookingMoreMenu({ style }: { style?: StyleProp<ViewStyle> }) {
   const router = useRouter();
+  const { t } = useT();
   return <MoreMenu style={style} items={[
-    { label: 'My appointments', icon: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, onPress: () => router.push('/booking/my-appointments' as never) },
-    { label: 'Notifications', icon: { ios: 'bell', android: 'notifications', web: 'notifications' }, onPress: () => router.push('/notifications') },
+    { label: t('appt.title'), icon: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, onPress: () => router.push('/booking/my-appointments' as never) },
+    { label: t('notif.title'), icon: { ios: 'bell', android: 'notifications', web: 'notifications' }, onPress: () => router.push('/notifications') },
   ]} />;
 }
 
 export function PrimaryButton({ title, onPress, disabled, loading }: { title: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
+  const { t } = useT();
   return (
-    <Pressable disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.primaryButton, (disabled || loading) && styles.disabled, pressed && styles.pressed]}>
-      <Text style={styles.primaryButtonText}>{loading ? 'Please wait...' : title}</Text>
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled: disabled || loading }} disabled={disabled || loading} onPress={onPress} style={({ pressed }) => [styles.primaryButton, (disabled || loading) && styles.disabled, pressed && styles.pressed]}>
+      <Text style={styles.primaryButtonText}>{loading ? t('common.pleaseWait') : title}</Text>
     </Pressable>
   );
 }
@@ -69,8 +75,23 @@ export function formatFee(value: number) {
   return `₱${value.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`;
 }
 
-export function formatDate(value: Date) {
-  return value.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+/** "Oct 29, 2026" in English, "Okt 29, 2026" in Filipino. */
+export function formatDate(value: Date, language: Language = 'English') {
+  return `${shortDay(value, language)}, ${value.getFullYear()}`;
+}
+
+/** The words for each payment method. The stored value stays English, because the rules and the admin panel read it. */
+export const PAYMENT_METHOD_KEYS: Record<PaymentMethod, { label: MessageKey; detail: MessageKey }> = {
+  GCash: { label: 'pay.method.gcash', detail: 'pay.detail.gcash' },
+  Maya: { label: 'pay.method.maya', detail: 'pay.detail.maya' },
+  'Credit / Debit Card': { label: 'pay.method.card', detail: 'pay.detail.card' },
+  'Pay On-Site': { label: 'pay.method.onsite', detail: 'pay.detail.onsite' },
+};
+
+/** A stored payment method in the person's language; an unexpected value is shown as stored. */
+export function paymentMethodLabel(method: string, t: (key: MessageKey) => string) {
+  const keys = PAYMENT_METHOD_KEYS[method as PaymentMethod];
+  return keys ? t(keys.label) : method;
 }
 
 // Merges a calendar day (from the date picker, time defaults to midnight)

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { BookingHeader, BookingHeaderActions, bookingColors, combineDateAndTime, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
-import { CONCERN_LIMIT, createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
+import { BookingError, CONCERN_LIMIT, createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { isPastSlot, manilaToday } from '@/features/booking/manila-time';
 import { bookableSlots, subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
@@ -12,9 +12,12 @@ import { DEFAULT_BOOKING_WINDOW, isMorning, slotsFromRanges } from '@/features/d
 import { auth } from '@/firebase';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
+import { monthNames } from '@/i18n/translate';
 
 const EMPTY_BOOKED_TIMES: Set<string> = new Set();
-const weekDays = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+// Monday first, shown as two capital letters ("MO", or "LU" in Filipino).
+const WEEKDAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 function monthDays(month: Date) {
   const first = new Date(month.getFullYear(), month.getMonth(), 1);
@@ -27,6 +30,7 @@ export default function SelectDateTimeScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/booking/find-doctor');
   const { provider, selectedDate, selectedTime, selectDate, selectTime, fee, setBookingId } = useBooking();
+  const { t, language } = useT();
   const [month, setMonth] = useState(new Date());
   const days = useMemo(() => monthDays(month), [month]);
   // Philippine time (DECISIONS.md D26). `now` moves every minute so a slot greys out the moment it starts.
@@ -68,7 +72,7 @@ export default function SelectDateTimeScreen() {
   }, [bookedTimes, selectTime, selectedTime, selectedDate, now]);
   const noneLeftToday = Boolean(selectedDate) && times.length > 0 && times.every(isPast);
 
-  if (!provider) return <View style={ui.screen}><BookingHeader title="Select Date & Time" onBack={() => goBack()} /><Text style={styles.notice}>Choose a doctor first.</Text></View>;
+  if (!provider) return <View style={ui.screen}><BookingHeader title={t('booking.pickTitle')} onBack={() => goBack()} /><Text style={styles.notice}>{t('booking.chooseDoctorFirst')}</Text></View>;
 
   // The doctor has to accept before any money is discussed, so this only files
   // the request; the patient is prompted to pay once it is accepted.
@@ -77,12 +81,13 @@ export default function SelectDateTimeScreen() {
     setRequesting(true); setRequestError('');
     try {
       const patientId = auth.currentUser?.uid;
-      if (!patientId) throw new Error('You need to be signed in to book an appointment.');
+      if (!patientId) { setRequestError(t('booking.error.signedOut')); return; }
       const bookingId = await createBookingRequest(patientId, provider.id, combineDateAndTime(selectedDate, selectedTime), fee, concern);
       setBookingId(bookingId);
       router.replace({ pathname: '/booking/request-sent', params: { id: bookingId } });
     } catch (value) {
-      setRequestError(value instanceof Error ? value.message : 'Unable to send your request.');
+      // A known refusal is said in the person's language; anything else (offline, a refused write) gets one plain message.
+      setRequestError(value instanceof BookingError ? t(`booking.error.${value.code}`) : t('booking.error.generic'));
     } finally {
       setRequesting(false);
     }
@@ -91,11 +96,11 @@ export default function SelectDateTimeScreen() {
 
   return (
     <View style={ui.screen}>
-      <BookingHeader title="Select Date & Time" subtitle="Book your consultation slot" onBack={() => goBack()} actions={<BookingHeaderActions />} />
+      <BookingHeader title={t('booking.pickTitle')} subtitle={t('booking.pickSubtitle')} onBack={() => goBack()} actions={<BookingHeaderActions />} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={ui.card}>
-          <View style={styles.monthHeader}><Text style={styles.monthTitle}>{month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</Text><View style={styles.monthActions}><Pressable onPress={() => setMonthOffset(-1)}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={20} tintColor={bookingColors.muted} /></Pressable><Pressable onPress={() => setMonthOffset(1)}><SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={20} tintColor={bookingColors.muted} /></Pressable></View></View>
-          <View style={styles.weekRow}>{weekDays.map((day) => <Text key={day} style={styles.weekDay}>{day}</Text>)}</View>
+          <View style={styles.monthHeader}><Text style={styles.monthTitle}>{`${monthNames(language)[month.getMonth()]} ${month.getFullYear()}`}</Text><View style={styles.monthActions}><Pressable accessibilityRole="button" accessibilityLabel={t('booking.prevMonth')} hitSlop={8} onPress={() => setMonthOffset(-1)}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={20} tintColor={bookingColors.muted} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={t('booking.nextMonth')} hitSlop={8} onPress={() => setMonthOffset(1)}><SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={20} tintColor={bookingColors.muted} /></Pressable></View></View>
+          <View style={styles.weekRow}>{WEEKDAY_KEYS.map((day) => <Text key={day} style={styles.weekDay}>{t(`weekday.${day}`).slice(0, 2).toUpperCase()}</Text>)}</View>
           <View style={styles.calendar}>{days.map((day, index) => {
             const unavailable = !day || day < today || !isWorkingDay(day);
             return (
@@ -105,30 +110,30 @@ export default function SelectDateTimeScreen() {
             );
           })}</View>
         </View>
-        <Text style={ui.sectionTitle}>Available Time Slots</Text>
-        {noneLeftToday ? <Text style={styles.noSlots}>No more times today. Please pick another day.</Text> : null}
-        <Text style={styles.period}>MORNING</Text>
+        <Text style={ui.sectionTitle}>{t('booking.slots')}</Text>
+        {noneLeftToday ? <Text style={styles.noSlots}>{t('booking.noneToday')}</Text> : null}
+        <Text style={styles.period}>{t('booking.morning')}</Text>
         <View style={styles.timeGrid}>{morningTimes.map((time) => <TimeButton key={time} time={time} selected={selectedTime === time} taken={bookedTimes.has(time)} past={isPast(time)} onPress={() => selectTime(time)} />)}</View>
-        {morningTimes.length === 0 ? <Text style={styles.noSlots}>No morning slots offered.</Text> : null}
-        <Text style={styles.period}>AFTERNOON</Text>
+        {morningTimes.length === 0 ? <Text style={styles.noSlots}>{t('booking.noMorning')}</Text> : null}
+        <Text style={styles.period}>{t('booking.afternoon')}</Text>
         <View style={styles.timeGrid}>{afternoonTimes.map((time) => <TimeButton key={time} time={time} selected={selectedTime === time} taken={bookedTimes.has(time)} past={isPast(time)} onPress={() => selectTime(time)} />)}</View>
-        {afternoonTimes.length === 0 ? <Text style={styles.noSlots}>No afternoon slots offered.</Text> : null}
-        <View style={styles.summary}><View><Text style={styles.summaryLabel}>SELECTED SLOT</Text><Text style={styles.summaryValue}>{selectedDate && selectedTime ? `${formatDate(selectedDate)} • ${selectedTime}` : 'Select a date and time'}</Text></View><View><Text style={styles.summaryLabel}>TOTAL FEE</Text><Text style={styles.summaryValue}>{formatFee(fee)}</Text></View></View>
-        <Text style={ui.sectionTitle}>What would you like to discuss?</Text>
+        {afternoonTimes.length === 0 ? <Text style={styles.noSlots}>{t('booking.noAfternoon')}</Text> : null}
+        <View style={styles.summary}><View><Text style={styles.summaryLabel}>{t('booking.selectedSlot')}</Text><Text style={styles.summaryValue}>{selectedDate && selectedTime ? `${formatDate(selectedDate, language)} • ${selectedTime}` : t('booking.selectSlot')}</Text></View><View><Text style={styles.summaryLabel}>{t('booking.totalFee')}</Text><Text style={styles.summaryValue}>{formatFee(fee)}</Text></View></View>
+        <Text style={ui.sectionTitle}>{t('booking.concernTitle')}</Text>
         <TextInput
-          accessibilityLabel="What would you like to discuss? (optional)"
+          accessibilityLabel={t('booking.concernLabel')}
           value={concern}
           onChangeText={setConcern}
-          placeholder="Optional. For example: spikes after breakfast, feeling tired."
+          placeholder={t('booking.concernPlaceholder')}
           placeholderTextColor="#94A3B8"
           style={styles.concern}
           multiline
           maxLength={CONCERN_LIMIT}
         />
-        <Text style={styles.concernCount}>{concern.length}/{CONCERN_LIMIT} · Shared with your doctor.</Text>
+        <Text style={styles.concernCount}>{t('booking.concernCount', { count: concern.length, limit: CONCERN_LIMIT })}</Text>
         {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
-        <PrimaryButton title="Request Appointment" onPress={requestAppointment} disabled={!selectedDate || !selectedTime} loading={requesting} />
-        <Text style={styles.requestHint}>Your doctor reviews the request first. You will choose how to pay once it is accepted.</Text>
+        <PrimaryButton title={t('booking.request')} onPress={requestAppointment} disabled={!selectedDate || !selectedTime} loading={requesting} />
+        <Text style={styles.requestHint}>{t('booking.requestHint')}</Text>
       </ScrollView>
     </View>
   );
@@ -136,9 +141,10 @@ export default function SelectDateTimeScreen() {
 
 // A slot that is taken, or has already started (D26), is shown greyed out and cannot be picked.
 function TimeButton({ time, selected, taken, past, onPress }: { time: string; selected: boolean; taken: boolean; past: boolean; onPress: () => void }) {
+  const { t } = useT();
   const off = taken || past;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={past ? `${time}, already passed` : taken ? `${time}, taken` : time} accessibilityState={{ disabled: off, selected }} disabled={off} onPress={onPress} style={[styles.timeButton, selected && styles.selectedTime, off && styles.takenTime]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={past ? t('booking.slotPassed', { time }) : taken ? t('booking.slotTaken', { time }) : time} accessibilityState={{ disabled: off, selected }} disabled={off} onPress={onPress} style={[styles.timeButton, selected && styles.selectedTime, off && styles.takenTime]}>
       <Text style={[styles.timeText, selected && styles.selectedTimeText, off && styles.takenTimeText]}>{time}</Text>
     </Pressable>
   );

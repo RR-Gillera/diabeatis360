@@ -74,17 +74,26 @@ const careLinkIdFor = (providerId: string, patientId: string) => `${providerId}_
 /** The longest concern a patient can send with a request (the rules refuse anything longer). */
 export const CONCERN_LIMIT = 300;
 
+/** Why a booking request was refused. The code lets the screen say it in the person's language (D33). */
+export class BookingError extends Error {
+  code: 'past' | 'guardian' | 'taken' | 'takenOrUnconfirmed';
+  constructor(code: BookingError['code'], message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 export async function createBookingRequest(patientId: string, providerId: string, selectedDate: Date, fee: number, concern = '') {
   // A time that has already started cannot be booked (DECISIONS.md D26). firestore.rules checks the same thing against
   // the server's clock; this is the friendly message for a phone whose clock is right.
-  if (selectedDate.getTime() <= Date.now()) throw new Error('That time has already passed. Please pick a later time.');
+  if (selectedDate.getTime() <= Date.now()) throw new BookingError('past', 'That time has already passed. Please pick a later time.');
   // A pediatric account (DECISIONS.md D16) may not book a consultation until an admin approves the guardian
   // verification. firestore.rules enforces the same rule; this is only the friendly message before that.
   const patientSnapshot = await getDoc(doc(db, 'Users', patientId));
   if (patientSnapshot.data()?.account_type === 'minor') {
     const guardianSnapshot = await getDoc(doc(db, 'Guardian_Verifications', patientId));
     if (guardianSnapshot.data()?.verification_status !== 'approved') {
-      throw new Error('This account needs guardian verification to be approved before booking a consultation. An admin is reviewing it, or you can resubmit it from Profile if it was rejected.');
+      throw new BookingError('guardian', 'This account needs guardian verification to be approved before booking a consultation. An admin is reviewing it, or you can resubmit it from Profile if it was rejected.');
     }
   }
 
@@ -111,7 +120,7 @@ export async function createBookingRequest(patientId: string, providerId: string
     await runTransaction(db, async (transaction) => {
       // Other people's bookings are private, so "is it free?" is answered by the slot, not by reading the booking.
       const slot = await transaction.get(slotReference);
-      if (slot.exists() && slot.data().active === true) throw new Error(taken);
+      if (slot.exists() && slot.data().active === true) throw new BookingError('taken', taken);
       transaction.set(reference, record);
       transaction.set(slotReference, { provider_id: providerId, scheduled_at: scheduledAt, booking_id: reference.id, active: true });
       transaction.set(linkReference, { provider_id: providerId, patient_id: patientId, booking_id: reference.id, updated_at: serverTimestamp() });
@@ -119,7 +128,7 @@ export async function createBookingRequest(patientId: string, providerId: string
   } catch (error) {
     // Losing a race for the slot, or an email that is not confirmed yet, both come back from the rules as "denied".
     if (typeof error === 'object' && error && (error as { code?: string }).code === 'permission-denied') {
-      throw new Error(`${taken} (If this keeps happening, check that your email address is confirmed.)`);
+      throw new BookingError('takenOrUnconfirmed', `${taken} (If this keeps happening, check that your email address is confirmed.)`);
     }
     throw error;
   }

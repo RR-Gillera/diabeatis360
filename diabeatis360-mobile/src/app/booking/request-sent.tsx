@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { useBooking } from '@/features/booking/booking-context';
+import { useT } from '@/i18n/language-context';
 
 // Shown straight after a booking request is filed. Deliberately NOT a payment
 // confirmation — nothing has been charged yet, and saying so plainly is the
@@ -12,6 +13,7 @@ export default function RequestSentScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { provider, selectedDate, selectedTime, fee } = useBooking();
+  const { t, language } = useT();
 
   return (
     <View style={ui.screen}>
@@ -20,8 +22,8 @@ export default function RequestSentScreen() {
           <View style={styles.icon}>
             <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={30} tintColor={bookingColors.green} />
           </View>
-          <Text style={styles.title}>Request Sent!</Text>
-          <Text style={styles.subtitle}>Waiting for the doctor to accept your appointment.</Text>
+          <Text accessibilityRole="header" style={styles.title}>{t('booking.sent.title')}</Text>
+          <Text style={styles.subtitle}>{t('booking.sent.subtitle')}</Text>
         </View>
 
         {provider && selectedDate && selectedTime ? (
@@ -31,21 +33,21 @@ export default function RequestSentScreen() {
               <Text style={styles.doctorSpecialty}>{provider.specialty}</Text>
             </View>
             <View style={styles.row}>
-              <Text style={styles.label}>STATUS</Text>
-              <View style={styles.pendingBadge}><Text style={styles.pendingText}>Awaiting approval</Text></View>
+              <Text style={styles.label}>{t('booking.status')}</Text>
+              <View style={styles.pendingBadge}><Text style={styles.pendingText}>{t('booking.awaiting')}</Text></View>
             </View>
             {id ? (
               <View style={styles.row}>
-                <Text style={styles.label}>BOOKING ID</Text>
+                <Text style={styles.label}>{t('booking.id')}</Text>
                 <Text style={styles.bookingId} selectable>{id}</Text>
               </View>
             ) : null}
             <View style={styles.row}>
-              <Text style={styles.label}>REQUESTED SLOT</Text>
-              <Text style={styles.value}>{formatDate(selectedDate)} • {selectedTime}</Text>
+              <Text style={styles.label}>{t('booking.requestedSlot')}</Text>
+              <Text style={styles.value}>{formatDate(selectedDate, language)} • {selectedTime}</Text>
             </View>
             <View style={[styles.row, styles.totalRow]}>
-              <Text style={styles.totalLabel}>CONSULTATION FEE</Text>
+              <Text style={styles.totalLabel}>{t('booking.fee')}</Text>
               <Text style={styles.totalValue}>{formatFee(fee)}</Text>
             </View>
           </View>
@@ -53,14 +55,12 @@ export default function RequestSentScreen() {
 
         <View style={styles.nextSteps}>
           <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={15} tintColor={bookingColors.green} />
-          <Text style={styles.nextStepsText}>
-            You have not been charged. Once the doctor accepts, you can pay online or choose to pay on-site at the clinic.
-          </Text>
+          <Text style={styles.nextStepsText}>{t('booking.sent.next')}</Text>
         </View>
       </ScrollView>
 
       <View style={styles.button}>
-        <PrimaryButton title="View Appointment" onPress={() => router.replace({ pathname: '/booking/appointment', params: { id: id ?? '' } })} />
+        <PrimaryButton title={t('booking.viewAppointment')} onPress={() => router.replace({ pathname: '/booking/appointment', params: { id: id ?? '' } })} />
       </View>
     </View>
   );

@@ -11,20 +11,23 @@ import { subscribeToBookableProviders } from '@/features/booking/booking-service
 import { useBooking } from '@/features/booking/booking-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { NotificationBell } from '@/features/notifications/notification-bell';
+import { useT } from '@/i18n/language-context';
 import type { Provider } from '@/features/booking/types';
 
-const filters = ['All', 'Endocrinologist', 'Diabetologist', 'Nutritionist'];
+// The filter values match the specialty the doctor saved (English); only the chip text is translated.
+const filters = ['All', 'Endocrinologist', 'Diabetologist', 'Nutritionist'] as const;
 
 export default function FindDoctorScreen() {
   const router = useRouter();
   const { uid } = useAuth();
   const { selectProvider } = useBooking();
+  const { t } = useT();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
-  const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useEffect(() => subscribeToBookableProviders(setProviders, (value) => setError(value.message)), []);
+  useEffect(() => subscribeToBookableProviders(setProviders, () => setLoadFailed(true)), []);
 
   const visibleProviders = useMemo(() => providers.filter((provider) => {
     const matchesSearch = `${provider.fullName} ${provider.specialty} ${provider.city}`.toLowerCase().includes(search.toLowerCase());
@@ -40,8 +43,8 @@ export default function FindDoctorScreen() {
     <View style={styles.screen}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>Find a Doctor</Text>
-          <Text style={styles.subtitle}>Consult with diabetes experts</Text>
+          <Text accessibilityRole="header" style={styles.title}>{t('doctors.title')}</Text>
+          <Text style={styles.subtitle}>{t('doctors.subtitle')}</Text>
         </View>
         <View style={styles.headerActions}>
           <NotificationBell style={styles.headerButton} />
@@ -52,38 +55,38 @@ export default function FindDoctorScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.searchBox}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} tintColor={bookingColors.navy} />
-          <TextInput value={search} onChangeText={setSearch} placeholder="Search for a medical professional..." placeholderTextColor="#8796AD" style={styles.searchInput} />
+          <TextInput value={search} onChangeText={setSearch} accessibilityLabel={t('doctors.search')} placeholder={t('doctors.search')} placeholderTextColor="#8796AD" style={styles.searchInput} />
         </View>
         <FlatList horizontal showsHorizontalScrollIndicator={false} data={filters} keyExtractor={(item) => item} contentContainerStyle={styles.filters} renderItem={({ item }) => (
-          <Pressable onPress={() => setFilter(item)} style={[styles.filter, filter === item && styles.activeFilter]}>
-            <Text style={[styles.filterText, filter === item && styles.activeFilterText]}>{item}</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: filter === item }} onPress={() => setFilter(item)} style={[styles.filter, filter === item && styles.activeFilter]}>
+            <Text style={[styles.filterText, filter === item && styles.activeFilterText]}>{t(`doctors.filter.${item}`)}</Text>
           </Pressable>
         )} />
         <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>Your Appointments</Text>
+          <Text style={styles.sectionTitle}>{t('doctors.yourAppointments')}</Text>
           <AppointmentHistoryList patientId={uid} />
         </View>
 
-        <Text style={styles.sectionTitle}>All Doctors</Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {!error && visibleProviders.length === 0 ? <Text style={styles.empty}>No providers match your search.</Text> : null}
+        <Text style={styles.sectionTitle}>{t('doctors.all')}</Text>
+        {loadFailed ? <Text style={styles.error}>{t('doctors.loadFailed')}</Text> : null}
+        {!loadFailed && visibleProviders.length === 0 ? <Text style={styles.empty}>{t('doctors.none')}</Text> : null}
         {visibleProviders.map((provider) => (
           <View key={provider.id} style={ui.card}>
             <View style={styles.doctorTop}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{provider.fullName.split(' ').map((part) => part[0]).slice(0, 2).join('')}</Text></View>
               <View style={styles.doctorCopy}>
                 <Text style={styles.doctorName}>{provider.fullName}</Text>
-                <Text style={styles.specialty}>{provider.specialty} <Text style={styles.experience}>• Experienced specialist</Text></Text>
-                {provider.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>✓ PRC LICENSE VERIFIED</Text></View> : null}
+                <Text style={styles.specialty}>{provider.specialty}</Text>
+                {provider.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>{t('doctors.verified')}</Text></View> : null}
               </View>
             </View>
             <View style={styles.detailsRow}>
-              <View><Text style={styles.label}>LOCATION</Text><Text style={styles.value}>📍 {provider.city}</Text></View>
-              <View><Text style={styles.label}>FEE</Text><Text style={styles.value}>{formatFee(provider.consultationFee)}</Text></View>
+              <View><Text style={styles.label}>{t('doctors.location')}</Text><Text style={styles.value}>📍 {provider.city}</Text></View>
+              <View><Text style={styles.label}>{t('doctors.fee')}</Text><Text style={styles.value}>{formatFee(provider.consultationFee)}</Text></View>
             </View>
             <View style={styles.actions}>
-              <Pressable style={styles.secondaryButton} onPress={() => choose(provider)}><Text style={styles.secondaryText}>View Profile</Text></Pressable>
-              <View style={styles.actionPrimary}><PrimaryButton title="Consult" onPress={() => choose(provider)} /></View>
+              <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => choose(provider)}><Text style={styles.secondaryText}>{t('doctors.viewProfile')}</Text></Pressable>
+              <View style={styles.actionPrimary}><PrimaryButton title={t('doctors.consult')} onPress={() => choose(provider)} /></View>
             </View>
           </View>
         ))}
@@ -118,7 +121,6 @@ const styles = StyleSheet.create({
   doctorCopy: { flex: 1, gap: 4 },
   doctorName: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' },
   specialty: { color: bookingColors.green, fontSize: 13, fontWeight: '700' },
-  experience: { color: bookingColors.muted, fontWeight: '500' },
   verified: { alignSelf: 'flex-start', backgroundColor: '#E6F6EF', borderRadius: 4, marginTop: 3, paddingHorizontal: 7, paddingVertical: 4 },
   verifiedText: { color: bookingColors.green, fontSize: 10, fontWeight: '800' },
   detailsRow: { borderBottomColor: bookingColors.border, borderBottomWidth: 1, borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, paddingVertical: 14 },
