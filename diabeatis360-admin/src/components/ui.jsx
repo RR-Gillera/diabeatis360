@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { CloseIcon, SearchIcon } from './icons'
 
-// Small shared building blocks so every admin page looks like one system (brand green #629C2C, rounded cards).
+// Small shared building blocks so every admin page looks like one system (brand green #4D7C22 for text and buttons, D37; rounded cards).
 // Matches FIGMA/ADMIN: white cards on a #F5F5F5 page, rounded-2xl/3xl corners, bold headings.
 
 export function Card({ className = '', children }) {

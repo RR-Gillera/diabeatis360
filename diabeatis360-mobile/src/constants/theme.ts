@@ -72,7 +72,10 @@ export const MaxContentWidth = 800;
  */
 export const Brand = {
   colors: {
-    primary: '#629C2C',
+    // Text and buttons (DECISIONS D37): #4D7C22 is 4.98:1 on white, so it passes WCAG AA; Figma's #629C2C is 3.33:1.
+    primary: '#4D7C22',
+    // Figma's green, only for large shapes without text (chart lines, the floating buttons), which need 3:1.
+    primaryBright: '#629C2C',
     primaryTint: 'rgba(220, 242, 169, 0.2)',
     text: '#111827',
     textMuted: '#6B7280',

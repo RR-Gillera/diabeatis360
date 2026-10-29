@@ -226,7 +226,8 @@ export const fil: Record<MessageKey, string> = {
   'auth.error.passwordsDiffer': 'Hindi magkatugma ang mga password mo.',
   'auth.error.acceptTerms': 'Pakitanggap ang Mga Tuntunin ng Serbisyo at Patakaran sa Privacy para magpatuloy.',
   'auth.error.emailInUse': 'May account na gamit ang email na ito. Mag-login na lang (kung hindi mo pa nakukumpirma ang email mo, dadalhin ka namin sa hakbang na iyon).',
-  'auth.error.weakPassword': 'Gumamit ng mas matibay na password na may hindi bababa sa anim na character.',
+  'auth.error.weakPassword': 'Gumamit ng mas matibay na password na may hindi bababa sa 8 character.',
+  'auth.error.passwordShort': 'Gumamit ng hindi bababa sa {min} na character para sa password mo.',
   'auth.error.register': 'Hindi namin magawa ang account mo. Pakisubukang muli.',
 
   // ---- email confirmation, password reset, Google / Facebook
@@ -902,7 +903,7 @@ export const fil: Record<MessageKey, string> = {
   'doctor.stat.completed': 'TAPOS NA',
   'doctor.stat.earnings': 'KABUUANG KITA',
   'doctor.new': 'Bago',
-  'doctor.earningsNote': 'Kita: ang naitalang singil sa mga konsultasyong bayad na, bawas ang {rate}% na komisyon ng platform. Demo lang ang pagbabayad.',
+  'doctor.earningsNote': 'Kita: ang naitalang singil sa mga konsultasyong binayaran online, bawas ang {rate}% na komisyon ng platform. Hindi kasama ang mga bayad sa klinika, na direktang napupunta sa iyo. Demo lang ang pagbabayad.',
   'doctor.upcoming': 'Susunod na Appointment',
   'doctor.diabetesConsultation': 'Konsultasyon sa diabetes',
   'doctor.today': 'Ngayon',

@@ -50,7 +50,7 @@ To find a passage in Word, press Ctrl+F and paste the quoted words.
   - Figure 56 (the diagram itself) probably still shows Express and FCM, so check the image.
 
 - [ ] **A6. Business model** (D3, D5)
-  - "Diabeatis360 earns 15 to 20 percent commission": the build uses a fixed **15%**, stored on each booking as `platform_commission`.
+  - "Diabeatis360 earns 15 to 20 percent commission": the build uses a fixed **15%**, stored on each booking as `platform_commission`. The commission is counted only on consultations **paid through the app**; an on-site payment goes to the doctor at the clinic and earns the platform nothing (D37).
   - Premium "…full gamification, priority appointment booking, and advanced AI health reports": Premium in the build means unlimited AI recommendations and unlimited label scans, the only two limits enforced. There is no priority booking and no advanced report, and gamification is the same on both plans.
   - **Edit:** list only what exists, or mark the other items as planned.
   - Premium "full unlimited access" / "unlimited nutrition label scanning, unlimited AI meal and exercise recommendations" (D20): **unlimited for normal use, with a server-enforced fair-use ceiling of 30 AI generations and 30 label scans per person per day** (it only stops a stuck loop or a script on one account), and a daily cap on Gemini requests for the whole system because the free Gemini quota is shared. The Free limits (3 scans and 2 generations a day) are unchanged and are now enforced so that simultaneous requests cannot exceed them.
@@ -184,6 +184,7 @@ Say once, above Table 6: the dictionary uses SQL types, but in Firestore each "P
   - The product health-rating cut-offs and the display reference values are rule-based and still need adviser or dietitian confirmation (`functions/lib/rating.js`, `constants/nutrition.ts`).
   - A blood sugar reading added without internet shows at once and is saved when the connection returns, as long as the app stays open (D35).
   - Each role sees only its own screens: a patient cannot open the doctor screens and a doctor cannot open the patient-only ones (D35); the database rules enforce what each may read or write.
+  - Passwords need at least 8 characters (D37).
   - The app is in English and Filipino (D33), but the Privacy Policy and Terms of Service, the admin panel, notification messages written by another person's app, and food and product names stay in English.
 
 - [ ] **E4. Safety design, worth stating because it is built:** a critical reading (below 54 mg/dL, or 250 mg/dL and above) blocks AI suggestions and shows "contact your doctor / seek emergency care"; every AI screen shows a disclaimer; every AI prompt carries the diabetes type and declared allergies, and the output is filtered for those allergens; the AI is told never to diagnose, change medication or give insulin doses.
@@ -197,6 +198,8 @@ Say once, above Table 6: the dictionary uses SQL types, but in Firestore each "P
 - [ ] **E8. Sign-in methods and the storyboard (D7, D23).** The system offers email and password, Google and Facebook. Apple was never built: Figma frames 25:2528 and 25:99 show an Apple button, and the build has Facebook there. Press Ctrl+F for "Apple" and for "Google" in the .docx: change "Apple" to "Facebook" in any storyboard caption or text, and describe Google and Facebook sign-in once in the Technology Stack (Google and Meta as sign-in providers, reached through Firebase Authentication) and in the privacy paragraph (E2). **[ADVISER]** The adviser credits a module only when it matches its frame (D17), so mention the Facebook-for-Apple swap when you show the Login screen.
 
 - [ ] **E9. Language (D33).** The mobile app is bilingual: every patient and doctor screen follows the language chosen in setup or in Profile > Language, and the AI answers in it too. Say this wherever the manuscript describes the language step ("Content will adapt" is now true). Suggested test row under **Update Health Profile**: "the patient changes the language to Filipino; every screen, the reminders and the AI answers switch to Filipino; the stored health values stay the same." What stays English is listed in E3.
+
+- [ ] **E10. Accessibility (D35, D37).** Worth stating because it is built: text and buttons meet WCAG 2.1 AA contrast (the build uses #4D7C22 instead of the frames' #629C2C, which is 3.33:1); buttons, tabs, switches and the camera controls have screen-reader labels; "Remove animations" on the phone turns the screen slides off; tab and stat labels stay readable at the largest system text size.
 
 ---
 

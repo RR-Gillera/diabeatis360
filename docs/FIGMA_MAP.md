@@ -13,7 +13,7 @@ returned React+Tailwind into this project's React Native components/theme. Never
 (`div`, `className` on non-NativeWind views, absolute pixel positions) straight into RN.
 
 ## Design tokens (read from the Dashboard frame)
-primary `#629C2C` · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` · muted `#6B7280`
+primary `#629C2C` in the frames; **in the build text and buttons use `#4D7C22`** (WCAG AA, DECISIONS D37) and `#629C2C` stays for charts and the floating buttons · status-pill tint `rgba(220,242,169,0.2)` · text `#111827` · muted `#6B7280`
 · screen bg `#F5F5F5` · card `#FFFFFF`, border `#F9FAFB`, radius 32 · button radius 16, height 64
 · font Inter (Medium 14 uppercase labels, ExtraBold 72 for big readings, Bold 18 buttons).
 

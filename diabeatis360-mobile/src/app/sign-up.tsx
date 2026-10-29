@@ -8,13 +8,14 @@ import type { SocialProvider } from '@/features/auth/social-types';
 import { useSocialSignIn } from '@/features/auth/use-social-sign-in';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
+import { PASSWORD_MIN_LENGTH } from '@/constants/account';
 
 export default function SignUpScreen() {
   const router = useRouter();
   const { t } = useT();
   const { signUp } = useAuth();
   const [fullName, setFullName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [terms, setTerms] = useState(false); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
-  const submit = async () => { if (!fullName.trim() || !email.trim() || !password || !confirm) { setError(t('auth.error.required')); return; } if (password !== confirm) { setError(t('auth.error.passwordsDiffer')); return; } if (!terms) { setError(t('auth.error.acceptTerms')); return; } setError(''); setLoading(true); try { const emailSent = await signUp(fullName, email, password); router.replace({ pathname: '/verify-email', params: { sent: emailSent ? '1' : '0' } } as never); } catch (value) { setError(t(registrationErrorKey(value))); } finally { setLoading(false); } };
+  const submit = async () => { if (!fullName.trim() || !email.trim() || !password || !confirm) { setError(t('auth.error.required')); return; } if (password !== confirm) { setError(t('auth.error.passwordsDiffer')); return; } if (password.length < PASSWORD_MIN_LENGTH) { setError(t('auth.error.passwordShort', { min: PASSWORD_MIN_LENGTH })); return; } if (!terms) { setError(t('auth.error.acceptTerms')); return; } setError(''); setLoading(true); try { const emailSent = await signUp(fullName, email, password); router.replace({ pathname: '/verify-email', params: { sent: emailSent ? '1' : '0' } } as never); } catch (value) { setError(t(registrationErrorKey(value))); } finally { setLoading(false); } };
   // The Google and Facebook buttons (DECISIONS.md D23; Facebook replaced Apple on 2026-10-17). A first-time Google/Facebook
   // sign-in creates the account, so this is "sign up" too; it needs the same agreement to the terms as the form above.
   const social = useSocialSignIn(setError);

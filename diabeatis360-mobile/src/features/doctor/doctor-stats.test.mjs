@@ -13,7 +13,7 @@ test('requests are split like the frame; finished ones belong to History', () =>
   assert.equal(requestTabFor('completed'), null);
 });
 
-test('dashboard counts and earnings (fee minus the 15% commission, paid or on-site finished consultations only)', () => {
+test('dashboard counts and earnings (fee minus the 15% commission, finished consultations paid online only, D37)', () => {
   const now = new Date(2026, 9, 24, 9, 0);
   const at = (day, hour) => new Date(2026, 9, day, hour, 0);
   const bookings = [
@@ -29,7 +29,7 @@ test('dashboard counts and earnings (fee minus the 15% commission, paid or on-si
   assert.equal(stats.today, 2, 'confirmed or completed today; pending and declined do not count');
   assert.equal(stats.pending, 2);
   assert.equal(stats.completed, 3);
-  assert.equal(stats.earnings, 425 + 680, 'unpaid finished consultations earn nothing yet');
+  assert.equal(stats.earnings, 680, 'only the finished consultation paid online counts; on-site (paid at the clinic) and unpaid ones do not');
 });
 
 test('age from a birthdate, counting whether the birthday has passed this year', () => {

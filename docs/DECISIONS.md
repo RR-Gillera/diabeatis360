@@ -58,6 +58,7 @@ never rewrites past revenue. The security rule checks that `platform_commission 
 = sum of `platform_commission` over `completed` bookings. (`payment_status` codes are `unpaid | paid | onsite`
 per D6, not "Paid (demo)".)
 **Manuscript:** state the 15% rate (it currently says 15–20%) and add `platform_commission` to Bookings.
+**Amended 2026-10-29 (D37):** revenue counts only completed bookings **paid online**; on-site payments earn no commission.
 Original proposal: mocked payment, `platform_commission = fee × 0.15`, "choose one rate and state it".
 
 ### D4 — Blood sugar interpretation thresholds — CLOSED 2026-09-25: adopted as proposed
@@ -586,3 +587,11 @@ A high-effort review of everything since D30 (`d3a2374..2700f18`) found 7 bugs a
 Also: the common allergy list comes from `COMMON_ALLERGIES` everywhere.
 **Checked:** unit 128 (122 pass, 6 skipped); mobile and admin lint; a browser run of the fixes on the emulators, 5/5 (TEST_LOG 2026-10-29).
 **Left for later (cleanups, no behaviour change):** the reading colours are defined in four screens (`readingColors` could serve them all); `notification-settings` has its own copy of `clockTime`; the reminder texts live both in `reminder-plan.ts` (used by its tests) and in `en.ts` (used on the phone); several screens listen to `Users/{uid}` separately and read the phone's stored answers one by one.
+
+### D37 — Paid-only revenue, an AA-contrast green, 8-character passwords, LiveKit for video — CLOSED 2026-10-29 (team choices in session, the open items of D35)
+1. **Revenue and earnings count only consultations paid online** (amends D3). An on-site fee is paid to the doctor at the clinic and never passes through the platform, so it earns no commission and is not "recorded" money. The doctor's Total Earnings and every admin revenue figure (Overview chart, Revenue page, Analytics weekly revenue, the appointments report) now use one rule: `status == 'completed' && payment_status == 'paid'` (`earnsCommission` in `diabeatis360-admin/src/lib/revenue.js`; `dashboardStats` in the app, tested). The doctor's note says on-site payments are not counted.
+2. **Green for text and buttons: #4D7C22** (4.98:1 on white, WCAG AA for normal text). Figma's #629C2C (3.33:1) stays only for large shapes without text, which need 3:1: the chart lines, points and area, the floating camera button and the Log tab's + button (`Brand.colors.primaryBright` / `homeColors.greenBright`). Admin: `--color-brand` is #4D7C22 (hover #3D641B); its charts keep #629C2C. A deliberate difference from the Figma frames, recorded in FIGMA_MAP.
+3. **Passwords need at least 8 characters** (`constants/account.ts`, checked on sign-up with a message). Firebase's own minimum is 6; the console's password policy (Authentication → Settings) can also enforce 8 on the server and on the reset page, if the team turns it on.
+4. **Video calls move to LiveKit's free plan** (replaces Daily.co in D27, which needs a credit card). A build plan is proposed to the team first (it changes the server endpoint and the call screen); until it is built, video calls stay as they are.
+**Checked:** unit 128 (122 pass, 6 skipped; the earnings test now expects paid-only); mobile and admin lint and build; a browser check on the emulators, 3/3 (sign-up refuses a 7-character password; the main button and the admin buttons are #4D7C22).
+**Manuscript:** the commission is earned only on consultations paid through the app; passwords have at least 8 characters; the design meets AA contrast (MANUSCRIPT_CHANGES).

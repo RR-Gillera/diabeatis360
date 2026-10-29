@@ -1,5 +1,6 @@
 import { toDate } from './format'
 import { bookingStatusLabels, commissionOf } from './labels'
+import { earnsCommission } from './revenue'
 
 // Pure functions that turn raw Firestore documents into chart data. No Firebase imports, so they are easy to test.
 
@@ -39,10 +40,10 @@ export function signupsByWeek(users, weeks) {
   return counts
 }
 
-/** Platform commission from COMPLETED consultations, per week of the appointment. */
+/** Platform commission from completed consultations paid online (D37), per week of the appointment. */
 export function revenueByWeek(bookings, weeks) {
   const totals = weeks.map((week) => ({ week: week.label, revenue: 0 }))
-  bookings.filter((booking) => booking.status === 'completed').forEach((booking) => {
+  bookings.filter(earnsCommission).forEach((booking) => {
     const index = bucketIndex(weeks, toDate(booking.scheduled_at))
     if (index >= 0) totals[index].revenue = Math.round((totals[index].revenue + commissionOf(booking)) * 100) / 100
   })

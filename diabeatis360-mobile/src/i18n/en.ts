@@ -226,7 +226,8 @@ export const en = {
   'auth.error.passwordsDiffer': 'Your passwords do not match.',
   'auth.error.acceptTerms': 'Please accept the Terms of Service and Privacy Policy to continue.',
   'auth.error.emailInUse': 'An account with this email already exists. Log in instead (if you have not confirmed your email yet, we will take you to that step).',
-  'auth.error.weakPassword': 'Use a stronger password with at least six characters.',
+  'auth.error.weakPassword': 'Use a stronger password with at least 8 characters.',
+  'auth.error.passwordShort': 'Use at least {min} characters for your password.',
   'auth.error.register': 'We could not create your account. Please try again.',
 
   // ---- email confirmation, password reset, Google / Facebook
@@ -902,7 +903,7 @@ export const en = {
   'doctor.stat.completed': 'COMPLETED',
   'doctor.stat.earnings': 'TOTAL EARNINGS',
   'doctor.new': 'New',
-  'doctor.earningsNote': 'Earnings: recorded fees of paid consultations, after the {rate}% platform commission. Payments are a demo.',
+  'doctor.earningsNote': 'Earnings: recorded fees of consultations paid online, after the {rate}% platform commission. On-site payments go to you at the clinic and are not counted. Payments are a demo.',
   'doctor.upcoming': 'Upcoming Appointment',
   'doctor.diabetesConsultation': 'Diabetes consultation',
   'doctor.today': 'Today',

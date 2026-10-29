@@ -149,3 +149,9 @@ Append newest at the bottom. Format:
 - **Files:** mobile `features/auth/{auth-context,use-health-profile}`, `app/onboarding/professional-info.tsx`, `features/booking/{types,booking-service}.ts`, `features/glucose/glucose-ui.tsx`, `app/health-profile/{edit,index}.tsx`, `app/language-settings.tsx`, `features/scanner/scan-result.tsx`, `app/doctor/patient/[id].tsx`; admin `pages/OverviewPage.jsx`.
 - **Verified:** unit 128 (122 pass, 6 skipped); lint clean; browser 5/5 on the emulators.
 - **Left for later:** the three cleanups listed in D36 (no behaviour change).
+
+## 2026-10-29 (later) — Claude Code — team choices applied (D37)
+- **Built:** revenue and doctor earnings count consultations paid online only (amends D3; one rule in the admin panel); text and buttons use #4D7C22 for WCAG AA, with Figma's green kept for charts and the floating buttons; sign-up needs 8-character passwords.
+- **Files:** mobile `constants/{theme,account}.ts`, `features/doctor/doctor-stats(.test)`, `features/home/home-ui.tsx`, `app/{glucose-log,sign-up}.tsx`, i18n; admin `index.css`, `lib/{revenue,analytics,reports,printHtml}.js`, `components/ui.jsx`.
+- **Verified:** unit 128 (122 pass, 6 skipped); lint and builds; browser 3/3 on the emulators.
+- **Next:** LiveKit replaces Daily for video (plan to be approved first); the phone re-test after the OTA update.
