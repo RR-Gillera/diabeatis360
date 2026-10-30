@@ -8,6 +8,7 @@ import { subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor
 import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 /** A sanity ceiling, so a typo such as an extra zero is caught before patients see it. */
 const MAX_FEE = 20000;
@@ -18,6 +19,7 @@ const MAX_FEE = 20000;
 export default function ConsultationFeeScreen() {
   const goBack = useSafeBack('/doctor/schedule');
   const { uid } = useAuth();
+  const { t } = useT();
   const [value, setValue] = useState('');
   const seeded = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -37,14 +39,14 @@ export default function ConsultationFeeScreen() {
   const save = async () => {
     const fee = Number(value.replace(/[^0-9.]/g, ''));
     if (!uid || saving) return;
-    if (!Number.isFinite(fee) || fee <= 0) { setError('Enter a fee above ₱0.'); return; }
-    if (fee > MAX_FEE) { setError(`That looks too high. The most this app accepts is ₱${MAX_FEE.toLocaleString('en-PH')}.`); return; }
+    if (!Number.isFinite(fee) || fee <= 0) { setError(t('doctor.fee.tooLow')); return; }
+    if (fee > MAX_FEE) { setError(t('doctor.fee.tooHigh', { max: `₱${MAX_FEE.toLocaleString('en-PH')}` })); return; }
     setSaving(true); setError(''); setMessage('');
     try {
       await updateDoctorProfile(uid, { consultationFee: Math.round(fee * 100) / 100 });
-      setMessage('Fee saved. New bookings use it; existing bookings keep the fee they were made with.');
+      setMessage(t('doctor.fee.saved'));
     } catch {
-      setError('We could not save the fee. Please try again.');
+      setError(t('doctor.fee.failed'));
     } finally {
       setSaving(false);
     }
@@ -52,14 +54,14 @@ export default function ConsultationFeeScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Set Consultation Fee" onBack={() => goBack()} />
+      <DoctorHeader title={t('doctor.fee.title')} onBack={() => goBack()} />
       <View style={styles.body}>
-        <Text style={styles.intro}>Set your standard rate for consultations. You can update this fee at any time.</Text>
-        <Text style={styles.label}>Consultation Fee</Text>
+        <Text style={styles.intro}>{t('doctor.fee.intro')}</Text>
+        <Text style={styles.label}>{t('pay.title')}</Text>
         <View style={styles.inputWrap}>
           <Text style={styles.peso}>₱</Text>
           <TextInput
-            accessibilityLabel="Consultation fee in pesos"
+            accessibilityLabel={t('doctor.fee.inputLabel')}
             value={value}
             onChangeText={(text) => { setValue(text); setMessage(''); }}
             keyboardType="decimal-pad"
@@ -73,7 +75,7 @@ export default function ConsultationFeeScreen() {
         {message ? <Text style={styles.success}>{message}</Text> : null}
       </View>
       <Pressable accessibilityRole="button" style={[styles.save, saving && styles.disabled]} disabled={saving} onPress={save}>
-        <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save Fee'}</Text>
+        <Text style={styles.saveText}>{saving ? t('common.saving') : t('doctor.fee.save')}</Text>
       </Pressable>
     </View>
   );

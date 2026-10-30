@@ -6,7 +6,7 @@ export const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (ch
 
 export const printStyles = `
   body { font-family: Inter, Arial, sans-serif; color: #1a1a1a; max-width: 900px; margin: 40px auto; padding: 0 24px; }
-  h1 { color: #629c2c; margin: 0 0 4px; } p.sub { color: #6b7280; margin: 0 0 24px; }
+  h1 { color: #4d7c22; margin: 0 0 4px; } p.sub { color: #6b7280; margin: 0 0 24px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; } th, td { padding: 8px 6px; border-bottom: 1px solid #e5e7eb; text-align: left; }
   th { color: #6b7280; font-size: 11px; text-transform: uppercase; }
   .tiles { display: flex; gap: 12px; margin-bottom: 20px; } .tile { flex: 1; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }

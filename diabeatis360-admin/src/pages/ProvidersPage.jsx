@@ -37,15 +37,18 @@ export default function ProvidersPage() {
     return counts
   }, [bookings.data])
 
+  // Three kinds: verified; pending (waiting for an admin); rejected (waiting for the doctor to correct and resubmit).
+  const kindOf = (doctor) => (doctor.is_verified ? 'verified' : doctor.rejection_reason ? 'rejected' : 'pending')
   const counts = useMemo(() => ({
-    verified: doctors.filter((doctor) => doctor.is_verified).length,
-    pending: doctors.filter((doctor) => !doctor.is_verified).length,
+    verified: doctors.filter((doctor) => kindOf(doctor) === 'verified').length,
+    pending: doctors.filter((doctor) => kindOf(doctor) === 'pending').length,
+    rejected: doctors.filter((doctor) => kindOf(doctor) === 'rejected').length,
   }), [doctors])
 
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return doctors
-      .filter((doctor) => (tab === 'verified' ? doctor.is_verified : !doctor.is_verified))
+      .filter((doctor) => kindOf(doctor) === tab)
       .filter((doctor) => !needle || [doctor.full_name, doctor.specialty, doctor.prc_license_number, doctor.city]
         .some((field) => String(field ?? '').toLowerCase().includes(needle)))
       .sort((a, b) => String(a.full_name ?? '').localeCompare(String(b.full_name ?? '')))
@@ -105,7 +108,7 @@ export default function ProvidersPage() {
       header: 'Status',
       render: (d) => (
         <div className="flex flex-wrap gap-1">
-          <StatusBadge tone={d.is_verified ? 'success' : 'warning'}>{d.is_verified ? 'Verified' : 'Pending'}</StatusBadge>
+          <StatusBadge tone={d.is_verified ? 'success' : d.rejection_reason ? 'danger' : 'warning'}>{d.is_verified ? 'Verified' : d.rejection_reason ? 'Rejected' : 'Pending'}</StatusBadge>
           {d.is_active === false ? <StatusBadge tone="danger">Inactive</StatusBadge> : null}
         </div>
       ),
@@ -130,10 +133,11 @@ export default function ProvidersPage() {
         options={[
           { value: 'verified', label: 'Verified' },
           { value: 'pending', label: 'Pending Approval', count: counts.pending },
+          { value: 'rejected', label: 'Rejected', count: counts.rejected },
         ]}
       />
       <SearchInput className="mb-4 max-w-md" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search providers by name, specialty, or license…" />
-      <DataTable columns={columns} rows={rows} pageSize={10} empty={tab === 'pending' ? 'No providers are waiting for approval.' : 'No verified providers yet.'} />
+      <DataTable columns={columns} rows={rows} pageSize={10} empty={tab === 'pending' ? 'No providers are waiting for approval.' : tab === 'rejected' ? 'No rejected providers are waiting to resubmit.' : 'No verified providers yet.'} />
 
       {/* FIGMA/ADMIN "Doctor Credential Verification" modal */}
       <Modal open={Boolean(selected)} onClose={() => setSelected(null)} title="Doctor Credential Verification" maxWidth="max-w-2xl">

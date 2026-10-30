@@ -11,9 +11,12 @@ import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { answerCall, endCall, fetchDisplayName, markMissed, RING_TIMEOUT_MS, startCall, subscribeToCall, type CallRecord } from '@/features/calls/call-service';
 import { CallFrame } from '@/features/calls/call-frame';
+import { CallError } from '@/features/calls/join-error';
 import { ensureCallPermissions, requestCallUrl } from '@/features/calls/video-room';
 import { callClock } from '@/features/consultation/consultation-format';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
+import { shortDay } from '@/i18n/translate';
 
 // The video call screen (DECISIONS.md D11; Figma P-26 to P-29, D-08 to D-10). Both people are here once the call is
 // accepted. What is shown depends only on the Calls/{bookingId} document, so both phones always agree:
@@ -24,6 +27,7 @@ export default function VideoCallScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { uid, displayName, role } = useAuth();
+  const { t, language } = useT();
   // The call fills the whole screen, under the status bar too; the name and timer start below it (screen-top.ts).
   const { top: statusBarHeight } = useSafeAreaInsets();
   const isDoctor = role === 'doctor';
@@ -54,12 +58,12 @@ export default function VideoCallScreen() {
   useEffect(() => {
     if (!id || !activeRoom) return;
     let cancelled = false;
-    requestCallUrl(id).then(
+    requestCallUrl(id, language).then(
       (url) => { if (!cancelled) setJoined({ room: activeRoom, url }); },
-      (value) => { if (!cancelled) setJoined({ room: activeRoom, error: value instanceof Error ? value.message : 'We could not open the video room.' }); },
+      (value) => { if (!cancelled) setJoined({ room: activeRoom, error: value instanceof CallError ? value.message : t('call.error.room') }); },
     );
     return () => { cancelled = true; };
-  }, [id, activeRoom, attempt]);
+  }, [id, activeRoom, attempt, language, t]);
   const room = joined && joined.room === activeRoom ? joined : null;
 
   useEffect(() => {
@@ -69,9 +73,11 @@ export default function VideoCallScreen() {
     return () => { cancelled = true; };
   }, [otherId]);
 
-  // The running clock while connected, and the final length once it ends.
+  // The running clock while connected, and the final length once it ends. It starts when the room has opened, not at
+  // "accept", so "Connecting…" and a room that could not open never count as call time (QA F-VC-TIMER).
+  const roomOpen = Boolean(room?.url);
   useEffect(() => {
-    if (status === 'accepted') {
+    if (status === 'accepted' && roomOpen) {
       if (connectedAt.current === null) connectedAt.current = Date.now();
       const timer = setInterval(() => setElapsed((Date.now() - (connectedAt.current ?? Date.now())) / 1000), 1000);
       return () => clearInterval(timer);
@@ -81,7 +87,7 @@ export default function VideoCallScreen() {
       connectedAt.current = null;
       setLasted(seconds);
     }
-  }, [status]);
+  }, [status, roomOpen]);
 
   // The caller gives up after RING_TIMEOUT_MS: the call is marked missed and the other person is left a note.
   useEffect(() => {
@@ -95,18 +101,18 @@ export default function VideoCallScreen() {
 
   const hangUp = async () => {
     if (!id) return;
-    try { await endCall(id); } catch { setError('We could not end the call. Please try again.'); }
+    try { await endCall(id); } catch { setError(t('call.error.end')); }
   };
 
   const respond = async (accept: boolean) => {
     if (!id) return;
     setError('');
     try {
-      if (accept) await ensureCallPermissions(); // before answering: the call frame needs them (video-room.ts)
+      if (accept) await ensureCallPermissions(language); // before answering: the call frame needs them (video-room.ts)
       await answerCall(id, accept);
       if (!accept) goBack();
     } catch (value) {
-      setError(accept && value instanceof Error ? value.message : 'We could not answer the call.');
+      setError(accept && value instanceof CallError ? value.message : t('call.error.answer'));
     }
   };
 
@@ -114,10 +120,10 @@ export default function VideoCallScreen() {
     if (!id || !uid) return;
     setError(''); setLasted(null);
     try {
-      await ensureCallPermissions();
-      await startCall(id, uid);
+      await ensureCallPermissions(language);
+      await startCall(id, uid, language);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'We could not start the call.');
+      setError(value instanceof CallError ? value.message : t('call.error.start'));
     }
   };
 
@@ -137,13 +143,13 @@ export default function VideoCallScreen() {
   if (!call) {
     return (
       <View style={[styles.light, styles.center]}>
-        <AppText weight="bold" style={styles.endTitle}>No call in progress</AppText>
-        <PrimaryButton title="Back" onPress={() => goBack()} style={styles.button} />
+        <AppText weight="bold" style={styles.endTitle}>{t('call.none')}</AppText>
+        <PrimaryButton title={t('common.back')} onPress={() => goBack()} style={styles.button} />
       </View>
     );
   }
 
-  const name = otherName || (isDoctor ? 'Your patient' : 'Your doctor');
+  const name = otherName || (isDoctor ? t('call.fallbackPatient') : t('call.fallbackDoctor'));
 
   if (call.status === 'accepted') {
     return (
@@ -152,29 +158,29 @@ export default function VideoCallScreen() {
           <CallFrame url={room.url} />
         ) : room?.error ? (
           <View style={[styles.center, styles.fill]}>
-            <AppText weight="extraBold" style={styles.title}>Couldn&apos;t open the video room</AppText>
+            <AppText weight="extraBold" style={styles.title}>{t('call.roomFailed')}</AppText>
             <AppText style={styles.text}>{room.error}</AppText>
             <View style={styles.stackWide}>
               <Pressable accessibilityRole="button" style={[styles.bigButton, styles.green]} onPress={retryJoin}>
-                <AppText weight="bold" style={styles.bigButtonText}>Try again</AppText>
+                <AppText weight="bold" style={styles.bigButtonText}>{t('call.tryAgain')}</AppText>
               </Pressable>
               <Pressable accessibilityRole="button" style={[styles.bigButton, styles.white]} onPress={messageInstead}>
-                <AppText weight="bold" style={styles.whiteText}>Message instead</AppText>
+                <AppText weight="bold" style={styles.whiteText}>{t('call.messageInstead')}</AppText>
               </Pressable>
             </View>
           </View>
         ) : (
           <View style={[styles.center, styles.fill]} accessibilityLiveRegion="polite">
             <ActivityIndicator color="#FFF" />
-            <AppText style={styles.text}>Connecting…</AppText>
+            <AppText style={styles.text}>{t('call.connecting')}</AppText>
           </View>
         )}
         <View style={[styles.topBar, { paddingTop: statusBarHeight + 12 }]} pointerEvents="box-none">
-          <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{otherName || 'Video call'}</AppText></View>
-          <View style={styles.timer}><View style={styles.timerDot} /><AppText weight="bold" style={styles.pillText}>{callClock(elapsed)}</AppText></View>
+          <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{otherName || t('call.videoCall')}</AppText></View>
+          {roomOpen ? <View style={styles.timer}><View style={styles.timerDot} /><AppText weight="bold" style={styles.pillText}>{callClock(elapsed)}</AppText></View> : null}
         </View>
         <View style={styles.bottomBar} pointerEvents="box-none">
-          <Pressable accessibilityRole="button" accessibilityLabel="End call" style={styles.endRound} onPress={hangUp}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('call.end')} style={styles.endRound} onPress={hangUp}>
             <SymbolView name={{ ios: 'phone.down.fill', android: 'call_end', web: 'call_end' }} size={26} tintColor="#FFF" />
           </Pressable>
         </View>
@@ -190,23 +196,23 @@ export default function VideoCallScreen() {
           <View style={styles.ringOuter}><View style={styles.ringInner}>
             <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{initialsOf(otherName)}</AppText></View>
           </View></View>
-          <AppText weight="extraBold" style={styles.title}>{isCaller ? `Calling ${name}…` : `${name} is calling`}</AppText>
-          <AppText style={styles.text}>{isCaller ? `Waiting for ${isDoctor ? 'the patient' : 'the doctor'} to join` : 'Video consultation'}</AppText>
+          <AppText weight="extraBold" style={styles.title}>{isCaller ? t('call.calling', { name }) : t('call.isCalling', { name })}</AppText>
+          <AppText style={styles.text}>{isCaller ? t(isDoctor ? 'call.waitPatient' : 'call.waitDoctor') : t('call.videoConsultation')}</AppText>
           {error ? <AppText style={styles.error}>{error}</AppText> : null}
         </View>
         {isCaller ? (
           <Pressable accessibilityRole="button" style={[styles.bigButton, styles.red]} onPress={hangUp}>
-            <AppText weight="bold" style={styles.bigButtonText}>Cancel</AppText>
+            <AppText weight="bold" style={styles.bigButtonText}>{t('common.cancel')}</AppText>
           </Pressable>
         ) : (
           <View style={styles.row}>
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.red, styles.half]} onPress={() => respond(false)}>
               <SymbolView name={{ ios: 'phone.down.fill', android: 'call_end', web: 'call_end' }} size={20} tintColor="#FFF" />
-              <AppText weight="bold" style={styles.bigButtonText}>Decline</AppText>
+              <AppText weight="bold" style={styles.bigButtonText}>{t('call.decline')}</AppText>
             </Pressable>
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.green, styles.half]} onPress={() => respond(true)}>
               <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={20} tintColor="#FFF" />
-              <AppText weight="bold" style={styles.bigButtonText}>Accept</AppText>
+              <AppText weight="bold" style={styles.bigButtonText}>{t('call.accept')}</AppText>
             </Pressable>
           </View>
         )}
@@ -217,14 +223,15 @@ export default function VideoCallScreen() {
   // declined / missed / ended (Figma P-29, D-10).
   const missedForMe = call.status === 'missed' && !isCaller;
   const when = call.createdAt ? call.createdAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
-  const day = (call.createdAt ?? new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const created = call.createdAt ?? new Date();
+  const day = `${shortDay(created, language)}, ${created.getFullYear()}`;
   const done = missedForMe
-    ? { title: 'Missed call', text: `${name} tried to reach you${when ? ` at ${when}` : ''}` }
+    ? { title: t('call.missedTitle'), text: when ? t('call.missedAt', { name, time: when }) : t('call.missed', { name }) }
     : call.status === 'missed'
-      ? { title: 'No answer', text: `${name} did not answer. They will see a missed-call note in their notifications.` }
+      ? { title: t('call.noAnswerTitle'), text: t('call.noAnswerText', { name }) }
       : call.status === 'declined'
-        ? { title: 'Call declined', text: `${name} declined the call. You can message them in the chat.` }
-        : { title: lasted !== null ? `Call ended ${callClock(lasted)}` : 'Call ended', text: `${name} · ${day}` };
+        ? { title: t('call.declinedTitle'), text: t('call.declinedText', { name }) }
+        : { title: lasted !== null ? t('call.endedAfter', { duration: callClock(lasted) }) : t('call.endedTitle'), text: `${name} · ${day}` };
   const red = call.status === 'missed' || call.status === 'declined';
 
   return (
@@ -241,19 +248,19 @@ export default function VideoCallScreen() {
         {call.status === 'ended' ? (
           <>
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.green]} onPress={openChat}>
-              <AppText weight="bold" style={styles.bigButtonText}>{isDoctor ? 'Open chat' : 'Back to chat'}</AppText>
+              <AppText weight="bold" style={styles.bigButtonText}>{isDoctor ? t('call.openChat') : t('call.backToChat')}</AppText>
             </Pressable>
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.white]} onPress={isDoctor ? () => router.replace('/doctor/appointments') : openSummary}>
-              <AppText weight="bold" style={styles.whiteText}>{isDoctor ? 'Back to requests' : 'View summary'}</AppText>
+              <AppText weight="bold" style={styles.whiteText}>{isDoctor ? t('call.backToRequests') : t('call.viewSummary')}</AppText>
             </Pressable>
           </>
         ) : (
           <>
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.green]} onPress={callBack}>
-              <AppText weight="bold" style={styles.bigButtonText}>{missedForMe ? 'Call back' : 'Call again'}</AppText>
+              <AppText weight="bold" style={styles.bigButtonText}>{missedForMe ? t('call.callBack') : t('call.callAgain')}</AppText>
             </Pressable>
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.white]} onPress={openChat}>
-              <AppText weight="bold" style={styles.whiteText}>{isDoctor ? 'Message patient' : 'Message doctor'}</AppText>
+              <AppText weight="bold" style={styles.whiteText}>{isDoctor ? t('call.messagePatient') : t('call.messageDoctor')}</AppText>
             </Pressable>
           </>
         )}

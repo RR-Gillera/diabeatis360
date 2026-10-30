@@ -4,12 +4,13 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
-import { enumLabel } from '@/constants/enums';
 import { useAuth } from '@/features/auth/auth-context';
 import { APPOINTMENT_TABS, initialsOf, tabFor, type AppointmentTab } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
+import { formatDate } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry, Provider } from '@/features/booking/types';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
 
 // "My Appointments" (Figma P-21): every booking of the signed-in patient, split into Upcoming, Pending, Completed and
 // Declined. Opened from the "more" menu on Find a Doctor. Tapping a card opens its details.
@@ -20,26 +21,20 @@ const pill: Record<AppointmentTab, { color: string; background: string }> = {
   declined: { color: '#D9364F', background: '#FBE6E9' },
 };
 
-const emptyText: Record<AppointmentTab, string> = {
-  upcoming: 'Confirmed appointments will show up here.',
-  pending: 'Requests waiting for a doctor to accept will show up here.',
-  completed: 'Finished consultations will show up here.',
-  declined: 'Declined or cancelled requests will show up here.',
-};
-
 export default function MyAppointmentsScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, label, language } = useT();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [entries, setEntries] = useState<AppointmentHistoryEntry[]>([]);
   const [tab, setTab] = useState<AppointmentTab>('upcoming');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => subscribeToProviders(setProviders, () => {}), []);
   useEffect(() => {
     if (!uid) return;
-    return subscribeToBookingHistory(uid, providers, (value) => { setEntries(value); setLoading(false); }, (value) => { setError(value.message); setLoading(false); });
+    return subscribeToBookingHistory(uid, providers, (value) => { setEntries(value); setLoading(false); }, () => { setFailed(true); setLoading(false); });
   }, [uid, providers]);
 
   // Upcoming soonest first; every other tab newest first.
@@ -51,19 +46,19 @@ export default function MyAppointmentsScreen() {
 
   return (
     <View style={styles.screen}>
-      <Text style={styles.title}>My Appointments</Text>
+      <Text accessibilityRole="header" style={styles.title}>{t('appt.title')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         {APPOINTMENT_TABS.map((option) => (
           <Pressable key={option.key} accessibilityRole="button" accessibilityState={{ selected: tab === option.key }} style={[styles.tab, tab === option.key && styles.tabActive]} onPress={() => setTab(option.key)}>
-            <Text style={[styles.tabText, tab === option.key && styles.tabTextActive]}>{option.label}</Text>
+            <Text style={[styles.tabText, tab === option.key && styles.tabTextActive]}>{t(`appt.tab.${option.key}`)}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {loading && !error ? <ActivityIndicator color={homeColors.green} style={styles.loader} /> : null}
-        {!loading && shown.length === 0 ? <Text style={styles.empty}>{emptyText[tab]}</Text> : null}
+        {failed ? <Text style={styles.error}>{t('booking.history.loadFailed')}</Text> : null}
+        {loading && !failed ? <ActivityIndicator color={homeColors.green} style={styles.loader} /> : null}
+        {!loading && shown.length === 0 ? <Text style={styles.empty}>{t(`appt.empty.${tab}`)}</Text> : null}
         {shown.map((entry) => {
           const look = pill[tab];
           const canChat = entry.status === 'confirmed' && entry.paymentStatus !== 'unpaid';
@@ -72,21 +67,21 @@ export default function MyAppointmentsScreen() {
             // The card is a plain View: its top part opens the details and the action buttons sit beside it, because a
             // button inside a button is invalid on the web and confusing for screen readers.
             <View key={entry.id} style={styles.card}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Appointment with ${entry.provider?.fullName ?? 'doctor'}, details`} style={styles.details} onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('appt.cardLabel', { name: entry.provider?.fullName ?? t('appt.doctor') })} style={styles.details} onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })}>
               <View style={styles.top}>
                 <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(entry.provider?.fullName)}</Text></View>
                 <View style={styles.who}>
-                  <Text style={styles.name}>{entry.provider?.fullName ?? 'Doctor'}</Text>
+                  <Text style={styles.name}>{entry.provider?.fullName ?? t('appt.doctor')}</Text>
                   <Text style={styles.specialty}>{entry.provider?.specialty ?? ''}</Text>
                 </View>
                 <View style={[styles.pill, { backgroundColor: look.background }]}>
-                  <Text style={[styles.pillText, { color: look.color }]}>{enumLabel('bookingStatus', entry.status as never)}</Text>
+                  <Text style={[styles.pillText, { color: look.color }]}>{label('bookingStatus', entry.status)}</Text>
                 </View>
               </View>
               <View style={styles.when}>
                 <View style={styles.whenItem}>
                   <SymbolView name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }} size={14} tintColor="#64748B" />
-                  <Text style={styles.whenText}>{entry.scheduledAt ? entry.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text>
+                  <Text style={styles.whenText}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'}</Text>
                 </View>
                 <View style={styles.whenItem}>
                   <SymbolView name={{ ios: 'clock', android: 'schedule', web: 'schedule' }} size={14} tintColor="#64748B" />
@@ -95,21 +90,21 @@ export default function MyAppointmentsScreen() {
               </View>
               </Pressable>
               {entry.status === 'declined' && entry.declineReason ? (
-                <View style={styles.reason}><Text style={styles.reasonLabel}>Doctor&apos;s reason</Text><Text style={styles.reasonText}>{entry.declineReason}</Text></View>
+                <View style={styles.reason}><Text style={styles.reasonLabel}>{t('appt.reason')}</Text><Text style={styles.reasonText}>{entry.declineReason}</Text></View>
               ) : null}
               {canChat ? (
                 <Pressable accessibilityRole="button" style={styles.filled} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
-                  <Text style={styles.filledText}>Open Chat</Text>
+                  <Text style={styles.filledText}>{t('appt.openChat')}</Text>
                 </Pressable>
               ) : null}
               {mustPay ? (
                 <Pressable accessibilityRole="button" style={styles.filled} onPress={() => router.push({ pathname: '/booking/consultation-fee', params: { id: entry.id } })}>
-                  <Text style={styles.filledText}>Pay now</Text>
+                  <Text style={styles.filledText}>{t('appt.payNow')}</Text>
                 </Pressable>
               ) : null}
               {entry.status === 'completed' ? (
                 <Pressable accessibilityRole="button" style={styles.outline} onPress={() => router.push({ pathname: '/consultation/summary/[id]', params: { id: entry.id } } as never)}>
-                  <Text style={styles.outlineText}>View Summary</Text>
+                  <Text style={styles.outlineText}>{t('appt.viewSummary')}</Text>
                 </Pressable>
               ) : null}
             </View>

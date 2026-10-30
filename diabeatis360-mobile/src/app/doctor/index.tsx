@@ -11,12 +11,18 @@ import { subscribeToBookingsForProvider } from '@/features/booking/booking-servi
 import { formatFee } from '@/features/booking/booking-ui';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { dashboardStats } from '@/features/doctor/doctor-stats';
+import { isProfileComplete } from '@/features/doctor/profile-complete';
 import { DoctorBottomNav, doctorStyles } from '@/features/doctor/doctor-ui';
 import type { DoctorProfile } from '@/features/doctor/types';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { shortTime } from '@/features/notifications/notification-display';
 import { subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
+import { useT } from '@/i18n/language-context';
+import { shortDay } from '@/i18n/translate';
+
+/** getDay() order, for the long weekday on the dashboard ("Thursday" / "Huwebes"). */
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 // The doctor's dashboard (Figma "Dashboard Earnings and Notifications", DECISIONS D24): today's numbers, the next
 // confirmed appointment and recent activity. Earnings are recorded amounts (payments are a demo), after the 15%
@@ -24,15 +30,16 @@ import { subscribeToNotifications, type NotificationEntry } from '@/features/not
 export default function DoctorHomeScreen() {
   const router = useRouter();
   const { uid, displayName } = useAuth();
+  const { t, language } = useT();
   // null until the first answer arrives, so the cards show "—" instead of a misleading 0 while loading.
   const [appointments, setAppointments] = useState<ProviderBookingEntry[] | null>(null);
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [activity, setActivity] = useState<NotificationEntry[]>([]);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
+    return subscribeToBookingsForProvider(uid, setAppointments, () => setFailed(true));
   }, [uid]);
   useEffect(() => {
     if (!uid) return;
@@ -53,9 +60,10 @@ export default function DoctorHomeScreen() {
   // A name that already starts with "Dr." must not become "Dr. Dr.".
   const firstName = (displayName ?? profile?.fullName ?? 'Doctor').trim().replace(/^dr\.?\s+/i, '').split(' ')[0];
   const hour = openedAt.getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = t(hour < 12 ? 'doctor.greeting.morning' : hour < 18 ? 'doctor.greeting.afternoon' : 'doctor.greeting.evening');
+  const dateLine = `${t(`weekday.long.${WEEKDAYS[openedAt.getDay()]}`)}, ${shortDay(openedAt, language)}`;
   // A doctor with no specialty/licence/fee can't be meaningfully booked, so the dashboard nudges them to finish it.
-  const profileIncomplete = profile && (!profile.specialty || !profile.prcLicenseNumber || !profile.city || !profile.consultationFee);
+  const profileIncomplete = profile && !isProfileComplete(profile);
   const nextIsToday = next?.scheduledAt ? next.scheduledAt.toDateString() === openedAt.toDateString() : false;
 
   return (
@@ -63,88 +71,88 @@ export default function DoctorHomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>{greeting}, Dr. {firstName}!</Text>
-            <Text style={styles.date}>{openedAt.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</Text>
+            <Text accessibilityRole="header" style={styles.greeting}>{t('doctor.greeting', { greeting, name: firstName })}</Text>
+            <Text style={styles.date}>{dateLine}</Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Profile" style={styles.me} onPress={() => router.navigate('/doctor/profile')}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('nav.profile')} style={styles.me} onPress={() => router.navigate('/doctor/profile')}>
             <Text style={styles.meText}>{initialsOf(profile?.fullName ?? displayName)}</Text>
           </Pressable>
         </View>
 
-        {error ? <Text style={[doctorStyles.error, styles.gutter]}>{error}</Text> : null}
+        {failed ? <Text style={[doctorStyles.error, styles.gutter]}>{t('booking.history.loadFailed')}</Text> : null}
 
         {profileIncomplete ? (
-          <Pressable style={styles.alert} onPress={() => router.push('/doctor/profile')}>
+          <Pressable accessibilityRole="button" style={styles.alert} onPress={() => router.push('/doctor/profile')}>
             <View style={styles.alertIcon}>
               <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={16} tintColor={homeColors.orange} />
             </View>
             <View style={styles.alertCopy}>
-              <Text style={styles.alertTitle}>Finish your doctor profile</Text>
-              <Text style={styles.alertText}>Patients can&apos;t see your specialty, location, or fee until you complete it.</Text>
+              <Text style={styles.alertTitle}>{t('doctor.finishTitle')}</Text>
+              <Text style={styles.alertText}>{t('doctor.finishText')}</Text>
             </View>
           </Pressable>
         ) : null}
 
         <View style={styles.grid}>
-          <View style={styles.stat}><Text style={styles.statLabel}>TODAY&apos;S{'\n'}APPOINTMENTS</Text><Text style={styles.statValue}>{show(stats.today)}</Text></View>
+          <View style={styles.stat}><Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.today')}</Text><Text style={styles.statValue}>{show(stats.today)}</Text></View>
           <Pressable accessibilityRole="button" style={styles.stat} onPress={() => router.navigate('/doctor/appointments')}>
-            <Text style={styles.statLabel}>PENDING{'\n'}REQUESTS</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.pending')}</Text>
             <View style={styles.statRow}>
               <Text style={styles.statValue}>{show(stats.pending)}</Text>
-              {stats.pending ? <View style={styles.newPill}><Text style={styles.newText}>New</Text></View> : null}
+              {stats.pending ? <View style={styles.newPill}><Text style={styles.newText}>{t('doctor.new')}</Text></View> : null}
             </View>
           </Pressable>
           <Pressable accessibilityRole="button" style={styles.stat} onPress={() => router.navigate('/doctor/history' as never)}>
-            <Text style={styles.statLabel}>COMPLETED</Text><Text style={styles.statValue}>{show(stats.completed)}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.completed')}</Text><Text style={styles.statValue}>{show(stats.completed)}</Text>
           </Pressable>
-          <View style={styles.stat}><Text style={styles.statLabel}>TOTAL EARNINGS</Text><Text style={styles.statValue} adjustsFontSizeToFit numberOfLines={1}>{show(formatFee(stats.earnings))}</Text></View>
+          <View style={styles.stat}><Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>{t('doctor.stat.earnings')}</Text><Text style={styles.statValue} adjustsFontSizeToFit numberOfLines={1}>{show(formatFee(stats.earnings))}</Text></View>
         </View>
-        <Text style={styles.footnote}>Earnings: recorded fees of paid consultations, after the 15% platform commission. Payments are a demo.</Text>
+        <Text style={styles.footnote}>{t('doctor.earningsNote', { rate: Math.round(PLATFORM_COMMISSION_RATE * 100) })}</Text>
 
-        <Text style={[doctorStyles.sectionTitle, styles.section]}>Upcoming Appointment</Text>
+        <Text style={[doctorStyles.sectionTitle, styles.section]}>{t('doctor.upcoming')}</Text>
         {appointments === null ? null : next ? (
           <View style={[doctorStyles.card, styles.nextCard]}>
             <View style={styles.nextTop}>
               <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(next.patientName)}</Text></View>
               <View style={styles.nextCopy}>
                 <Text style={styles.nextName}>{next.patientName}</Text>
-                <Text style={styles.nextMeta}>Diabetes consultation</Text>
+                <Text style={styles.nextMeta}>{t('doctor.diabetesConsultation')}</Text>
               </View>
               <View style={styles.nextWhen}>
-                <Text style={styles.nextDay}>{nextIsToday ? 'Today' : next.scheduledAt?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+                <Text style={styles.nextDay}>{nextIsToday ? t('doctor.today') : next.scheduledAt ? shortDay(next.scheduledAt, language) : ''}</Text>
                 <Text style={styles.nextTime}>{next.scheduledAt?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</Text>
               </View>
             </View>
             <Pressable accessibilityRole="button" style={styles.primary} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: next.id } })}>
-              <Text style={styles.primaryText}>View Consultation</Text>
+              <Text style={styles.primaryText}>{t('doctor.viewConsultation')}</Text>
             </Pressable>
           </View>
         ) : (
-          <View style={[doctorStyles.card, styles.gutterCard]}><Text style={styles.muted}>No confirmed appointments coming up.</Text></View>
+          <View style={[doctorStyles.card, styles.gutterCard]}><Text style={styles.muted}>{t('doctor.noUpcoming')}</Text></View>
         )}
 
         <View style={styles.sectionRow}>
-          <Text style={doctorStyles.sectionTitle}>Recent Activity</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate('/doctor/notifications')}><Text style={styles.seeAll}>See all</Text></Pressable>
+          <Text style={doctorStyles.sectionTitle}>{t('doctor.recent')}</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/doctor/notifications')}><Text style={styles.seeAll}>{t('doctor.seeAll')}</Text></Pressable>
         </View>
         <View style={[doctorStyles.card, styles.gutterCard]}>
-          {activity.length === 0 ? <Text style={styles.muted}>Nothing yet.</Text> : activity.slice(0, 3).map((item, index) => (
+          {activity.length === 0 ? <Text style={styles.muted}>{t('doctor.nothingYet')}</Text> : activity.slice(0, 3).map((item, index) => (
             <View key={item.id} style={[styles.activityRow, index > 0 && styles.activityDivider]}>
               <Text style={styles.activityText}>{item.message}</Text>
-              <Text style={styles.activityWhen}>{shortTime(item.sentAt, openedAt)}</Text>
+              <Text style={styles.activityWhen}>{shortTime(item.sentAt, openedAt, language)}</Text>
             </View>
           ))}
         </View>
 
-        <Text style={[doctorStyles.sectionTitle, styles.section]}>Quick Actions</Text>
+        <Text style={[doctorStyles.sectionTitle, styles.section]}>{t('doctor.quick')}</Text>
         <View style={styles.quickRow}>
-          <Pressable style={styles.quickCard} onPress={() => router.push('/doctor/schedule')}>
+          <Pressable accessibilityRole="button" style={styles.quickCard} onPress={() => router.push('/doctor/schedule')}>
             <View style={styles.quickIcon}><SymbolView name={{ ios: 'clock.fill', android: 'schedule', web: 'schedule' }} size={18} tintColor={homeColors.green} /></View>
-            <Text style={styles.quickText}>Manage Schedule</Text>
+            <Text style={styles.quickText}>{t('doctor.manageSchedule')}</Text>
           </Pressable>
-          <Pressable style={styles.quickCard} onPress={() => router.push('/doctor/patients')}>
+          <Pressable accessibilityRole="button" style={styles.quickCard} onPress={() => router.push('/doctor/patients')}>
             <View style={styles.quickIcon}><SymbolView name={{ ios: 'person.2.fill', android: 'groups', web: 'groups' }} size={18} tintColor={homeColors.green} /></View>
-            <Text style={styles.quickText}>My Patients</Text>
+            <Text style={styles.quickText}>{t('doctor.myPatients')}</Text>
           </Pressable>
         </View>
       </ScrollView>

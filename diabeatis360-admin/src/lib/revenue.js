@@ -4,16 +4,22 @@ import { commissionOf } from './labels'
 // Pure functions behind the Revenue page (no Firebase imports, so they are easy to explain and test).
 //
 // What "platform revenue" means in Diabeatis360 (DECISIONS.md D3 + D5):
-//   1. the 15% commission on COMPLETED consultations, and
+//   1. the 15% commission on COMPLETED consultations PAID ONLINE (D37: an on-site fee is paid at the clinic and never
+//      passes through the platform, so it earns no commission), and
 //   2. what patients pay for a premium plan (the plan's price, counted once when the subscription starts).
 // Doctors keep the other 85% of each consultation fee, so that part is never platform revenue.
 // Payments are mocked in the app (no real billing yet), so these are recorded amounts, not bank deposits.
+
+/** Whether a booking earns the platform its commission (D37): finished, and paid online. One rule for every page. */
+export function earnsCommission(booking) {
+  return booking.status === 'completed' && booking.payment_status === 'paid'
+}
 
 /** One list of dated money events: [{ date, amount, kind: 'consultation' | 'subscription' }]. */
 export function revenueEvents(bookings, subscriptions, plans) {
   const priceByPlan = Object.fromEntries(plans.map((plan) => [plan.id, Number(plan.price ?? 0)]))
   const events = []
-  bookings.filter((booking) => booking.status === 'completed').forEach((booking) => {
+  bookings.filter(earnsCommission).forEach((booking) => {
     const date = toDate(booking.scheduled_at)
     if (date) events.push({ date, amount: commissionOf(booking), kind: 'consultation' })
   })

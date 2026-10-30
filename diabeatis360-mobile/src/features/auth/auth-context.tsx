@@ -59,6 +59,8 @@ type AuthContextValue = {
    * the person in, and returns their role. Returns null while the email is still unconfirmed.
    */
   checkEmailVerified: () => Promise<DemoRole | null>;
+  /** Reads the profile again and updates the role: setup turns a new account into a doctor's after the session began. */
+  refreshSession: () => Promise<DemoRole | null>;
   resendVerificationEmail: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateDisplayName: (fullName: string) => Promise<void>;
@@ -235,6 +237,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return next.role;
   };
 
+  const refreshSession = async () => {
+    const user = auth.currentUser;
+    if (!user) return null;
+    const next = await sessionFor(user);
+    if (next === 'deactivated') return null; // sessionFor has signed them out already
+    setSession(next);
+    return next.role;
+  };
+
   const resendVerificationEmail = async () => {
     const user = auth.currentUser;
     if (!user) throw Object.assign(new Error('Not signed in'), { code: 'auth/user-token-expired' });
@@ -265,6 +276,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     signInWithProvider,
     signUp,
     checkEmailVerified,
+    refreshSession,
     resendVerificationEmail,
     resetPassword,
     updateDisplayName,

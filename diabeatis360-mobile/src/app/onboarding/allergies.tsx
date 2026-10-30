@@ -1,97 +1,113 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
 
-import { AuthButton, authColors, authStyles } from '@/features/auth/auth-ui';
+import { AuthButton, authColors } from '@/features/auth/auth-ui';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
+import { allergyText, COMMON_ALLERGIES, NO_ALLERGIES, toggleAllergy } from '@/features/auth/health-profile';
+import { SETUP_PROGRESS, SetupScreen } from '@/features/auth/setup-kit';
+import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
+import type { MessageKey } from '@/i18n/translate';
 
-const presets = ['Nuts', 'Dairy', 'Eggs', 'Seafood'];
+// Figma "Profile Setup Step 7" (Any allergies or ingredients to avoid?).
 // An explicit answer is required (DECISIONS.md D25): either allergies, or "None". Skipping is not allowed, because
-// meal suggestions and the scanner use this list to keep the person safe.
-const NONE = 'None';
-
+// meal suggestions and the scanner use this list to keep the person safe. Typing a name that is not a chip adds it.
 export default function AllergiesScreen() {
   const router = useRouter();
   const { email, uid } = useAuth();
+  const { t } = useT();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [showOtherInput, setShowOtherInput] = useState(false);
-  const [otherText, setOtherText] = useState('');
 
-  const toggle = (item: string) => {
-    if (item === NONE) { setSelected((current) => (current.includes(NONE) ? [] : [NONE])); return; }
-    setSelected((current) => {
-      const rest = current.filter((value) => value !== NONE);
-      return rest.includes(item) ? rest.filter((value) => value !== item) : [...rest, item];
-    });
-  };
+  const typed = search.trim();
+  const chipLabel = (item: string) => t(`allergy.${item}` as MessageKey);
+  const visible = COMMON_ALLERGIES.filter((item) => [item, chipLabel(item)].some((name) => name.toLowerCase().includes(typed.toLowerCase())));
+  const custom = selected.filter((item) => !COMMON_ALLERGIES.includes(item) && item !== NO_ALLERGIES);
+  const canAddTyped = typed.length > 0 && !visible.some((item) => [item, chipLabel(item)].some((name) => name.toLowerCase() === typed.toLowerCase()))
+    && !selected.some((item) => item.toLowerCase() === typed.toLowerCase());
 
-  const addOther = () => {
-    const value = otherText.trim();
-    if (value && value.toLowerCase() !== 'none' && !selected.includes(value)) setSelected((current) => [...current.filter((item) => item !== NONE), value]);
-    else if (value.toLowerCase() === 'none') setSelected([NONE]);
-    setOtherText('');
-    setShowOtherInput(false);
-  };
-
-  const customEntries = selected.filter((item) => !presets.includes(item) && item !== NONE);
-  const visiblePresets = presets.filter((item) => item.toLowerCase().includes(search.toLowerCase()));
+  const tap = (item: string) => setSelected((current) => toggleAllergy(current, item));
+  const addTyped = () => { if (canAddTyped) { tap(typed); setSearch(''); } };
 
   const next = async () => {
     if (!selected.length) return;
-    if (email) await saveOnboardingValue(email, 'allergy', selected.join(', '), uid);
+    if (email) await saveOnboardingValue(email, 'allergy', allergyText(selected), uid);
     router.push('/onboarding/activity');
   };
 
-  return <View style={[authStyles.screen, styles.screen]}>
-    <Progress />
-    <Text style={styles.back} onPress={() => router.back()}>‹  Back</Text>
-    <Text style={styles.title}>Any allergies or{`\n`}ingredients to avoid?</Text>
-    <Text style={styles.subtitle}>This helps us recommend safer meals and avoid ingredients that may affect your health. Select as many as apply.</Text>
-    <TextInput value={search} onChangeText={setSearch} placeholder="⌕   Search" placeholderTextColor="#899AB2" style={styles.search} />
-    <View style={styles.grid}>
-      {visiblePresets.map((item) => (
-        <Text key={item} onPress={() => toggle(item)} style={[styles.allergy, selected.includes(item) && styles.selected]}>{item}</Text>
-      ))}
-      {customEntries.map((item) => (
-        <Text key={item} onPress={() => toggle(item)} style={[styles.allergy, styles.selected]}>{item} ✕</Text>
-      ))}
-      <Text onPress={() => setShowOtherInput((value) => !value)} style={[styles.allergy, showOtherInput && styles.selected]}>Other</Text>
-      <Text accessibilityRole="button" accessibilityState={{ selected: selected.includes(NONE) }} onPress={() => toggle(NONE)} style={[styles.allergy, selected.includes(NONE) && styles.selected]}>None</Text>
-    </View>
-    {showOtherInput ? (
-      <View style={styles.otherRow}>
-        <TextInput value={otherText} onChangeText={setOtherText} placeholder="Type an allergy or ingredient" placeholderTextColor="#899AB2" style={styles.otherInput} onSubmitEditing={addOther} autoFocus />
-        <Text onPress={addOther} style={styles.addButton}>Add</Text>
+  return (
+    <SetupScreen
+      section={t('setup.section.personal')}
+      percent={SETUP_PROGRESS.allergies}
+      title={t('setup.allergies.title')}
+      subtitle={t('setup.allergies.subtitle')}
+      onBack={() => router.back()}
+      footer={<>
+        {!selected.length ? <Text style={styles.needAnswer}>{t('setup.allergies.needAnswer')}</Text> : null}
+        <AuthButton title={t('common.next')} icon="next" onPress={next} disabled={!selected.length} />
+      </>}
+    >
+      <View style={styles.search}>
+        <View style={styles.searchIcon}>
+          <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor="#64748B" />
+        </View>
+        <TextInput
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={addTyped}
+          placeholder={t('setup.allergies.search')}
+          placeholderTextColor="#94A3B8"
+          accessibilityLabel={t('setup.allergies.search')}
+          returnKeyType="done"
+          style={styles.searchInput}
+        />
       </View>
-    ) : null}
-    <View style={styles.bottom}>
-      {!selected.length ? <Text style={styles.needAnswer}>Choose your allergies, or None if you have none.</Text> : null}
-      <AuthButton title="Next  ›" onPress={next} disabled={!selected.length} />
-    </View>
-  </View>;
+
+      <View style={styles.grid}>
+        {visible.map((item) => <Chip key={item} label={chipLabel(item)} selected={selected.includes(item)} onPress={() => tap(item)} />)}
+        {custom.map((item) => <Chip key={item} label={item} selected removable onPress={() => tap(item)} />)}
+        {canAddTyped ? <Chip label={t('setup.allergies.addTyped', { name: typed })} selected={false} onPress={addTyped} /> : null}
+        <Chip label={t('allergy.None')} selected={selected.includes(NO_ALLERGIES)} onPress={() => tap(NO_ALLERGIES)} />
+      </View>
+    </SetupScreen>
+  );
 }
 
-function Progress() { return <><View style={styles.progress}><Text style={styles.section}>PERSONAL DETAILS</Text><Text style={styles.step}>60% Complete</Text></View><View style={styles.track}><View style={[styles.fill, { width: '60%' }]} /></View></>; }
+function Chip({ label, selected, removable, onPress }: { label: string; selected: boolean; removable?: boolean; onPress: () => void }) {
+  const { t } = useT();
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={removable ? t('common.tapToRemove', { label }) : label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+      {removable ? <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={14} tintColor={authColors.green} /> : null}
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  screen: { padding: 24 },
-  progress: { flexDirection: 'row', justifyContent: 'space-between' },
-  section: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  step: { color: '#91A4BF', fontSize: 11, fontWeight: '700' },
-  track: { backgroundColor: '#DDE5EF', height: 6, marginTop: 10 },
-  fill: { backgroundColor: authColors.green, height: '100%' },
-  back: { color: '#91A4BF', fontSize: 15, marginTop: 44 },
-  title: { color: authColors.navy, fontSize: 31, fontWeight: '900', lineHeight: 38, marginTop: 26 },
-  subtitle: { color: authColors.muted, fontSize: 16, lineHeight: 25, marginTop: 14 },
-  search: { backgroundColor: '#FFF', borderRadius: 28, color: authColors.navy, fontSize: 17, marginTop: 34, padding: 20 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 12 },
-  allergy: { backgroundColor: '#FFF', borderColor: '#FFF', borderRadius: 28, borderWidth: 1, color: authColors.navy, fontSize: 16, fontWeight: '800', minWidth: '43%', padding: 16, textAlign: 'center' },
-  selected: { borderColor: authColors.green, color: authColors.green },
-  otherRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  otherInput: { backgroundColor: '#FFF', borderColor: authColors.green, borderRadius: 14, borderWidth: 1, color: authColors.navy, flex: 1, fontSize: 15, padding: 14 },
-  addButton: { alignSelf: 'center', color: authColors.green, fontSize: 14, fontWeight: '800', paddingHorizontal: 12 },
-  bottom: { marginTop: 'auto', paddingTop: 24 },
-  needAnswer: { color: authColors.muted, fontSize: 13, marginBottom: 10, textAlign: 'center' },
+  search: {
+    alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 30, flexDirection: 'row', gap: 12, marginTop: 28, padding: 8,
+    elevation: 1, shadowColor: '#94A3B8', shadowOffset: { height: 4, width: 0 }, shadowOpacity: 0.08, shadowRadius: 12,
+  },
+  searchIcon: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
+  searchInput: { color: authColors.navy, flex: 1, fontFamily: Brand.font.medium, fontSize: 16, minHeight: 44 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 },
+  chip: {
+    alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#FFFFFF', borderRadius: 28, borderWidth: 1.5, flexDirection: 'row', gap: 8,
+    justifyContent: 'center', minHeight: 54, minWidth: '46%', paddingHorizontal: 18,
+    elevation: 1, shadowColor: '#94A3B8', shadowOffset: { height: 3, width: 0 }, shadowOpacity: 0.07, shadowRadius: 8,
+  },
+  chipSelected: { borderColor: authColors.green },
+  chipText: { color: authColors.navy, fontFamily: Brand.font.bold, fontSize: 16 },
+  chipTextSelected: { color: authColors.green },
+  pressed: { opacity: 0.85 },
+  needAnswer: { color: authColors.muted, fontFamily: Brand.font.medium, fontSize: 13, textAlign: 'center' },
 });

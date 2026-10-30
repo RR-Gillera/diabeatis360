@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
-import { CallEmergencyButton } from '@/components/ui/call-emergency-button';
+import { CallEmergencyButton, EMERGENCY_NUMBER } from '@/components/ui/call-emergency-button';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
@@ -11,24 +11,20 @@ import { AiRecommendations } from '@/features/glucose/glucose-ui';
 import { glucoseAlert } from '@/features/notifications/notification-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
+import { clockTime } from '@/i18n/translate';
 
-const badgeStyle: Record<Interpretation, { label: string; color: string; background: string }> = {
-  normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
-  low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
-  high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
-  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
-};
-
-const explanation: Record<Interpretation, string> = {
-  normal: 'Your blood sugar level is within the healthy range. This is great! Your body is managing glucose well at this time.',
-  high: 'Your blood sugar level is higher than the healthy target range. A few adjustments now can help bring it back down.',
-  low: 'Your blood sugar level is below the healthy target range. A quick snack now can help bring it back up safely.',
-  critical: 'Your blood sugar level is in a dangerous range. Please contact your doctor or seek emergency care now.',
+const badgeStyle: Record<Interpretation, { color: string; background: string }> = {
+  normal: { color: homeColors.green, background: homeColors.greenTint },
+  low: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
+  high: { color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { color: '#FFFFFF', background: homeColors.red },
 };
 
 export default function GlucoseResultScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, label, language } = useT();
   // How many doctors were sent this critical reading (D28). Only said when it actually happened.
   const { doctors } = useLocalSearchParams<{ doctors?: string }>();
   const doctorsNotified = Number(doctors) || 0;
@@ -42,15 +38,40 @@ export default function GlucoseResultScreen() {
   if (!latest) {
     return (
       <View style={[styles.screen, styles.emptyScreen]}>
-        <Text style={styles.emptyText}>No reading found.</Text>
-        <Pressable onPress={() => router.back()}><Text style={styles.emptyLink}>Go back</Text></Pressable>
+        <Text style={styles.emptyText}>{t('result.notFound')}</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={styles.emptyLink}>{t('result.goBack')}</Text></Pressable>
       </View>
     );
   }
 
   const badge = badgeStyle[latest.interpretation];
-  const alert = glucoseAlert(latest.readingMgdl, latest.context);
-  const time = latest.loggedAt ? latest.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—';
+  const alert = glucoseAlert(latest.readingMgdl, latest.context, language);
+  const time = latest.loggedAt ? clockTime(latest.loggedAt) : '—';
+  const critical = alert?.severity === 'critical';
+
+  // The alert card. On a critical reading it comes FIRST, right under the title, with Call 911 above "See a Doctor", so it
+  // is never below the fold on a small phone (QA F-911-BELOW-FOLD, D34).
+  const alertCard = alert ? (
+    <View style={[styles.alertCard, critical ? styles.alertCritical : styles.alertWarning]}>
+      <View style={styles.alertHeader}>
+        <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={18} tintColor={critical ? homeColors.red : homeColors.orange} />
+        <Text accessibilityRole="header" style={[styles.alertTitle, { color: critical ? homeColors.red : '#B45309' }]}>
+          {critical ? t('critical.title') : t('result.checkUp')}
+        </Text>
+      </View>
+      <Text style={styles.alertText}>{alert.message}</Text>
+      {critical && doctorsNotified > 0 ? (
+        <Text style={[styles.alertText, styles.doctorNotified]} accessibilityLiveRegion="polite">
+          {doctorsNotified === 1 ? t('result.doctorNotified', { number: EMERGENCY_NUMBER }) : t('result.doctorsNotified', { count: doctorsNotified, number: EMERGENCY_NUMBER })}
+        </Text>
+      ) : null}
+      {critical ? <CallEmergencyButton /> : null}
+      <Pressable accessibilityRole="button" style={[styles.alertButton, { backgroundColor: critical ? homeColors.red : homeColors.orange }]} onPress={() => router.push('/booking/find-doctor')}>
+        <SymbolView name={{ ios: 'stethoscope', android: 'medical_services', web: 'medical_services' }} size={15} tintColor="#FFF" />
+        <Text style={styles.alertButtonText}>{t('result.seeDoctor')}</Text>
+      </Pressable>
+    </View>
+  ) : null;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scroll}>
@@ -58,47 +79,29 @@ export default function GlucoseResultScreen() {
         <View style={styles.heroIcon}>
           <SymbolView name={{ ios: 'checkmark.seal.fill', android: 'verified', web: 'verified' }} size={34} tintColor={homeColors.green} />
         </View>
-        <Text style={styles.heroTitle}>Reading Saved Successfully</Text>
-        <Text style={styles.heroSubtitle}>Your blood sugar has been recorded</Text>
+        <Text style={styles.heroTitle}>{t('result.saved')}</Text>
+        <Text style={styles.heroSubtitle}>{t('result.recorded')}</Text>
       </View>
 
+      {critical ? alertCard : null}
+
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>LATEST READING</Text>
+        <Text style={styles.cardLabel}>{t('home.latest')}</Text>
         <View style={styles.readingRow}>
           <Text style={styles.readingValue}>{latest.readingMgdl}</Text>
           <Text style={styles.readingUnit}>mg/dL</Text>
         </View>
         <View style={[styles.badge, { backgroundColor: badge.background }]}>
           <View style={[styles.badgeDot, { backgroundColor: badge.color }]} />
-          <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+          <Text style={[styles.badgeText, { color: badge.color }]}>{label('interpretation', latest.interpretation)}</Text>
         </View>
-        <Text style={styles.recordedAt}>Recorded at {time}</Text>
+        <Text style={styles.recordedAt}>{t('result.recordedAt', { time })}</Text>
         <View style={styles.divider} />
-        <Text style={styles.whatTitle}>What this means</Text>
-        <Text style={styles.whatText}>{explanation[latest.interpretation]}</Text>
+        <Text style={styles.whatTitle}>{t('result.whatThisMeans')}</Text>
+        <Text style={styles.whatText}>{t(`result.${latest.interpretation}`)}</Text>
       </View>
 
-      {alert ? (
-        <View style={[styles.alertCard, alert.severity === 'critical' ? styles.alertCritical : styles.alertWarning]}>
-          <View style={styles.alertHeader}>
-            <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={18} tintColor={alert.severity === 'critical' ? homeColors.red : homeColors.orange} />
-            <Text style={[styles.alertTitle, { color: alert.severity === 'critical' ? homeColors.red : '#B45309' }]}>
-              {alert.severity === 'critical' ? 'Seek medical help now' : 'Worth getting checked'}
-            </Text>
-          </View>
-          <Text style={styles.alertText}>{alert.message}</Text>
-          {alert.severity === 'critical' && doctorsNotified > 0 ? (
-            <Text style={[styles.alertText, styles.doctorNotified]} accessibilityLiveRegion="polite">
-              {doctorsNotified === 1 ? 'Your doctor was' : `Your ${doctorsNotified} doctors were`} also notified in the app. If you feel unwell, call 911 now.
-            </Text>
-          ) : null}
-          <Pressable style={[styles.alertButton, { backgroundColor: alert.severity === 'critical' ? homeColors.red : homeColors.orange }]} onPress={() => router.push('/booking/find-doctor')}>
-            <SymbolView name={{ ios: 'stethoscope', android: 'medical_services', web: 'medical_services' }} size={15} tintColor="#FFF" />
-            <Text style={styles.alertButtonText}>See a Doctor</Text>
-          </Pressable>
-          {alert.severity === 'critical' ? <CallEmergencyButton /> : null}
-        </View>
-      ) : null}
+      {critical ? null : alertCard}
 
       <View style={styles.recommendations}>
         <AiRecommendations interpretation={latest.interpretation} />

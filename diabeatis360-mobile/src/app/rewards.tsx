@@ -15,23 +15,26 @@ import {
   type Badge,
   type EarnedBadge,
 } from '@/features/gamification/gamification-service';
+import { badgeText } from '@/features/gamification/badge-text';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 export default function RewardsScreen() {
   const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
   const [badges, setBadges] = useState<Badge[]>([]);
   const [earned, setEarned] = useState<EarnedBadge[]>([]);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToGlucoseHistory(uid, setEntries, (value) => setError(value.message));
+    return subscribeToGlucoseHistory(uid, setEntries, () => setFailed(true));
   }, [uid]);
 
-  useEffect(() => subscribeToBadges(setBadges, (value) => setError(value.message)), []);
+  useEffect(() => subscribeToBadges(setBadges, () => setFailed(true)), []);
 
   useEffect(() => {
     if (!uid) return;
@@ -52,51 +55,48 @@ export default function RewardsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={goBack} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={goBack} hitSlop={10}>
           <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
         </Pressable>
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>Wellness Rewards</Text>
-          <Text style={styles.subtitle}>Your streak, points and badges</Text>
+          <Text accessibilityRole="header" style={styles.title}>{t('rewards.title')}</Text>
+          <Text style={styles.subtitle}>{t('rewards.subtitle')}</Text>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {failed ? <Text style={styles.error}>{t('rewards.loadFailed')}</Text> : null}
 
         <View style={styles.streakCard}>
           <View style={styles.flameWrap}>
             <SymbolView name={{ ios: 'flame.fill', android: 'local_fire_department', web: 'local_fire_department' }} size={30} tintColor="#F59E0B" />
           </View>
           <Text style={styles.streakValue}>{stats.streak}</Text>
-          <Text style={styles.streakLabel}>{stats.streak === 1 ? 'day streak' : 'day streak'}</Text>
-          <Text style={styles.streakHint}>
-            {stats.streak === 0
-              ? 'Log a reading today to start a streak.'
-              : 'Log a reading each day to keep it going.'}
-          </Text>
+          <Text style={styles.streakLabel}>{t('rewards.dayStreak')}</Text>
+          <Text style={styles.streakHint}>{stats.streak === 0 ? t('rewards.startStreak') : t('rewards.keepStreak')}</Text>
         </View>
 
         <View style={styles.statRow}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.points}</Text>
-            <Text style={styles.statLabel}>Points</Text>
+            <Text style={styles.statLabel}>{t('rewards.points')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.bestStreak}</Text>
-            <Text style={styles.statLabel}>Best streak</Text>
+            <Text style={styles.statLabel}>{t('rewards.bestStreak')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.totalLogs}</Text>
-            <Text style={styles.statLabel}>Readings</Text>
+            <Text style={styles.statLabel}>{t('rewards.readings')}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Achievement Badges</Text>
+        <Text style={styles.sectionTitle}>{t('rewards.badges')}</Text>
         {badges.length === 0 ? (
-          <Text style={styles.empty}>No badges have been set up yet.</Text>
+          <Text style={styles.empty}>{t('rewards.noBadges')}</Text>
         ) : badges.map((badge) => {
           const unlocked = earnedIds.has(badge.id) || hasQualified(badge, stats);
+          const words = badgeText(badge, language);
           return (
             <View key={badge.id} style={[styles.badgeCard, !unlocked && styles.badgeLocked]}>
               <View style={[styles.badgeIcon, unlocked ? styles.badgeIconOn : styles.badgeIconOff]}>
@@ -109,9 +109,9 @@ export default function RewardsScreen() {
                 />
               </View>
               <View style={styles.badgeCopy}>
-                <Text style={[styles.badgeName, !unlocked && styles.badgeNameLocked]}>{badge.name}</Text>
-                <Text style={styles.badgeDescription}>{badge.description}</Text>
-                <Text style={styles.badgeCriteria}>{unlocked ? 'Unlocked' : `Goal: ${badge.criteria}`}</Text>
+                <Text style={[styles.badgeName, !unlocked && styles.badgeNameLocked]}>{words.name}</Text>
+                <Text style={styles.badgeDescription}>{words.description}</Text>
+                <Text style={styles.badgeCriteria}>{unlocked ? t('rewards.unlocked') : t('rewards.goal', { goal: words.goal })}</Text>
               </View>
             </View>
           );

@@ -15,24 +15,28 @@ import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
 import { isChatAvailable } from '@/constants/enums';
 import { startCall } from '@/features/calls/call-service';
+import { CallError } from '@/features/calls/join-error';
 import { ensureCallPermissions } from '@/features/calls/video-room';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
+import { shortDay, translate, type Language } from '@/i18n/translate';
 
-function dayLabel(date: Date | null) {
+function dayLabel(date: Date | null, language: Language) {
   if (!date) return '';
   const startOfDay = (value: Date) => { const copy = new Date(value); copy.setHours(0, 0, 0, 0); return copy; };
   const today = startOfDay(new Date());
   const target = startOfDay(date);
-  if (target.getTime() === today.getTime()) return 'TODAY';
+  if (target.getTime() === today.getTime()) return translate(language, 'chat.today');
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-  if (target.getTime() === yesterday.getTime()) return 'YESTERDAY';
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  if (target.getTime() === yesterday.getTime()) return translate(language, 'chat.yesterday');
+  return shortDay(date, language).toUpperCase();
 }
 
 export default function ConsultationScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { uid, role } = useAuth();
+  const { t, language } = useT();
   const isDoctor = role === 'doctor';
 
   const [booking, setBooking] = useState<AppointmentHistoryEntry | null>(null);
@@ -42,6 +46,7 @@ export default function ConsultationScreen() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false); // "End this consultation?" (Figma P-23 / D-07)
   // The doctor's notes form (Figma D-07 Notes): after the confirm, or later when the patient ended the consultation.
   const [notesForm, setNotesForm] = useState<'end' | 'later' | null>(null);
@@ -52,12 +57,12 @@ export default function ConsultationScreen() {
 
   useEffect(() => {
     if (!id) return;
-    return subscribeToBooking(id, (value) => { setBooking(value); setLoading(false); }, (value) => { setError(value.message); setLoading(false); });
+    return subscribeToBooking(id, (value) => { setBooking(value); setLoading(false); }, () => { setLoadFailed(true); setLoading(false); });
   }, [id]);
 
   useEffect(() => {
     if (!id) return;
-    return subscribeToMessages(id, setMessages, (value) => setError(value.message));
+    return subscribeToMessages(id, setMessages, () => setLoadFailed(true));
   }, [id]);
 
   useEffect(() => {
@@ -79,9 +84,9 @@ export default function ConsultationScreen() {
     setSending(true);
     try {
       await sendMessage(id, uid, isDoctor ? 'doctor' : 'patient', text);
-    } catch (value) {
+    } catch {
       setDraft(text); // put it back rather than silently losing what they typed
-      setError(value instanceof Error ? value.message : 'Message failed to send.');
+      setError(t('chat.sendFailed'));
     } finally {
       setSending(false);
     }
@@ -100,8 +105,8 @@ export default function ConsultationScreen() {
     try {
       await endConsultation(id, isDoctor ? notes : null, isDoctor ? 'doctor' : 'patient');
       setNotesForm(null);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to end the consultation.');
+    } catch {
+      setError(t('chat.endFailed'));
     } finally {
       setEnding(false);
     }
@@ -114,8 +119,8 @@ export default function ConsultationScreen() {
     try {
       await saveConsultationNotes(id, notes);
       setNotesForm(null);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save the notes.');
+    } catch {
+      setError(t('chat.notesFailed'));
     } finally {
       setSavingNotes(false);
     }
@@ -127,40 +132,38 @@ export default function ConsultationScreen() {
     if (!id || !uid) return;
     setError('');
     try {
-      await ensureCallPermissions();
-      await startCall(id, uid);
+      await ensureCallPermissions(language);
+      await startCall(id, uid, language);
       router.push({ pathname: '/video-call/[id]', params: { id } } as never);
     } catch (value) {
-      setError(value instanceof Error ? value.message : 'We could not start the call.');
+      setError(value instanceof CallError ? value.message : t('call.error.start'));
     }
   };
 
   // Falls back to a role label only when the joined name is genuinely missing.
   const counterpartName = isDoctor
-    ? (booking?.patientName || 'Your patient')
-    : (booking?.provider?.fullName || 'Your doctor');
+    ? (booking?.patientName || t('call.fallbackPatient'))
+    : (booking?.provider?.fullName || t('call.fallbackDoctor'));
   const ended = consultation.status === 'ended';
   const canConsult = isChatAvailable(booking?.status ?? '');
   const unpaid = booking?.paymentStatus === 'unpaid';
   // Naming the slot in the header is what stops two people from typing into
   // different appointments and assuming the chat is broken.
   const appointmentLabel = booking?.scheduledAt
-    ? `${booking.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-    : ended ? 'Consultation ended' : 'Consultation';
+    ? `${shortDay(booking.scheduledAt, language)} · ${booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    : ended ? t('chat.ended') : t('chat.consultation');
 
   const body = () => {
-    if (!id) return <Text style={styles.notice}>No consultation selected.</Text>;
+    if (!id) return <Text style={styles.notice}>{t('chat.noneSelected')}</Text>;
     if (loading) return <ActivityIndicator color={homeColors.green} style={styles.loader} />;
-    if (!booking) return <Text style={styles.notice}>This appointment no longer exists.</Text>;
+    if (!booking) return <Text style={styles.notice}>{loadFailed ? t('appt.loadFailed') : t('pay.gone')}</Text>;
     if (!canConsult) {
       return (
         <View style={styles.gate}>
           <SymbolView name={{ ios: 'clock.fill', android: 'schedule', web: 'schedule' }} size={24} tintColor="#B45309" />
-          <Text style={styles.gateTitle}>{booking.status === 'declined' ? 'This request was declined' : 'Waiting for the doctor'}</Text>
+          <Text style={styles.gateTitle}>{booking.status === 'declined' ? t('pay.declinedTitle') : t('pay.waitingTitle')}</Text>
           <Text style={styles.gateText}>
-            {booking.status === 'declined'
-              ? 'The doctor declined this appointment, so there is no consultation to open.'
-              : 'The consultation opens once the doctor accepts your appointment.'}
+            {booking.status === 'declined' ? t('chat.declinedText') : t('chat.waitingText')}
           </Text>
         </View>
       );
@@ -169,10 +172,10 @@ export default function ConsultationScreen() {
       return (
         <View style={styles.gate}>
           <SymbolView name={{ ios: 'creditcard.fill', android: 'credit_card', web: 'credit_card' }} size={24} tintColor="#B45309" />
-          <Text style={styles.gateTitle}>Payment needed first</Text>
-          <Text style={styles.gateText}>Settle the consultation fee to open the chat with your doctor.</Text>
-          <Pressable style={styles.gateButton} onPress={() => router.replace({ pathname: '/booking/consultation-fee', params: { id } })}>
-            <Text style={styles.gateButtonText}>Go to Payment</Text>
+          <Text style={styles.gateTitle}>{t('chat.payFirstTitle')}</Text>
+          <Text style={styles.gateText}>{t('chat.payFirstText')}</Text>
+          <Pressable accessibilityRole="button" style={styles.gateButton} onPress={() => router.replace({ pathname: '/booking/consultation-fee', params: { id } })}>
+            <Text style={styles.gateButtonText}>{t('chat.goToPayment')}</Text>
           </Pressable>
         </View>
       );
@@ -188,14 +191,12 @@ export default function ConsultationScreen() {
         >
           <View style={styles.introCard}>
             <SymbolView name={{ ios: 'lock.fill', android: 'lock', web: 'lock' }} size={13} tintColor={homeColors.textFaint} />
-            <Text style={styles.introText}>
-              This conversation is between you and {counterpartName}. Do not use it for emergencies — call your nearest hospital instead.
-            </Text>
+            <Text style={styles.introText}>{t('chat.intro', { name: counterpartName })}</Text>
           </View>
 
           {messages.map((message) => {
             const mine = message.senderId === uid;
-            const day = dayLabel(message.sentAt);
+            const day = dayLabel(message.sentAt, language);
             const showDay = day && day !== lastDay;
             lastDay = day || lastDay;
             return (
@@ -205,7 +206,7 @@ export default function ConsultationScreen() {
                   <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                     <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{message.text}</Text>
                     <Text style={[styles.bubbleTime, mine && styles.bubbleTimeMine]}>
-                      {message.sentAt ? message.sentAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Sending...'}
+                      {message.sentAt ? message.sentAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : t('chat.sending')}
                     </Text>
                   </View>
                 </View>
@@ -214,7 +215,7 @@ export default function ConsultationScreen() {
           })}
 
           {messages.length === 0 ? (
-            <Text style={styles.emptyChat}>No messages yet. Say hello to start the consultation.</Text>
+            <Text style={styles.emptyChat}>{t('chat.empty')}</Text>
           ) : null}
 
           {ended ? (
@@ -222,28 +223,28 @@ export default function ConsultationScreen() {
             <View style={styles.summaryCard}>
               <View style={styles.summaryHeader}>
                 <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={16} tintColor="#94A3B8" />
-                <Text style={styles.summaryTitle}>Consultation ended</Text>
+                <Text style={styles.summaryTitle}>{t('chat.ended')}</Text>
               </View>
               <Text style={styles.summaryWhen}>
-                This chat is now read-only.{consultation.endedAt ? ` Ended ${consultation.endedAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.` : ''}
+                {t('chat.readOnly')}{consultation.endedAt ? ` ${t('chat.endedAt', { date: shortDay(consultation.endedAt, language), time: consultation.endedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) })}` : ''}
               </Text>
               <Pressable accessibilityRole="button" style={styles.viewSummary} onPress={() => router.push({ pathname: '/consultation/summary/[id]', params: { id } } as never)}>
-                <Text style={styles.viewSummaryText}>View summary</Text>
+                <Text style={styles.viewSummaryText}>{t('call.viewSummary')}</Text>
               </Pressable>
               {isDoctor && !consultation.summary && !consultation.advice ? (
                 <Pressable accessibilityRole="button" style={styles.addNotes} onPress={() => setNotesForm('later')}>
-                  <Text style={styles.addNotesText}>Add your notes</Text>
+                  <Text style={styles.addNotesText}>{t('chat.addNotes')}</Text>
                 </Pressable>
               ) : null}
             </View>
           ) : null}
         </ScrollView>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error || loadFailed ? <Text style={styles.error}>{error || t('chat.loadFailed')}</Text> : null}
 
         {ended ? (
           <View style={styles.composer}>
-            <View style={[styles.input, styles.inputClosed]}><Text style={styles.closedText}>Messaging is closed</Text></View>
+            <View style={[styles.input, styles.inputClosed]}><Text style={styles.closedText}>{t('chat.closed')}</Text></View>
             <View style={[styles.sendButton, styles.sendButtonClosed]}>
               <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={17} tintColor="#FFF" />
             </View>
@@ -253,13 +254,14 @@ export default function ConsultationScreen() {
             <TextInput
               value={draft}
               onChangeText={setDraft}
-              placeholder="Type a message..."
+              accessibilityLabel={t('chat.placeholder')}
+              placeholder={t('chat.placeholder')}
               placeholderTextColor="#94A3B8"
               style={styles.input}
               multiline
               onSubmitEditing={send}
             />
-            <Pressable style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]} onPress={send} disabled={!draft.trim() || sending}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.send')} accessibilityState={{ disabled: !draft.trim() || sending }} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]} onPress={send} disabled={!draft.trim() || sending}>
               <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={17} tintColor="#FFF" />
             </Pressable>
           </View>
@@ -275,7 +277,7 @@ export default function ConsultationScreen() {
     // No other screen in the app hit this because none of them pin an input to the very bottom of the screen.
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={goBack} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={goBack} hitSlop={10}>
           <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
         </Pressable>
         <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(counterpartName)}</Text></View>
@@ -284,7 +286,7 @@ export default function ConsultationScreen() {
           <Text style={styles.headerSubtitle} numberOfLines={1}>{appointmentLabel}</Text>
         </View>
         {canConsult && !ended && !(unpaid && !isDoctor) ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Video call" style={styles.callButton} onPress={startVideoCall} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('call.videoCall')} style={styles.callButton} onPress={startVideoCall} hitSlop={8}>
             <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={17} tintColor="#FFF" />
           </Pressable>
         ) : null}
@@ -292,14 +294,14 @@ export default function ConsultationScreen() {
           // Figma P-23: "View profile" and, while the consultation is open, "End consultation".
           <MoreMenu style={styles.moreButton} tint="#0F172A" items={[
             {
-              label: 'View profile',
+              label: t('chat.viewProfile'),
               icon: { ios: 'person.fill', android: 'person', web: 'person' },
               onPress: () => (isDoctor && booking.patientId
                 ? router.push({ pathname: '/doctor/patient/[id]', params: { id: booking.patientId } })
                 : router.push({ pathname: '/booking/appointment', params: { id: booking.id } })),
             },
             ...(!ended && !(unpaid && !isDoctor)
-              ? [{ label: 'End consultation', icon: { ios: 'xmark', android: 'close', web: 'close' } as const, destructive: true, onPress: () => setConfirmEnd(true) }]
+              ? [{ label: t('chat.end'), icon: { ios: 'xmark', android: 'close', web: 'close' } as const, destructive: true, onPress: () => setConfirmEnd(true) }]
               : []),
           ]} />
         ) : null}
@@ -311,17 +313,15 @@ export default function ConsultationScreen() {
         <View style={styles.confirmOverlay}>
           <View style={styles.confirmCard}>
             <View style={styles.confirmIcon}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={26} tintColor="#EF4444" /></View>
-            <Text style={styles.confirmTitle}>End this consultation?</Text>
+            <Text style={styles.confirmTitle}>{t('chat.confirmTitle')}</Text>
             <Text style={styles.confirmText}>
-              {isDoctor
-                ? "The patient won't be able to send new messages. You'll add your notes next."
-                : "You won't be able to send new messages. You can still read the chat and view the summary."}
+              {isDoctor ? t('chat.confirmDoctor') : t('chat.confirmPatient')}
             </Text>
             <Pressable accessibilityRole="button" style={[styles.confirmDanger, ending && styles.sendButtonDisabled]} onPress={confirmed} disabled={ending}>
-              <Text style={styles.confirmDangerText}>{ending ? 'Ending...' : 'End consultation'}</Text>
+              <Text style={styles.confirmDangerText}>{ending ? t('chat.ending') : t('chat.end')}</Text>
             </Pressable>
             <Pressable accessibilityRole="button" style={styles.confirmKeep} onPress={() => setConfirmEnd(false)}>
-              <Text style={styles.confirmKeepText}>Keep chatting</Text>
+              <Text style={styles.confirmKeepText}>{t('chat.keep')}</Text>
             </Pressable>
           </View>
         </View>
@@ -329,10 +329,10 @@ export default function ConsultationScreen() {
 
       <DoctorNotesForm
         visible={notesForm !== null}
-        title={notesForm === 'later' ? 'Consultation notes' : 'End Consultation'}
+        title={notesForm === 'later' ? t('chat.notesTitle') : t('chat.endTitle')}
         patientName={counterpartName}
         initial={notesForm === 'later' ? consultation : undefined}
-        submitLabel={notesForm === 'later' ? 'Save notes' : 'Save and end consultation'}
+        submitLabel={notesForm === 'later' ? t('chat.saveNotes') : t('chat.saveAndEnd')}
         busy={ending || savingNotes}
         error={error}
         onSubmit={(notes) => (notesForm === 'later' ? saveLateNotes(notes) : finish(notes))}

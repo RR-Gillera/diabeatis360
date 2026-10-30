@@ -9,6 +9,7 @@ import { parseBirthdate } from '@/features/auth/birthdate';
 import { TimePickerSheet } from '@/features/doctor/time-picker';
 import { labelFromMinutes, minutesFromLabel } from '@/features/doctor/time-slots';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
 
 import type { ConsultationNotes } from './consultation-service';
 
@@ -23,7 +24,7 @@ const dateText = (date: Date) => `${MONTHS[date.getMonth()]} ${date.getDate()}, 
  * The doctor's notes (Figma D-07 Notes, DECISIONS D24): Diagnosis notes, Advice and an optional Follow-up date and time,
  * as a full-screen sheet. Used when ending a consultation, and to write or change the notes afterwards.
  */
-export function DoctorNotesForm({ visible, title = 'End Consultation', patientName, initial, submitLabel, busy, error, onSubmit, onClose }: {
+export function DoctorNotesForm({ visible, title, patientName, initial, submitLabel, busy, error, onSubmit, onClose }: {
   visible: boolean;
   title?: string;
   patientName: string;
@@ -34,12 +35,15 @@ export function DoctorNotesForm({ visible, title = 'End Consultation', patientNa
   onSubmit: (notes: ConsultationNotes) => void;
   onClose: () => void;
 }) {
+  const { t } = useT();
   const [summary, setSummary] = useState(initial?.summary ?? '');
   const [advice, setAdvice] = useState(initial?.advice ?? '');
   const [day, setDay] = useState(initial?.followUpAt ? dateText(initial.followUpAt) : '');
   const [time, setTime] = useState(initial?.followUpAt ? labelFromMinutes(initial.followUpAt.getHours() * 60 + initial.followUpAt.getMinutes()) : '09:00 AM');
   const [pickingTime, setPickingTime] = useState(false);
   const [problem, setProblem] = useState('');
+  // Ending with nothing written asks first (QA F-EMPTY-NOTES): the patient would only see "No summary recorded yet".
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
 
   // Re-seed the fields each time the sheet opens with different notes (for example after they were saved elsewhere).
   const seedKey = `${visible}:${initial?.summary ?? ''}:${initial?.advice ?? ''}:${initial?.followUpAt?.getTime() ?? ''}`;
@@ -51,6 +55,7 @@ export function DoctorNotesForm({ visible, title = 'End Consultation', patientNa
     setDay(initial?.followUpAt ? dateText(initial.followUpAt) : '');
     setTime(initial?.followUpAt ? labelFromMinutes(initial.followUpAt.getHours() * 60 + initial.followUpAt.getMinutes()) : '09:00 AM');
     setProblem('');
+    setConfirmEmpty(false);
   }
 
   const followUpAt = () => {
@@ -63,7 +68,8 @@ export function DoctorNotesForm({ visible, title = 'End Consultation', patientNa
 
   const submit = () => {
     const when = followUpAt();
-    if (when && when.getTime() < Date.now()) { setProblem('The follow-up must be in the future.'); return; }
+    if (when && when.getTime() < Date.now()) { setProblem(t('doctor.notes.future')); return; }
+    if (!summary.trim() && !advice.trim() && !when && !confirmEmpty) { setConfirmEmpty(true); setProblem(t('doctor.notes.emptyConfirm')); return; }
     setProblem('');
     onSubmit({ summary, advice, followUpAt: when });
   };
@@ -73,33 +79,33 @@ export function DoctorNotesForm({ visible, title = 'End Consultation', patientNa
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <RoundBackButton onPress={onClose} />
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>Add notes for {patientName}</Text>
+          <Text accessibilityRole="header" style={styles.title}>{title ?? t('chat.endTitle')}</Text>
+          <Text style={styles.subtitle}>{t('doctor.notes.for', { name: patientName })}</Text>
 
-          <Text style={styles.label}>Diagnosis notes</Text>
-          <TextInput accessibilityLabel="Diagnosis notes" value={summary} onChangeText={setSummary} placeholder="e.g. Readings steady this week. Continue the current care plan." placeholderTextColor="#94A3B8" style={styles.input} multiline maxLength={SUMMARY_LIMIT} />
+          <Text style={styles.label}>{t('doctor.notes.diagnosis')}</Text>
+          <TextInput accessibilityLabel={t('doctor.notes.diagnosis')} value={summary} onChangeText={setSummary} placeholder={t('doctor.notes.diagnosisPlaceholder')} placeholderTextColor="#94A3B8" style={styles.input} multiline maxLength={SUMMARY_LIMIT} />
 
-          <Text style={styles.label}>Advice</Text>
-          <TextInput accessibilityLabel="Advice" value={advice} onChangeText={setAdvice} placeholder="e.g. Keep logging morning and bedtime readings. Stay hydrated." placeholderTextColor="#94A3B8" style={styles.input} multiline maxLength={ADVICE_LIMIT} />
+          <Text style={styles.label}>{t('summary.advice')}</Text>
+          <TextInput accessibilityLabel={t('summary.advice')} value={advice} onChangeText={setAdvice} placeholder={t('doctor.notes.advicePlaceholder')} placeholderTextColor="#94A3B8" style={styles.input} multiline maxLength={ADVICE_LIMIT} />
 
-          <Text style={styles.label}>Follow-up (optional)</Text>
-          <BirthdateField value={day} onChange={setDay} title="Follow-up date" placeholder="No follow-up" years={FUTURE_YEARS} />
+          <Text style={styles.label}>{t('doctor.notes.followUp')}</Text>
+          <BirthdateField value={day} onChange={setDay} title={t('doctor.notes.followUpDate')} placeholder={t('doctor.notes.noFollowUp')} years={FUTURE_YEARS} />
           {day ? (
             <View style={styles.followRow}>
-              <Pressable accessibilityRole="button" style={styles.time} onPress={() => setPickingTime(true)}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${t('doctor.notes.followUpTime')}: ${time}`} style={styles.time} onPress={() => setPickingTime(true)}>
                 <SymbolView name={{ ios: 'clock', android: 'schedule', web: 'schedule' }} size={16} tintColor="#64748B" />
                 <Text style={styles.timeText}>{time}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => setDay('')} hitSlop={8}><Text style={styles.clear}>No follow-up</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => setDay('')} hitSlop={8}><Text style={styles.clear}>{t('doctor.notes.noFollowUp')}</Text></Pressable>
             </View>
           ) : null}
-          <Text style={styles.hint}>The patient sees these notes in their Consultation Summary.</Text>
+          <Text style={styles.hint}>{t('doctor.notes.hint')}</Text>
           {problem || error ? <Text style={styles.error}>{problem || error}</Text> : null}
         </ScrollView>
         <Pressable accessibilityRole="button" style={[styles.submit, busy && styles.disabled]} disabled={busy} onPress={submit}>
-          <Text style={styles.submitText}>{busy ? 'Saving...' : submitLabel}</Text>
+          <Text style={styles.submitText}>{busy ? t('common.saving') : submitLabel}</Text>
         </Pressable>
-        <TimePickerSheet visible={pickingTime} title="Follow-up time" value={time} onCancel={() => setPickingTime(false)} onConfirm={(label) => { setTime(label); setPickingTime(false); }} />
+        <TimePickerSheet visible={pickingTime} title={t('doctor.notes.followUpTime')} value={time} onCancel={() => setPickingTime(false)} onConfirm={(label) => { setTime(label); setPickingTime(false); }} />
       </View>
     </Modal>
   );

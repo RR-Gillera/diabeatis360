@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { AppText } from '@/components/ui/app-text';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
 
 import type { DoctorProfile } from './types';
 
@@ -22,6 +23,7 @@ function Row({ label, value }: { label: string; value: string }) {
  * verifies the credentials. After a rejection the doctor can correct the details and send them again (onResubmit).
  */
 export function PendingVerification({ profile, onSignOut, onResubmit }: { profile: DoctorProfile; onSignOut: () => void; onResubmit: () => void }) {
+  const { t } = useT();
   const rejected = Boolean(profile.rejectionReason);
   return (
     <View style={styles.screen}>
@@ -35,29 +37,29 @@ export function PendingVerification({ profile, onSignOut, onResubmit }: { profil
             tintColor={rejected ? '#EF4444' : '#F59E0B'}
           />
         </View>
-        <AppText weight="extraBold" style={styles.title}>{rejected ? 'Verification not approved' : 'Verification in progress'}</AppText>
+        <AppText weight="extraBold" style={styles.title}>{rejected ? t('doctor.pending.rejectedTitle') : t('doctor.pending.title')}</AppText>
 
         {rejected ? (
           <View style={styles.reason}>
-            <AppText weight="bold" style={styles.reasonLabel}>REASON</AppText>
+            <AppText weight="bold" style={styles.reasonLabel}>{t('doctor.pending.reason')}</AppText>
             <AppText weight="bold" style={styles.reasonText}>{profile.rejectionReason}</AppText>
-            <AppText style={styles.reasonHint}>Correct your details and send them again. An admin will review them once more.</AppText>
+            <AppText style={styles.reasonHint}>{t('doctor.pending.fix')}</AppText>
           </View>
         ) : (
           <>
             <View style={styles.card}>
-              <AppText style={styles.cardTitle}>Submitted details</AppText>
-              <Row label="PRC number" value={profile.prcLicenseNumber} />
-              <Row label="Specialty" value={profile.specialty} />
-              <Row label="City" value={profile.city} />
+              <AppText style={styles.cardTitle}>{t('doctor.pending.submitted')}</AppText>
+              <Row label={t('doctor.prcNumber')} value={profile.prcLicenseNumber} />
+              <Row label={t('doctor.specialty')} value={profile.specialty} />
+              <Row label={t('doctor.city')} value={profile.city} />
             </View>
-            <AppText style={styles.body}>An admin will review your credentials. This screen opens your dashboard by itself once you are approved.</AppText>
+            <AppText style={styles.body}>{t('doctor.pending.body')}</AppText>
           </>
         )}
       </ScrollView>
       <View style={styles.footer}>
-        {rejected ? <PrimaryButton title="Update details and resubmit" onPress={onResubmit} /> : null}
-        <Pressable accessibilityRole="button" onPress={onSignOut} hitSlop={8}><AppText weight="bold" style={styles.signOut}>Sign out</AppText></Pressable>
+        {rejected ? <PrimaryButton title={t('doctor.pending.resubmit')} onPress={onResubmit} /> : null}
+        <Pressable accessibilityRole="button" onPress={onSignOut} hitSlop={8}><AppText weight="bold" style={styles.signOut}>{t('doctor.signOut')}</AppText></Pressable>
       </View>
     </View>
   );

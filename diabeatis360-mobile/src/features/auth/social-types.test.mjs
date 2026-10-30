@@ -47,3 +47,9 @@ test('anything unexpected gets a generic message and never repeats the raw error
   assert.equal(socialErrorMessage(undefined, 'google'), generic);
   assert.equal(socialErrorMessage('boom', 'facebook'), 'We could not sign you in with Facebook. Please try again.');
 });
+
+test('the same reasons in Filipino when the person chose Filipino (D33)', () => {
+  assert.match(socialErrorMessage(new SocialLoginError('unavailable'), 'google', 'Filipino'), /Google.*naka-install na Diabeatis360 app/);
+  assert.match(socialErrorMessage({ code: 'auth/network-request-failed' }, 'google', 'Filipino'), /Walang internet/);
+  assert.equal(socialErrorMessage(new SocialLoginError('cancelled'), 'facebook', 'Filipino'), '', 'closing the window still says nothing');
+});

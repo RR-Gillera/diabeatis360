@@ -15,6 +15,8 @@ export type Provider = {
   consultationFee: number;
   isVerified: boolean;
   isActive: boolean;
+  /** Specialty, PRC number, city and a fee are really filled in (profile-complete.ts), read before any display default. */
+  profileComplete: boolean;
 };
 
 export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';

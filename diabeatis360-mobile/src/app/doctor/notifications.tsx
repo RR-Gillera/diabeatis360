@@ -11,6 +11,8 @@ import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/featu
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
+import { useT } from '@/i18n/language-context';
+import { shortDay, type Language, type MessageKey } from '@/i18n/translate';
 
 type Notice = {
   id: string;
@@ -19,6 +21,8 @@ type Notice = {
   notificationId?: string;
   bookingId?: string;
   unread?: boolean;
+  /** A booking request still waiting for an answer: listed first. */
+  pending?: boolean;
   title: string;
   detail: string;
   when: Date | null;
@@ -28,48 +32,52 @@ type Notice = {
   background: string;
 };
 
+type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
+
 // Notifications are derived from real booking activity rather than read from
 // the (still unused) Notifications collection — nothing writes that collection
 // yet, so deriving keeps this screen truthful instead of empty or seeded.
-function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
+function toNotices(appointments: ProviderBookingEntry[], t: Translate, language: Language): Notice[] {
   return appointments.map((entry) => {
     const when = entry.scheduledAt;
     if (entry.status === 'pending') {
       return {
         id: entry.id, patientId: entry.patientId,
-        title: 'New booking request',
-        detail: `${entry.patientName} requested a consultation${when ? ` on ${when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''} · ${formatFee(entry.fee)}`,
+        title: t('doctor.notif.newRequest'), pending: true,
+        detail: when
+          ? t('doctor.notif.requestOn', { name: entry.patientName, date: shortDay(when, language), time: when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), fee: formatFee(entry.fee) })
+          : t('doctor.notif.request', { name: entry.patientName, fee: formatFee(entry.fee) }),
         when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: '#B45309', background: '#FEF3C7',
       };
     }
     if (entry.status === 'confirmed') {
       return {
         id: entry.id, patientId: entry.patientId,
-        title: 'Appointment confirmed',
-        detail: `You accepted ${entry.patientName}'s consultation${when ? ` on ${when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}.`,
+        title: t('doctor.notif.confirmed'),
+        detail: when ? t('doctor.notif.confirmedOn', { name: entry.patientName, date: shortDay(when, language) }) : t('doctor.notif.confirmedText', { name: entry.patientName }),
         when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint,
       };
     }
     if (entry.status === 'completed') {
       return {
         id: entry.id, patientId: entry.patientId,
-        title: 'Consultation completed',
-        detail: `Your consultation with ${entry.patientName} has ended.`,
+        title: t('doctor.notif.completed'),
+        detail: t('doctor.notif.completedText', { name: entry.patientName }),
         when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: '#475569', background: '#F1F5F9',
       };
     }
     if (entry.status === 'cancelled') {
       return {
         id: entry.id, patientId: entry.patientId,
-        title: 'Appointment cancelled',
-        detail: `${entry.patientName} cancelled their consultation request.`,
+        title: t('doctor.notif.cancelled'),
+        detail: t('doctor.notif.cancelledText', { name: entry.patientName }),
         when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
       };
     }
     return {
       id: entry.id, patientId: entry.patientId,
-      title: 'Appointment declined',
-      detail: `You declined ${entry.patientName}'s consultation request.`,
+      title: t('doctor.notif.declined'),
+      detail: t('doctor.notif.declinedText', { name: entry.patientName }),
       when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
     };
   });
@@ -78,13 +86,14 @@ function toNotices(appointments: ProviderBookingEntry[]): Notice[] {
 export default function DoctorNotificationsScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
   const [stored, setStored] = useState<NotificationEntry[]>([]);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
+    return subscribeToBookingsForProvider(uid, setAppointments, () => setFailed(true));
   }, [uid]);
 
   useEffect(() => {
@@ -103,7 +112,7 @@ export default function DoctorNotificationsScreen() {
         notificationId: entry.id,
         bookingId: entry.relatedId,
         unread: !entry.isRead,
-        title: 'New message',
+        title: t('notif.kind.message'),
         detail: entry.message,
         when: entry.sentAt,
         icon: 'bubble.left.and.bubble.right.fill' as const,
@@ -118,7 +127,7 @@ export default function DoctorNotificationsScreen() {
         patientId: '',
         notificationId: entry.id,
         unread: !entry.isRead,
-        title: entry.severity === 'warning' ? 'Credential review: changes needed' : 'Credentials verified',
+        title: entry.severity === 'warning' ? t('doctor.notif.credWarn') : t('doctor.notif.credOk'),
         detail: entry.message,
         when: entry.sentAt,
         icon: entry.severity === 'warning' ? 'exclamationmark.triangle.fill' as const : 'checkmark.seal.fill' as const,
@@ -140,7 +149,7 @@ export default function DoctorNotificationsScreen() {
           // Unknown patient (the booking is not in the list yet): fall back to the consultation.
           bookingId: patientId ? undefined : entry.relatedId || undefined,
           unread: !entry.isRead,
-          title: 'Critical reading',
+          title: t('doctor.notif.critical'),
           detail: entry.message,
           when: entry.sentAt,
           icon: 'exclamationmark.triangle.fill' as const,
@@ -149,27 +158,28 @@ export default function DoctorNotificationsScreen() {
           background: '#FBE6E9',
         };
       });
-    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...toNotices(appointments)];
+    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...toNotices(appointments, t, language)];
     // Pending requests first, then most recent — the doctor's action queue
     // matters more than strict chronology.
     return list.sort((a, b) => {
-      const aPending = a.unread || a.title === 'New booking request' ? 0 : 1;
-      const bPending = b.unread || b.title === 'New booking request' ? 0 : 1;
+      const aPending = a.unread || a.pending ? 0 : 1;
+      const bPending = b.unread || b.pending ? 0 : 1;
       if (aPending !== bPending) return aPending - bPending;
       return (b.when?.getTime() ?? 0) - (a.when?.getTime() ?? 0);
     });
-  }, [appointments, stored]);
+  }, [appointments, stored, t, language]);
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Notifications" subtitle="Booking activity and critical readings from your patients" />
+      <DoctorHeader title={t('notif.title')} subtitle={t('doctor.notif.subtitle')} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
-        {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
+        {failed ? <Text style={doctorStyles.error}>{t('booking.history.loadFailed')}</Text> : null}
         {notices.length === 0 ? (
-          <EmptyState icon="bell.fill" iconAndroid="inbox" title="Nothing yet" detail="Booking requests, updates and critical readings from your patients will show up here." />
+          <EmptyState icon="bell.fill" iconAndroid="inbox" title={t('doctor.notif.none')} detail={t('doctor.notif.noneText')} />
         ) : notices.map((notice) => (
           <Pressable
             key={notice.id}
+            accessibilityRole="button"
             style={[doctorStyles.card, styles.card, notice.unread ? styles.cardUnread : null]}
             onPress={() => {
               if (notice.notificationId) void markNotificationRead(notice.notificationId);

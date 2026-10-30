@@ -18,27 +18,42 @@ import { glucoseDirection } from '@/constants/glucose';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { ageFrom, weeklyInsights } from '@/features/doctor/doctor-stats';
+import { ACTIVITY_LEVELS, COMMON_ALLERGIES, DIETS } from '@/features/auth/health-profile';
+import { useT } from '@/i18n/language-context';
+import { shortDay, type MessageKey } from '@/i18n/translate';
 
-const readingStyle: Record<Interpretation, { label: string; color: string; background: string }> = {
-  normal: { label: 'Normal', color: homeColors.green, background: homeColors.greenTint },
-  low: { label: 'Low', color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
-  high: { label: 'High', color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
-  critical: { label: 'Critical', color: '#FFFFFF', background: homeColors.red },
+// The badge colours per reading; the words come from constants/enums.ts in the person's language.
+const readingStyle: Record<Interpretation, { color: string; background: string }> = {
+  normal: { color: homeColors.green, background: homeColors.greenTint },
+  low: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
+  high: { color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
+  critical: { color: '#FFFFFF', background: homeColors.red },
 };
 
 // A doctor reads a patient's records only while that patient shares them, by booking this doctor (DECISIONS.md D22). After a
 // decline, or when the patient stops sharing, the database says "permission denied"; say what that means in plain words.
-function readError(value: Error) {
-  return (value as { code?: string }).code === 'permission-denied'
-    ? 'You can no longer see this patient\'s records. Their request may have been declined, or they stopped sharing them with you.'
-    : value.message;
+function readError(value: Error): MessageKey {
+  return (value as { code?: string }).code === 'permission-denied' ? 'doctor.patient.noAccess' : 'doctor.patient.loadFailed';
+}
+
+/** A stored health value (always English) in the reader's language; an unexpected value is shown as stored. */
+function healthLabel(value: string, t: (key: MessageKey) => string) {
+  if (['Type 1', 'Type 2', 'Prediabetes'].includes(value)) return t(`condition.${value}` as MessageKey);
+  const option = [...ACTIVITY_LEVELS, ...DIETS].find((item) => item.value === value);
+  return option ? t(option.labelKey) : value;
+}
+
+/** A common allergy in the reader's language ("Nuts" -> "Mani"); one the patient typed is shown as typed. */
+function allergyLabel(item: string, t: (key: MessageKey) => string) {
+  return COMMON_ALLERGIES.includes(item) ? t(`allergy.${item}` as MessageKey) : item;
 }
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
+  const { t } = useT();
   return (
     <View style={styles.profileRow}>
       <Text style={doctorStyles.label}>{label}</Text>
-      <Text style={[styles.profileValue, !value && styles.profileValueMissing]}>{value || 'Not provided'}</Text>
+      <Text style={[styles.profileValue, !value && styles.profileValueMissing]}>{value || t('doctor.patient.notProvided')}</Text>
     </View>
   );
 }
@@ -47,12 +62,13 @@ export default function DoctorPatientDetailScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/doctor/patients');
   const { uid } = useAuth();
+  const { t, label, language } = useT();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<MessageKey | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -88,16 +104,16 @@ export default function DoctorPatientDetailScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="Patient Health Profile" onBack={() => goBack()} />
+      <DoctorHeader title={t('doctor.patient.title')} onBack={() => goBack()} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         {!id ? (
-          <EmptyState icon="person.crop.circle.badge.questionmark" iconAndroid="person_search" title="Patient not found" />
+          <EmptyState icon="person.crop.circle.badge.questionmark" iconAndroid="person_search" title={t('doctor.patient.notFound')} />
         ) : loading ? (
           <ActivityIndicator color={homeColors.green} />
         ) : error ? (
-          <Text style={doctorStyles.error}>{error}</Text>
+          <Text style={doctorStyles.error}>{t(error)}</Text>
         ) : !profile ? (
-          <EmptyState icon="person.crop.circle.badge.questionmark" iconAndroid="person_search" title="Patient not found" detail="This patient record no longer exists." />
+          <EmptyState icon="person.crop.circle.badge.questionmark" iconAndroid="person_search" title={t('doctor.patient.notFound')} detail={t('doctor.patient.gone')} />
         ) : (
           <>
             {/* Figma D-06: who, then Profile / Logs / Insights. */}
@@ -105,13 +121,13 @@ export default function DoctorPatientDetailScreen() {
               <View style={styles.whoAvatar}><Text style={styles.whoInitials}>{initialsOf(profile.fullName)}</Text></View>
               <View style={styles.whoCopy}>
                 <Text style={styles.whoName}>{profile.fullName}</Text>
-                <Text style={styles.whoMeta}>{age !== null ? `${age} years old` : 'Age not provided'}</Text>
+                <Text style={styles.whoMeta}>{age !== null ? t('doctor.patient.age', { age }) : t('doctor.request.noAge')}</Text>
               </View>
             </View>
             <View style={styles.segment}>
               {(['profile', 'logs', 'insights'] as const).map((option) => (
                 <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: tab === option }} style={[styles.segmentItem, tab === option && styles.segmentActive]} onPress={() => setTab(option)}>
-                  <Text style={[styles.segmentText, tab === option && styles.segmentTextActive]}>{option === 'profile' ? 'Profile' : option === 'logs' ? 'Logs' : 'Insights'}</Text>
+                  <Text style={[styles.segmentText, tab === option && styles.segmentTextActive]}>{t(`doctor.patient.tab.${option}`)}</Text>
                 </Pressable>
               ))}
             </View>
@@ -119,20 +135,20 @@ export default function DoctorPatientDetailScreen() {
             {tab === 'profile' ? (
               <>
                 <View style={[doctorStyles.card, styles.card]}>
-                  <ProfileRow label="Diabetes type" value={profile.diabetesType} />
-                  <ProfileRow label="Activity level" value={profile.activityLevel} />
-                  <ProfileRow label="Diet" value={profile.dietaryPreference} />
+                  <ProfileRow label={t('doctor.patient.diabetesType')} value={healthLabel(profile.diabetesType, t)} />
+                  <ProfileRow label={t('doctor.patient.activity')} value={healthLabel(profile.activityLevel, t)} />
+                  <ProfileRow label={t('doctor.patient.diet')} value={healthLabel(profile.dietaryPreference, t)} />
                   <View style={styles.profileRow}>
-                    <Text style={doctorStyles.label}>Allergies</Text>
+                    <Text style={doctorStyles.label}>{t('doctor.patient.allergies')}</Text>
                     {allergyList.length ? (
-                      <View style={styles.chips}>{allergyList.map((item) => <View key={item} style={styles.chip}><Text style={styles.chipText}>{item}</Text></View>)}</View>
-                    ) : <Text style={[styles.profileValue, styles.profileValueMissing]}>None declared</Text>}
+                      <View style={styles.chips}>{allergyList.map((item) => <View key={item} style={styles.chip}><Text style={styles.chipText}>{allergyLabel(item, t)}</Text></View>)}</View>
+                    ) : <Text style={[styles.profileValue, styles.profileValueMissing]}>{t('doctor.patient.noAllergies')}</Text>}
                   </View>
-                  {profile.location ? <ProfileRow label="Location" value={profile.location} /> : null}
+                  {profile.location ? <ProfileRow label={t('doctor.patient.location')} value={profile.location} /> : null}
                 </View>
                 <View style={styles.visible}>
                   <SymbolView name={{ ios: 'eye.fill', android: 'visibility', web: 'visibility' }} size={14} tintColor={homeColors.green} />
-                  <Text style={styles.visibleText}>Visible because this patient booked you.</Text>
+                  <Text style={styles.visibleText}>{t('doctor.patient.visible')}</Text>
                 </View>
               </>
             ) : null}
@@ -143,19 +159,19 @@ export default function DoctorPatientDetailScreen() {
                   <View style={styles.summaryRow}>
                     <View style={styles.summaryItem}>
                       <Text style={styles.summaryValue}>{latest ? latest.readingMgdl : '—'}</Text>
-                      <Text style={styles.summaryLabel}>Latest</Text>
+                      <Text style={styles.summaryLabel}>{t('doctor.patient.latest')}</Text>
                     </View>
                     <View style={styles.summaryItem}>
                       <Text style={styles.summaryValue}>{weekAverage ?? '—'}</Text>
-                      <Text style={styles.summaryLabel}>Week avg</Text>
+                      <Text style={styles.summaryLabel}>{t('doctor.patient.weekAvg')}</Text>
                     </View>
                     <View style={styles.summaryItem}>
                       <Text style={[styles.summaryValue, highCount ? styles.summaryValueHigh : null]}>{highCount}</Text>
-                      <Text style={styles.summaryLabel}>High</Text>
+                      <Text style={styles.summaryLabel}>{label('interpretation', 'high')}</Text>
                     </View>
                     <View style={styles.summaryItem}>
                       <Text style={[styles.summaryValue, lowCount ? styles.summaryValueLow : null]}>{lowCount}</Text>
-                      <Text style={styles.summaryLabel}>Low</Text>
+                      <Text style={styles.summaryLabel}>{label('interpretation', 'low')}</Text>
                     </View>
                   </View>
                   <View style={styles.chartWrap}>
@@ -165,16 +181,16 @@ export default function DoctorPatientDetailScreen() {
 
                 {consultations.length ? (
                   <>
-                    <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Consultations</Text>
+                    <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>{t('doctor.patient.consultations')}</Text>
                     {consultations.map((entry) => (
-                      <Pressable key={entry.id} style={[doctorStyles.card, styles.consultCard]} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
+                      <Pressable key={entry.id} accessibilityRole="button" style={[doctorStyles.card, styles.consultCard]} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
                         <View style={styles.consultIcon}>
                           <SymbolView name={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' }} size={16} tintColor={homeColors.green} />
                         </View>
                         <View style={styles.consultCopy}>
-                          <Text style={styles.consultTitle}>Open Chat</Text>
+                          <Text style={styles.consultTitle}>{t('appt.openChat')}</Text>
                           <Text style={styles.consultMeta}>
-                            {entry.scheduledAt ? entry.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Appointment'}
+                            {entry.scheduledAt ? shortDay(entry.scheduledAt, language) : t('doctor.patient.appointment')}
                             {entry.scheduledAt ? ` · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
                           </Text>
                         </View>
@@ -184,9 +200,9 @@ export default function DoctorPatientDetailScreen() {
                   </>
                 ) : null}
 
-                <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Reading History</Text>
+                <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>{t('doctor.patient.history')}</Text>
                 {entries.length === 0 ? (
-                  <EmptyState icon="drop.fill" iconAndroid="monitor_heart" title="No readings logged" detail="This patient has not logged any blood sugar readings yet." />
+                  <EmptyState icon="drop.fill" iconAndroid="monitor_heart" title={t('doctor.patient.noReadings')} detail={t('doctor.patient.noReadingsText')} />
                 ) : entries.slice(0, 20).map((entry) => {
                   const style = readingStyle[entry.interpretation];
                   return (
@@ -198,15 +214,15 @@ export default function DoctorPatientDetailScreen() {
                         <View>
                           <Text style={styles.entryReading}>{entry.readingMgdl} <Text style={styles.entryUnit}>mg/dL</Text></Text>
                           <Text style={styles.entryMeta}>
-                            {entry.loggedAt ? entry.loggedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                            {entry.loggedAt ? shortDay(entry.loggedAt, language) : '—'}
                             {entry.loggedAt ? ` · ${entry.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
-                            {' · '}{entry.context === 'after_meal' ? 'After meal' : 'Before meal'}
+                            {' · '}{label('mealContext', entry.context)}
                           </Text>
                           {entry.notes ? <Text style={styles.entryNotes}>&ldquo;{entry.notes}&rdquo;</Text> : null}
                         </View>
                       </View>
                       <View style={[styles.entryBadge, { backgroundColor: style.background }]}>
-                        <Text style={[styles.entryBadgeText, { color: style.color }]}>{style.label}</Text>
+                        <Text style={[styles.entryBadgeText, { color: style.color }]}>{label('interpretation', entry.interpretation)}</Text>
                       </View>
                     </View>
                   );
@@ -218,15 +234,15 @@ export default function DoctorPatientDetailScreen() {
               insights ? (
                 <>
                   <View style={styles.tiles}>
-                    <View style={[doctorStyles.card, styles.tile]}><Text style={styles.tileValue}>{insights.average}</Text><Text style={styles.tileLabel}>7-day average (mg/dL)</Text></View>
-                    <View style={[doctorStyles.card, styles.tile]}><Text style={styles.tileValue}>{insights.inRangePercent}%</Text><Text style={styles.tileLabel}>Readings in the normal range</Text></View>
-                    <View style={[doctorStyles.card, styles.tile]}><Text style={[styles.tileValue, styles.summaryValueHigh]}>{insights.highest}</Text><Text style={styles.tileLabel}>Highest (mg/dL)</Text></View>
-                    <View style={[doctorStyles.card, styles.tile]}><Text style={[styles.tileValue, styles.summaryValueLow]}>{insights.lowest}</Text><Text style={styles.tileLabel}>Lowest (mg/dL)</Text></View>
+                    <View style={[doctorStyles.card, styles.tile]}><Text style={styles.tileValue}>{insights.average}</Text><Text style={styles.tileLabel}>{t('doctor.patient.avg7')}</Text></View>
+                    <View style={[doctorStyles.card, styles.tile]}><Text style={styles.tileValue}>{insights.inRangePercent}%</Text><Text style={styles.tileLabel}>{t('doctor.patient.inRange')}</Text></View>
+                    <View style={[doctorStyles.card, styles.tile]}><Text style={[styles.tileValue, styles.summaryValueHigh]}>{insights.highest}</Text><Text style={styles.tileLabel}>{t('doctor.patient.highest')}</Text></View>
+                    <View style={[doctorStyles.card, styles.tile]}><Text style={[styles.tileValue, styles.summaryValueLow]}>{insights.lowest}</Text><Text style={styles.tileLabel}>{t('doctor.patient.lowest')}</Text></View>
                   </View>
-                  <Text style={styles.insightNote}>Based on {insights.count} {insights.count === 1 ? 'reading' : 'readings'} in the last 7 days. Plain numbers from the patient&apos;s own log, not an AI estimate.</Text>
+                  <Text style={styles.insightNote}>{insights.count === 1 ? t('doctor.patient.basedOnOne') : t('doctor.patient.basedOn', { count: insights.count })}</Text>
                 </>
               ) : (
-                <EmptyState icon="chart.bar.fill" iconAndroid="insights" title="No readings this week" detail="Insights appear once the patient logs readings in the last 7 days." />
+                <EmptyState icon="chart.bar.fill" iconAndroid="insights" title={t('doctor.patient.noWeek')} detail={t('doctor.patient.noWeekText')} />
               )
             ) : null}
           </>

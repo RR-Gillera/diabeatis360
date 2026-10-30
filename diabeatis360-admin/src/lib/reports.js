@@ -1,5 +1,6 @@
 import { formatDateTime, toDate } from './format'
 import { bookingStatusLabels, commissionOf, paymentStatusLabels } from './labels'
+import { earnsCommission } from './revenue'
 
 // Report definitions for "Generate System Reports". Each report turns the collections into rows; the page shows
 // the rows as a table, and the very same rows become the CSV file.
@@ -55,7 +56,7 @@ export function buildReport(type, data, from, to) {
       summary: [
         { label: 'Total appointments', value: rows.length },
         { label: 'Completion rate', value: decided.length ? `${Math.round((completed.length / decided.length) * 100)}%` : '—' },
-        { label: 'Platform revenue (15%)', value: `₱${completed.reduce((sum, b) => sum + commissionOf(b), 0).toFixed(2)}` },
+        { label: 'Platform revenue (15%, paid online)', value: `₱${rows.filter(earnsCommission).reduce((sum, b) => sum + commissionOf(b), 0).toFixed(2)}` },
       ],
       columns: [
         { header: 'Date & time', value: (b) => formatDateTime(b.scheduled_at) },

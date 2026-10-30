@@ -1,24 +1,36 @@
-import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
+import { AuthButton } from '@/features/auth/auth-ui';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
+import { SETUP_PROGRESS, SetupHint, SetupNote, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
+import { useT } from '@/i18n/language-context';
 
+// Figma "Profile Setup Step 3" (Language & Region). Tapping a language switches every screen at once (D33); Next saves
+// it to the profile (Users.language_preference).
 export default function LanguageScreen() {
   const router = useRouter();
   const { email, uid } = useAuth();
-  const [language, setLanguage] = useState('English');
-  // This screen used to drop the chosen language on the floor — it was never
-  // persisted anywhere, so the preference silently vanished on Next.
+  const { t, language, setLanguage } = useT();
   const next = async () => {
     if (email) await saveOnboardingValue(email, 'language', language, uid);
     router.push('/onboarding/profile-type');
   };
-  return <View style={[authStyles.screen, styles.screen]}><View style={styles.progress}><Text style={styles.progressLabel}>INITIAL SETUP</Text><Text style={styles.step}>25% Complete</Text></View><View style={styles.track}><View style={styles.fill} /></View><Text style={styles.back} onPress={() => router.back()}>‹  Back</Text><Text style={styles.title}>Language &{`\n`}Region</Text><Text style={styles.subtitle}>Choose your preferred language for a better health management experience.</Text><Option title="🇺🇸   English" detail="System Default" selected={language === 'English'} onPress={() => setLanguage('English')} /><Option title="🇵🇭   Filipino / Tagalog" detail="Lokal na Wika" selected={language === 'Filipino'} onPress={() => setLanguage('Filipino')} /><View style={styles.info}><Text style={styles.infoIcon}>●</Text><Text style={styles.infoText}>You can change your language preferences at any time in the app settings.</Text></View><View style={styles.bottom}><AuthButton title="Next  ›" onPress={next} /><Text style={styles.hint}>◉    Content will adapt based on your selection.</Text></View></View>;
+  return (
+    <SetupScreen
+      section={t('setup.section.initial')}
+      percent={SETUP_PROGRESS.language}
+      title={t('setup.language.title')}
+      subtitle={t('setup.language.subtitle')}
+      onBack={router.canGoBack() ? () => router.back() : undefined}
+      footer={<>
+        <AuthButton title={t('common.next')} icon="next" onPress={next} />
+        <SetupHint icon={{ ios: 'globe', android: 'language' }}>{t('setup.language.hint')}</SetupHint>
+      </>}
+    >
+      <SetupOption emoji="🇺🇸" title="English" detail={t('setup.language.englishDetail')} selected={language === 'English'} onPress={() => setLanguage('English')} />
+      <SetupOption emoji="🇵🇭" title="Filipino / Tagalog" detail={t('setup.language.filipinoDetail')} selected={language === 'Filipino'} onPress={() => setLanguage('Filipino')} />
+      <SetupNote>{t('setup.language.note')}</SetupNote>
+    </SetupScreen>
+  );
 }
-
-function Option({ title, detail, selected, onPress }: { title: string; detail: string; selected: boolean; onPress: () => void }) { return <Pressable onPress={onPress} style={[styles.option, selected && styles.selected]}><View style={styles.optionText}><Text style={styles.optionTitle}>{title}</Text><Text style={styles.detail}>{detail}</Text></View><View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <Text style={styles.check}>✓</Text> : null}</View></Pressable>; }
-
-const styles = StyleSheet.create({ screen: { padding: 24 }, progress: { flexDirection: 'row', justifyContent: 'space-between' }, progressLabel: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 }, step: { color: '#91A4BF', fontSize: 11, fontWeight: '700' }, track: { backgroundColor: '#DDE5EF', borderRadius: 4, height: 6, marginTop: 10 }, fill: { backgroundColor: authColors.green, borderRadius: 4, height: '100%', width: '25%' }, back: { color: '#91A4BF', fontSize: 15, marginTop: 44 }, title: { color: authColors.navy, fontSize: 32, fontWeight: '900', lineHeight: 38, marginTop: 26 }, subtitle: { color: authColors.muted, fontSize: 16, lineHeight: 25, marginTop: 14 }, option: { alignItems: 'center', backgroundColor: '#FFF', borderColor: '#FFF', borderRadius: 24, borderWidth: 2, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, minHeight: 86, paddingHorizontal: 20 }, selected: { borderColor: authColors.green }, optionText: { gap: 5 }, optionTitle: { color: authColors.navy, fontSize: 18, fontWeight: '800' }, detail: { color: '#91A4BF', fontSize: 14, marginLeft: 37 }, radio: { alignItems: 'center', borderColor: authColors.border, borderRadius: 14, borderWidth: 2, height: 24, justifyContent: 'center', width: 24 }, radioSelected: { backgroundColor: authColors.green, borderColor: authColors.green }, check: { color: '#FFF', fontWeight: '900' }, info: { alignItems: 'flex-start', backgroundColor: '#F0F7E7', borderRadius: 18, flexDirection: 'row', gap: 12, marginTop: 40, padding: 20 }, infoIcon: { color: authColors.green, fontSize: 16 }, infoText: { color: authColors.green, flex: 1, fontSize: 14, lineHeight: 23 }, bottom: { marginTop: 'auto', paddingTop: 34 }, hint: { color: '#91A4BF', fontSize: 12, marginTop: 24, textAlign: 'center' } });

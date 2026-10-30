@@ -7,6 +7,8 @@ import { LockIcon, MailIcon } from '../components/icons'
 import { sendAdminPasswordReset, signInAdmin } from '../services/adminAccount'
 import { useResetEmail } from '../lib/useResetEmail'
 
+const LAST_EMAIL_KEY = 'diabeatis360:lastAdminEmail'
+
 function loginError(error) {
   const code = error?.code ?? ''
   if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(code)) {
@@ -65,7 +67,8 @@ function BrandPanel() {
 export default function LoginPage() {
   const navigate = useNavigate()
   const { status, authMessage, clearAuthMessage } = useAuth()
-  const [email, setEmail] = useState('')
+  // The page reloads after "Not an admin account", so the email typed is kept for this browser tab (QA F-ADMIN-EMAIL-CLEARED).
+  const [email, setEmail] = useState(() => { try { return sessionStorage.getItem(LAST_EMAIL_KEY) ?? '' } catch { return '' } })
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(false)
@@ -88,6 +91,7 @@ export default function LoginPage() {
     }
     setError('')
     setBusy(true)
+    try { sessionStorage.setItem(LAST_EMAIL_KEY, email.trim()) } catch { /* private mode: nothing to keep */ }
     try {
       await signInAdmin(email, password, remember)
       // AuthProvider now checks Admins/{uid}; a non-admin is signed out again and sees "Not an admin account".
@@ -152,7 +156,7 @@ export default function LoginPage() {
             </div>
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-ink">Password</span>
+                <label htmlFor="admin-password" className="text-sm font-medium text-ink">Password</label>
                 <button type="button" onClick={openReset} className="text-sm font-bold text-brand underline-offset-2 hover:underline">
                   Forgot password?
                 </button>
@@ -160,6 +164,7 @@ export default function LoginPage() {
               <div className="relative mt-1">
                 <LockIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <input
+                  id="admin-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -169,6 +174,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted hover:text-ink"
                 >
                   {showPassword ? 'Hide' : 'Show'}

@@ -8,11 +8,13 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
+import { formatDate } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { durationLabel } from '@/features/consultation/consultation-format';
 import { subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Consultation Summary (Figma P-25): who, when, how long, and the doctor's notes. Opened from "View Summary" on a
 // completed appointment, from the ended chat, and after a video call. The notes come from Consultation_Notes, which only
@@ -20,15 +22,16 @@ import { useSafeBack } from '@/hooks/use-safe-back';
 export default function ConsultationSummaryScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { role } = useAuth();
+  const { t, language } = useT();
   const goBack = useSafeBack(role === 'doctor' ? '/doctor/appointments' : '/booking/my-appointments' as never);
   const [booking, setBooking] = useState<AppointmentHistoryEntry | null>(null);
   const [consultation, setConsultation] = useState<ConsultationState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    return subscribeToBooking(id, setBooking, (value) => setError(value.message));
+    return subscribeToBooking(id, setBooking, () => setFailed(true));
   }, [id]);
   useEffect(() => {
     if (!id) return;
@@ -39,11 +42,11 @@ export default function ConsultationSummaryScreen() {
     return subscribeToMessages(id, setMessages, () => {});
   }, [id]);
 
-  const doctorName = booking?.provider?.fullName ?? 'Your doctor';
+  const doctorName = booking?.provider?.fullName ?? t('call.fallbackDoctor');
   const isDoctor = role === 'doctor';
-  const title = isDoctor ? (booking?.patientName || 'Your patient') : doctorName;
-  const subtitle = isDoctor ? 'Patient' : [booking?.provider?.specialty, booking?.provider?.city].filter(Boolean).join(' · ');
-  const duration = durationLabel(messages[0]?.sentAt ?? null, consultation?.endedAt ?? null);
+  const title = isDoctor ? (booking?.patientName || t('call.fallbackPatient')) : doctorName;
+  const subtitle = isDoctor ? t('summary.patient') : [booking?.provider?.specialty, booking?.provider?.city].filter(Boolean).join(' · ');
+  const duration = durationLabel(messages[0]?.sentAt ?? null, consultation?.endedAt ?? null, language);
   const date = booking?.scheduledAt ?? consultation?.endedAt ?? null;
   const summary = consultation?.summary?.trim() ?? '';
   const advice = consultation?.advice?.trim() ?? '';
@@ -53,9 +56,9 @@ export default function ConsultationSummaryScreen() {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.scroll}>
       <RoundBackButton onPress={goBack} />
-      <Text style={styles.title}>Consultation Summary</Text>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!booking && !error ? <ActivityIndicator color={homeColors.green} style={styles.loader} /> : null}
+      <Text accessibilityRole="header" style={styles.title}>{t('summary.title')}</Text>
+      {failed ? <Text style={styles.error}>{t('appt.loadFailed')}</Text> : null}
+      {!booking && !failed ? <ActivityIndicator color={homeColors.green} style={styles.loader} /> : null}
       {booking ? (
         <>
           <View style={styles.card}>
@@ -67,8 +70,8 @@ export default function ConsultationSummaryScreen() {
               </View>
             </View>
             <View style={styles.divider} />
-            <View style={styles.row}><Text style={styles.label}>Date</Text><Text style={styles.value}>{date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</Text></View>
-            {duration ? <View style={styles.row}><Text style={styles.label}>Duration</Text><Text style={styles.value}>{duration}</Text></View> : null}
+            <View style={styles.row}><Text style={styles.label}>{t('summary.date')}</Text><Text style={styles.value}>{date ? formatDate(date, language) : '—'}</Text></View>
+            {duration ? <View style={styles.row}><Text style={styles.label}>{t('summary.duration')}</Text><Text style={styles.value}>{duration}</Text></View> : null}
           </View>
 
           {hasNotes ? (
@@ -76,7 +79,7 @@ export default function ConsultationSummaryScreen() {
             {summary ? <View style={styles.card}>
               <View style={styles.sectionHead}>
                 <SymbolView name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }} size={16} tintColor={homeColors.green} />
-                <Text style={styles.sectionTitle}>Doctor&apos;s notes</Text>
+                <Text style={styles.sectionTitle}>{t('summary.notes')}</Text>
               </View>
               <Text style={styles.sectionText}>{summary}</Text>
             </View> : null}
@@ -84,7 +87,7 @@ export default function ConsultationSummaryScreen() {
               <View style={styles.card}>
                 <View style={styles.sectionHead}>
                   <SymbolView name={{ ios: 'sparkle', android: 'auto_awesome', web: 'auto_awesome' }} size={16} tintColor={homeColors.green} />
-                  <Text style={styles.sectionTitle}>Advice</Text>
+                  <Text style={styles.sectionTitle}>{t('summary.advice')}</Text>
                 </View>
                 <Text style={styles.sectionText}>{advice}</Text>
               </View>
@@ -93,12 +96,12 @@ export default function ConsultationSummaryScreen() {
               <View style={styles.card}>
                 <View style={styles.sectionHead}>
                   <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor={homeColors.green} />
-                  <Text style={styles.sectionTitle}>Follow-up</Text>
+                  <Text style={styles.sectionTitle}>{t('summary.followUp')}</Text>
                 </View>
                 <Text style={styles.sectionText}>
-                  {followUp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · {followUp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · Chat consultation
+                  {formatDate(followUp, language)} · {followUp.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {t('summary.chatConsultation')}
                 </Text>
-                <Text style={styles.followNote}>Book this time from Find a Doctor; a follow-up is not booked automatically.</Text>
+                <Text style={styles.followNote}>{t('summary.followNote')}</Text>
               </View>
             ) : null}
             </>
@@ -108,9 +111,9 @@ export default function ConsultationSummaryScreen() {
               <View style={styles.emptyCircle}>
                 <SymbolView name={{ ios: 'doc.text.fill', android: 'description', web: 'description' }} size={34} tintColor={homeColors.green} />
               </View>
-              <Text style={styles.emptyTitle}>No summary recorded yet</Text>
+              <Text style={styles.emptyTitle}>{t('summary.noneTitle')}</Text>
               <Text style={styles.emptyText}>
-                {isDoctor ? 'You have not added notes for this consultation yet.' : `${doctorName} hasn't added notes for this consultation.`}
+                {isDoctor ? t('summary.noneDoctor') : t('summary.nonePatient', { name: doctorName })}
               </Text>
             </View>
           )}

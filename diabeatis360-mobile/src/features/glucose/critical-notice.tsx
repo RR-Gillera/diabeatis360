@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { AppText } from '@/components/ui/app-text';
 import { CallEmergencyButton } from '@/components/ui/call-emergency-button';
 import { Brand } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
 
 /**
  * Shown instead of meal/exercise suggestions when the latest reading is critical (DECISIONS.md D4).
@@ -11,15 +12,16 @@ import { Brand } from '@/constants/theme';
  * never gives medication or insulin advice.
  */
 export function CriticalNotice({ readingMgdl }: { readingMgdl: number | null }) {
+  const { t } = useT();
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={20} tintColor={Brand.colors.danger} />
-        <AppText weight="bold" style={styles.title}>Seek medical help now</AppText>
+        <AppText weight="bold" style={styles.title}>{t('critical.title')}</AppText>
       </View>
       <AppText style={styles.text}>
-        {readingMgdl !== null ? `Your latest reading of ${readingMgdl} mg/dL is in a dangerous range. ` : 'Your latest reading is in a dangerous range. '}
-        Please contact your doctor or go to the nearest hospital. Suggestions are paused until your reading is back in range.
+        {readingMgdl !== null ? t('critical.withValue', { value: readingMgdl }) : t('critical.noValue')}
+        {t('critical.advice')}
       </AppText>
       <CallEmergencyButton compact />
     </View>

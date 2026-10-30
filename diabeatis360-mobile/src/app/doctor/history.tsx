@@ -7,22 +7,24 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
-import { formatFee } from '@/features/booking/booking-ui';
+import { formatDate, formatFee } from '@/features/booking/booking-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { DoctorBottomNav, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
 
 // History (the doctor nav's third tab, DECISIONS D24): finished consultations, newest first. Each opens Consultation
 // Details (the doctor frame "After Consultation"), where the notes are read and added to.
 export default function DoctorHistoryScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
+    return subscribeToBookingsForProvider(uid, setAppointments, () => setFailed(true));
   }, [uid]);
 
   const finished = useMemo(() => appointments
@@ -32,21 +34,21 @@ export default function DoctorHistoryScreen() {
   return (
     <View style={doctorStyles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Consultation History</Text>
-        <Text style={styles.subtitle}>Finished consultations, newest first</Text>
-        {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
+        <Text accessibilityRole="header" style={styles.title}>{t('doctor.history.title')}</Text>
+        <Text style={styles.subtitle}>{t('doctor.history.subtitle')}</Text>
+        {failed ? <Text style={doctorStyles.error}>{t('booking.history.loadFailed')}</Text> : null}
         {finished.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyCircle}><SymbolView name={{ ios: 'clock.arrow.circlepath', android: 'history', web: 'history' }} size={40} tintColor={homeColors.green} /></View>
-            <Text style={styles.emptyTitle}>No finished consultations yet</Text>
-            <Text style={styles.emptyText}>When a consultation ends it moves here, with its notes.</Text>
+            <Text style={styles.emptyTitle}>{t('doctor.history.none')}</Text>
+            <Text style={styles.emptyText}>{t('doctor.history.noneText')}</Text>
           </View>
         ) : finished.map((entry) => (
           <Pressable key={entry.id} accessibilityRole="button" style={[doctorStyles.card, styles.card]} onPress={() => router.push({ pathname: '/doctor/consultation/[id]', params: { id: entry.id } } as never)}>
             <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(entry.patientName)}</Text></View>
             <View style={styles.copy}>
               <Text style={styles.name}>{entry.patientName}</Text>
-              <Text style={styles.meta}>{entry.scheduledAt ? entry.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'} · {formatFee(entry.fee)}</Text>
+              <Text style={styles.meta}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'} · {formatFee(entry.fee)}</Text>
             </View>
             <StatusPill status={entry.status} />
           </Pressable>

@@ -24,3 +24,10 @@ test('the duration reads like the frame and is hidden when it cannot be known', 
   assert.equal(durationLabel(start, null), null);
   assert.equal(durationLabel(after(10), start), null, 'an end before the start is not shown');
 });
+
+test('the duration is said in Filipino too (D33)', () => {
+  const start = new Date(2026, 9, 29, 9, 0);
+  assert.equal(durationLabel(start, new Date(2026, 9, 29, 9, 18), 'Filipino'), '18 minuto');
+  assert.equal(durationLabel(start, new Date(2026, 9, 29, 10, 5), 'Filipino'), '1 oras 5 min');
+  assert.equal(durationLabel(start, new Date(2026, 9, 29, 9, 0, 20), 'Filipino'), 'Wala pang isang minuto');
+});

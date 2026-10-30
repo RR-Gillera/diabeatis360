@@ -5,10 +5,11 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { NOTIFICATION_FILTERS, matchesFilter, notificationTitle, shortTime, type NotificationFilter } from '@/features/notifications/notification-display';
+import { filterLabel, NOTIFICATION_FILTERS, matchesFilter, notificationTitle, shortTime, type NotificationFilter } from '@/features/notifications/notification-display';
 import { markAllNotificationsRead, markNotificationRead, subscribeToNotifications, type NotificationEntry, type NotificationType } from '@/features/notifications/notification-service';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Icon and colour per kind of notification (Figma P-22). A critical blood sugar alert is red instead of orange.
 const kindStyle = {
@@ -21,25 +22,21 @@ const kindStyle = {
   doctor_verification: { color: homeColors.green, background: homeColors.greenTint, icon: 'person.badge.shield.checkmark', iconAndroid: 'verified_user' },
 } as const satisfies Record<NotificationType, { color: string; background: string; icon: string; iconAndroid: string }>;
 
-const emptyText: Record<NotificationFilter, string> = {
-  all: 'Alerts about your readings, appointments and messages will show up here.',
-  appointments: 'Updates about your bookings will show up here.',
-  messages: 'New messages from your doctor will show up here.',
-  alerts: 'Out-of-range readings and verification results will show up here.',
-};
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [entries, setEntries] = useState<NotificationEntry[]>([]);
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToNotifications(uid, setEntries, (value) => setError(value.message));
+    return subscribeToNotifications(uid, setEntries, () => setLoadFailed(true));
   }, [uid]);
 
   const shown = useMemo(() => entries.filter((entry) => matchesFilter(entry.type, filter)), [entries, filter]);
@@ -59,7 +56,7 @@ export default function NotificationsScreen() {
     try {
       await markAllNotificationsRead(unreadIds);
     } catch {
-      setError('We could not mark them as read. Please try again.');
+      setError(t('notif.markFailed'));
     } finally {
       setMarking(false);
     }
@@ -68,13 +65,13 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" style={styles.backButton} onPress={() => goBack()} hitSlop={10}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={() => goBack()} hitSlop={10}>
           <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
         </Pressable>
-        <Text style={styles.title}>Notifications</Text>
+        <Text accessibilityRole="header" style={styles.title}>{t('notif.title')}</Text>
         {unreadIds.length > 0 ? (
           <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
-            <Text style={styles.markAll}>{marking ? 'Marking...' : 'Mark all as read'}</Text>
+            <Text style={styles.markAll}>{marking ? t('notif.marking') : t('notif.markAll')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -82,20 +79,20 @@ export default function NotificationsScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
         {NOTIFICATION_FILTERS.map((tab) => (
           <Pressable key={tab.key} accessibilityRole="button" accessibilityState={{ selected: filter === tab.key }} style={[styles.tab, filter === tab.key && styles.tabActive]} onPress={() => setFilter(tab.key)}>
-            <Text style={[styles.tabText, filter === tab.key && styles.tabTextActive]}>{tab.label}</Text>
+            <Text style={[styles.tabText, filter === tab.key && styles.tabTextActive]}>{filterLabel(tab.key, language)}</Text>
           </Pressable>
         ))}
       </ScrollView>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error || loadFailed ? <Text style={styles.error}>{error || t('notif.loadFailed')}</Text> : null}
         {shown.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <SymbolView name={{ ios: 'bell.fill', android: 'inbox', web: 'inbox' }} size={22} tintColor={homeColors.textFaint} />
             </View>
-            <Text style={styles.emptyTitle}>You are all caught up</Text>
-            <Text style={styles.emptyDetail}>{emptyText[filter]}</Text>
+            <Text style={styles.emptyTitle}>{t('notif.caughtUp')}</Text>
+            <Text style={styles.emptyDetail}>{t(`notif.empty.${filter}`)}</Text>
           </View>
         ) : (
           <View style={styles.list}>
@@ -109,12 +106,12 @@ export default function NotificationsScreen() {
                     <SymbolView name={{ ios: look.icon, android: look.iconAndroid, web: look.iconAndroid }} size={18} tintColor={look.color} />
                   </View>
                   <View style={styles.copy}>
-                    <Text style={styles.rowTitle}>{notificationTitle(entry.type)}</Text>
+                    <Text style={styles.rowTitle}>{notificationTitle(entry.type, language)}</Text>
                     <Text style={styles.message}>{entry.message}</Text>
                   </View>
                   <View style={styles.side}>
-                    <Text style={styles.when}>{shortTime(entry.sentAt)}</Text>
-                    {!entry.isRead ? <View style={styles.unreadDot} accessibilityLabel="Unread" /> : null}
+                    <Text style={styles.when}>{shortTime(entry.sentAt, new Date(), language)}</Text>
+                    {!entry.isRead ? <View style={styles.unreadDot} accessibilityLabel={t('notif.unread')} /> : null}
                   </View>
                 </Pressable>
               );

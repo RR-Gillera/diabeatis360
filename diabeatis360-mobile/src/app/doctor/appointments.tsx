@@ -12,25 +12,22 @@ import type { ProviderBookingEntry } from '@/features/booking/types';
 import { REQUEST_TABS, requestTabFor, type RequestTab } from '@/features/doctor/doctor-stats';
 import { DoctorBottomNav, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
+import { shortDay } from '@/i18n/translate';
 
 // "Appointment Requests" (Figma D-11): the doctor's bookings in three tabs. A pending request opens Request Details,
 // where it is accepted or declined. Finished consultations are under History.
-const emptyCopy: Record<RequestTab, { title: string; text: string }> = {
-  pending: { title: 'No pending requests right now', text: 'New requests from patients will appear here.' },
-  accepted: { title: 'No accepted appointments', text: 'Requests you accept will appear here until the consultation ends.' },
-  declined: { title: 'No declined requests', text: 'Requests you decline or that were cancelled will appear here.' },
-};
-
 export default function DoctorRequestsScreen() {
   const router = useRouter();
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const [tab, setTab] = useState<RequestTab>('pending');
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
-    return subscribeToBookingsForProvider(uid, setAppointments, (value) => setError(value.message));
+    return subscribeToBookingsForProvider(uid, setAppointments, () => setFailed(true));
   }, [uid]);
 
   const shown = useMemo(() => appointments.filter((entry) => requestTabFor(entry.status) === tab), [appointments, tab]);
@@ -38,31 +35,31 @@ export default function DoctorRequestsScreen() {
   return (
     <View style={doctorStyles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Appointment Requests</Text>
+        <Text accessibilityRole="header" style={styles.title}>{t('doctor.req.title')}</Text>
         <View style={styles.segment}>
           {REQUEST_TABS.map((option) => {
             const count = appointments.filter((entry) => requestTabFor(entry.status) === option.key).length;
             return (
               <Pressable key={option.key} accessibilityRole="button" accessibilityState={{ selected: tab === option.key }} style={[styles.segmentItem, tab === option.key && styles.segmentActive]} onPress={() => setTab(option.key)}>
-                <Text style={[styles.segmentText, tab === option.key && styles.segmentTextActive]}>{option.label}{count ? ` (${count})` : ''}</Text>
+                <Text style={[styles.segmentText, tab === option.key && styles.segmentTextActive]}>{t(`doctor.req.tab.${option.key}`)}{count ? ` (${count})` : ''}</Text>
               </Pressable>
             );
           })}
         </View>
 
-        {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
+        {failed ? <Text style={doctorStyles.error}>{t('booking.history.loadFailed')}</Text> : null}
 
         {shown.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyCircle}><SymbolView name={{ ios: 'tray.fill', android: 'inbox', web: 'inbox' }} size={40} tintColor={homeColors.green} /></View>
-            <Text style={styles.emptyTitle}>{emptyCopy[tab].title}</Text>
-            <Text style={styles.emptyText}>{emptyCopy[tab].text}</Text>
+            <Text style={styles.emptyTitle}>{t(`doctor.req.empty.${tab}.title`)}</Text>
+            <Text style={styles.emptyText}>{t(`doctor.req.empty.${tab}.text`)}</Text>
           </View>
         ) : shown.map((entry) => (
           <View key={entry.id} style={[doctorStyles.card, styles.card]}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`${entry.patientName}, request details`}
+              accessibilityLabel={t('doctor.req.cardLabel', { name: entry.patientName })}
               style={styles.cardTop}
               onPress={() => router.push({ pathname: '/doctor/request/[id]', params: { id: entry.id } } as never)}>
               <View style={[styles.avatar, entry.queueNumber ? styles.avatarQueued : null]}>
@@ -72,23 +69,23 @@ export default function DoctorRequestsScreen() {
               <View style={styles.copy}>
                 <Text style={styles.name}>{entry.patientName}</Text>
                 <Text style={styles.meta}>
-                  {entry.scheduledAt ? `${entry.scheduledAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '—'} · {formatFee(entry.fee)}
+                  {entry.scheduledAt ? `${shortDay(entry.scheduledAt, language)} · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '—'} · {formatFee(entry.fee)}
                 </Text>
               </View>
               <StatusPill status={entry.status} />
             </Pressable>
             {entry.status === 'pending' ? (
               <Pressable accessibilityRole="button" style={styles.primary} onPress={() => router.push({ pathname: '/doctor/request/[id]', params: { id: entry.id } } as never)}>
-                <Text style={styles.primaryText}>Review request</Text>
+                <Text style={styles.primaryText}>{t('doctor.req.review')}</Text>
               </Pressable>
             ) : null}
             {entry.status === 'confirmed' ? (
               <View style={styles.row}>
                 <Pressable accessibilityRole="button" style={styles.outline} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: entry.patientId } })}>
-                  <Text style={styles.outlineText}>Patient records</Text>
+                  <Text style={styles.outlineText}>{t('doctor.req.records')}</Text>
                 </Pressable>
                 <Pressable accessibilityRole="button" style={[styles.primary, styles.flex]} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: entry.id } })}>
-                  <Text style={styles.primaryText}>Open Chat</Text>
+                  <Text style={styles.primaryText}>{t('appt.openChat')}</Text>
                 </Pressable>
               </View>
             ) : null}

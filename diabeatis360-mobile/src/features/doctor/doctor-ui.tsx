@@ -4,15 +4,17 @@ import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { homeColors } from '@/features/home/home-ui';
-import { enumLabel } from '@/constants/enums';
 import type { BookingStatus } from '@/features/booking/types';
+import { useT } from '@/i18n/language-context';
+import type { MessageKey } from '@/i18n/translate';
 
-export const statusStyle: Record<BookingStatus, { label: string; color: string; background: string }> = {
-  pending: { label: enumLabel('bookingStatus', 'pending'), color: '#B45309', background: '#FEF3C7' },
-  confirmed: { label: enumLabel('bookingStatus', 'confirmed'), color: homeColors.green, background: homeColors.greenTint },
-  completed: { label: enumLabel('bookingStatus', 'completed'), color: '#475569', background: '#F1F5F9' },
-  declined: { label: enumLabel('bookingStatus', 'declined'), color: '#D9364F', background: '#FBE6E9' },
-  cancelled: { label: enumLabel('bookingStatus', 'cancelled'), color: '#D9364F', background: '#FBE6E9' },
+// The pill colours per status; the words come from constants/enums.ts in the person's language.
+export const statusStyle: Record<BookingStatus, { color: string; background: string }> = {
+  pending: { color: '#B45309', background: '#FEF3C7' },
+  confirmed: { color: homeColors.green, background: homeColors.greenTint },
+  completed: { color: '#475569', background: '#F1F5F9' },
+  declined: { color: '#D9364F', background: '#FBE6E9' },
+  cancelled: { color: '#D9364F', background: '#FBE6E9' },
 };
 
 type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
@@ -20,17 +22,18 @@ type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
 // The five tabs of the doctor frames (Dashboard, D-05, D-11; DECISIONS D24). The patients list stays reachable from the
 // dashboard's "My Patients" and from the History cards.
 const navItems = [
-  { key: 'home', label: 'Home', href: '/doctor', icon: 'house.fill', iconAndroid: 'home' },
-  { key: 'requests', label: 'Requests', href: '/doctor/appointments', icon: 'tray.fill', iconAndroid: 'inbox' },
-  { key: 'history', label: 'History', href: '/doctor/history' as Href, icon: 'clock.arrow.circlepath', iconAndroid: 'history' },
-  { key: 'notifications', label: 'Notifications', href: '/doctor/notifications', icon: 'bell.fill', iconAndroid: 'notifications' },
-  { key: 'profile', label: 'Profile', href: '/doctor/profile', icon: 'person.fill', iconAndroid: 'person' },
-] as const satisfies { key: DoctorTab; label: string; href: Href; icon: string; iconAndroid: string }[];
+  { key: 'home', labelKey: 'nav.home', href: '/doctor', icon: 'house.fill', iconAndroid: 'home' },
+  { key: 'requests', labelKey: 'doctor.nav.requests', href: '/doctor/appointments', icon: 'tray.fill', iconAndroid: 'inbox' },
+  { key: 'history', labelKey: 'doctor.nav.history', href: '/doctor/history' as Href, icon: 'clock.arrow.circlepath', iconAndroid: 'history' },
+  { key: 'notifications', labelKey: 'notif.title', href: '/doctor/notifications', icon: 'bell.fill', iconAndroid: 'notifications' },
+  { key: 'profile', labelKey: 'nav.profile', href: '/doctor/profile', icon: 'person.fill', iconAndroid: 'person' },
+] as const satisfies { key: DoctorTab; labelKey: MessageKey; href: Href; icon: string; iconAndroid: string }[];
 
 // Doctor-side tab bar. Same visual language as the patient BottomNav, minus the
 // raised center camera action — nutrition scanning is a patient-only module.
 export function DoctorBottomNav({ active }: { active: DoctorTab }) {
   const router = useRouter();
+  const { t } = useT();
   return (
     <View style={styles.nav}>
       {navItems.map((item) => {
@@ -38,9 +41,9 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
         // dismissTo rather than push, for the same reason as the patient nav:
         // switching tabs should move between them, not stack another copy.
         return (
-          <Pressable key={item.key} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
+          <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: item.key === active }} accessibilityLabel={t(item.labelKey)} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
             <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={20} tintColor={color} />
-            <Text style={[styles.navLabel, { color }]}>{item.label}</Text>
+            <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.navLabel, { color }]}>{t(item.labelKey)}</Text>
           </Pressable>
         );
       })}
@@ -50,20 +53,21 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
 
 export function DoctorHeader({ title, subtitle, onBack, badgeCount }: { title: string; subtitle?: string; onBack?: () => void; badgeCount?: number }) {
   const router = useRouter();
+  const { t } = useT();
   return (
     <View style={styles.header}>
       <View style={styles.headerLeft}>
         {onBack ? (
-          <Pressable onPress={onBack} hitSlop={10} style={styles.backButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} onPress={onBack} hitSlop={10} style={styles.backButton}>
             <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
           </Pressable>
         ) : null}
         <View style={styles.headerCopy}>
-          <Text style={styles.headerTitle}>{title}</Text>
+          <Text accessibilityRole="header" style={styles.headerTitle}>{title}</Text>
           {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
-      <Pressable style={styles.bellButton} onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('notif.title')} style={styles.bellButton} onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}>
         <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
         {badgeCount ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{badgeCount > 9 ? '9+' : badgeCount}</Text></View> : null}
       </Pressable>
@@ -72,10 +76,11 @@ export function DoctorHeader({ title, subtitle, onBack, badgeCount }: { title: s
 }
 
 export function StatusPill({ status }: { status: BookingStatus }) {
+  const { label } = useT();
   const style = statusStyle[status] ?? statusStyle.pending;
   return (
     <View style={[styles.pill, { backgroundColor: style.background }]}>
-      <Text style={[styles.pillText, { color: style.color }]}>{style.label}</Text>
+      <Text style={[styles.pillText, { color: style.color }]}>{label('bookingStatus', status)}</Text>
     </View>
   );
 }

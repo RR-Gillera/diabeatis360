@@ -11,10 +11,12 @@ import { Brand } from '@/constants/theme';
 import type { LabelAlternative } from '@/features/ai/types';
 import { db } from '@/firebase';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 
 // Healthier Alternatives (Figma 195:2960): "Instead of X, try Y" swaps for the scanned product. They were generated
 // together with the analysis and saved on the Nutrition_Scans document, so this screen makes no new AI call.
 export default function HealthierAlternativesScreen() {
+  const { t } = useT();
   const goBack = useSafeBack('/scanner');
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [alternatives, setAlternatives] = useState<LabelAlternative[] | null | undefined>(undefined);
@@ -35,18 +37,18 @@ export default function HealthierAlternativesScreen() {
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Pressable style={styles.close} onPress={() => goBack()} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.close} onPress={() => goBack()} hitSlop={8}>
             <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor={Brand.colors.text} />
           </Pressable>
-          <AppText weight="extraBold" style={styles.title}>Healthier Alternatives</AppText>
+          <AppText weight="extraBold" accessibilityRole="header" style={styles.title}>{t('alt.title')}</AppText>
         </View>
 
         <View style={styles.pad}>
-          <AppText weight="extraBold" style={styles.heading}>Looking for a better option?</AppText>
-          <AppText style={styles.subtitle}>Swap classic Filipino favorites for these diabetes-friendly choices to maintain stable glucose levels.</AppText>
+          <AppText weight="extraBold" style={styles.heading}>{t('alt.heading')}</AppText>
+          <AppText style={styles.subtitle}>{t('alt.subtitle')}</AppText>
 
           {alternatives === undefined ? <ActivityIndicator color={Brand.colors.primary} style={styles.loader} /> : null}
-          {alternatives === null || alternatives?.length === 0 ? <AppText style={styles.empty}>No alternatives were suggested for this product.</AppText> : null}
+          {alternatives === null || alternatives?.length === 0 ? <AppText style={styles.empty}>{t('alt.none')}</AppText> : null}
 
           {(alternatives ?? []).map((item, index) => (
             <Card key={`${item.instead_of}-${index}`} style={styles.card}>
@@ -55,7 +57,7 @@ export default function HealthierAlternativesScreen() {
                   <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={14} tintColor={Brand.colors.danger} />
                 </View>
                 <View style={styles.copy}>
-                  <AppText weight="bold" style={[styles.tag, { color: Brand.colors.textMuted }]}>INSTEAD OF</AppText>
+                  <AppText weight="bold" style={[styles.tag, { color: Brand.colors.textMuted }]}>{t('alt.insteadOf')}</AppText>
                   <AppText weight="bold" style={styles.value}>{item.instead_of}</AppText>
                 </View>
               </View>
@@ -65,7 +67,7 @@ export default function HealthierAlternativesScreen() {
                   <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={14} tintColor={Brand.colors.primary} />
                 </View>
                 <View style={styles.copy}>
-                  <AppText weight="bold" style={[styles.tag, { color: Brand.colors.primary }]}>TRY</AppText>
+                  <AppText weight="bold" style={[styles.tag, { color: Brand.colors.primary }]}>{t('alt.try')}</AppText>
                   <AppText weight="bold" style={styles.value}>{item.try}</AppText>
                 </View>
               </View>

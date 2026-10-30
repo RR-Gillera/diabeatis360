@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
 import { labelFromMinutes, minutesFromLabel } from './time-slots';
 
 const HOURS = Array.from({ length: 12 }, (_, index) => index + 1);
@@ -26,6 +27,7 @@ export function TimePickerSheet({ visible, title, value, onCancel, onConfirm }: 
   onCancel: () => void;
   onConfirm: (label: string) => void;
 }) {
+  const { t } = useT();
   const [draft, setDraft] = useState(value);
 
   // Re-seed every time the sheet opens, not only when the time differs: a
@@ -57,7 +59,7 @@ export function TimePickerSheet({ visible, title, value, onCancel, onConfirm }: 
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
-            <Pressable onPress={onCancel} hitSlop={10}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('doctor.time.close')} onPress={onCancel} hitSlop={10}>
               <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" />
             </Pressable>
           </View>
@@ -66,13 +68,13 @@ export function TimePickerSheet({ visible, title, value, onCancel, onConfirm }: 
 
           <View style={styles.columns}>
             <Column
-              label="Hour"
+              label={t('doctor.time.hour')}
               items={HOURS.map(String)}
               selected={String(hour12)}
               onSelect={(item) => commit(Number(item), minute, meridiem)}
             />
             <Column
-              label="Minute"
+              label={t('doctor.time.minute')}
               items={MINUTES.map((item) => String(item).padStart(2, '0'))}
               selected={String(minute).padStart(2, '0')}
               onSelect={(item) => commit(hour12, Number(item), meridiem)}
@@ -85,8 +87,8 @@ export function TimePickerSheet({ visible, title, value, onCancel, onConfirm }: 
             />
           </View>
 
-          <Pressable style={styles.confirm} onPress={() => onConfirm(draft)}>
-            <Text style={styles.confirmText}>Done</Text>
+          <Pressable accessibilityRole="button" style={styles.confirm} onPress={() => onConfirm(draft)}>
+            <Text style={styles.confirmText}>{t('common.done')}</Text>
           </Pressable>
         </View>
       </View>

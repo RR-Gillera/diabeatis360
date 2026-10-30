@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
-/* Brand tokens shared with the mobile app (docs/FIGMA_MAP.md): primary #629C2C, page background #F5F5F5. */
+/* Brand tokens shared with the mobile app (docs/FIGMA_MAP.md): text and buttons #4D7C22 (WCAG AA, DECISIONS D37; Figma's
+   #629C2C is 3.33:1 and stays for the charts only), page background #F5F5F5. */
 @theme {
-  --color-brand: #629c2c;
-  --color-brand-dark: #4f8022;
+  --color-brand: #4d7c22;
+  --color-brand-dark: #3d641b;
   --color-brand-tint: #eef6e3;
   --color-nav-active: #ddf0a9; /* light-lime pill behind the selected sidebar item (FIGMA/ADMIN) */
   --color-page: #f5f5f5;

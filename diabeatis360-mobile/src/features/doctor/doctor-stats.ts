@@ -31,7 +31,8 @@ export function dashboardStats(bookings: Booking[], commissionRate: number, now:
   const pending = bookings.filter((entry) => entry.status === 'pending').length;
   const finished = bookings.filter((entry) => entry.status === 'completed');
   const earnings = finished
-    .filter((entry) => entry.paymentStatus === 'paid' || entry.paymentStatus === 'onsite')
+    // Paid online only (DECISIONS D37): an on-site fee is paid to the doctor at the clinic, so the app never saw it.
+    .filter((entry) => entry.paymentStatus === 'paid')
     .reduce((total, entry) => total + entry.fee - Math.round(entry.fee * commissionRate * 100) / 100, 0);
   return { today, pending, completed: finished.length, earnings: Math.round(earnings * 100) / 100 };
 }

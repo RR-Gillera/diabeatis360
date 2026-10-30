@@ -9,16 +9,18 @@ import { subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor
 import { DoctorBottomNav, DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
+import { useT } from '@/i18n/language-context';
 import { resetTo } from '@/lib/navigation';
 
 // The fields a patient actually sees on the Find a Doctor card — which is why
 // leaving them blank makes a doctor effectively unbookable.
+// The labels are translation keys (D33); the placeholders are examples and stay as they are.
 const fields = [
-  { key: 'fullName', label: 'Full Name', placeholder: 'Dr. Juan Dela Cruz', keyboard: 'default' },
-  { key: 'specialty', label: 'Specialty', placeholder: 'Endocrinologist', keyboard: 'default' },
-  { key: 'prcLicenseNumber', label: 'PRC License Number', placeholder: '0123456', keyboard: 'default' },
-  { key: 'city', label: 'City', placeholder: 'Cebu City', keyboard: 'default' },
-  { key: 'consultationFee', label: 'Consultation Fee (₱)', placeholder: '500', keyboard: 'numeric' },
+  { key: 'fullName', labelKey: 'doctor.profile.fullName', placeholder: 'Dr. Juan Dela Cruz', keyboard: 'default' },
+  { key: 'specialty', labelKey: 'doctor.specialty', placeholder: 'Endocrinologist', keyboard: 'default' },
+  { key: 'prcLicenseNumber', labelKey: 'doctor.profile.prc', placeholder: '0123456', keyboard: 'default' },
+  { key: 'city', labelKey: 'doctor.city', placeholder: 'Cebu City', keyboard: 'default' },
+  { key: 'consultationFee', labelKey: 'doctor.profile.fee', placeholder: '500', keyboard: 'numeric' },
 ] as const;
 
 type FormState = Record<(typeof fields)[number]['key'], string>;
@@ -28,11 +30,13 @@ const emptyForm: FormState = { fullName: '', specialty: '', prcLicenseNumber: ''
 export default function DoctorProfileScreen() {
   const router = useRouter();
   const { uid, email, signOut, updateDisplayName } = useAuth();
+  const { t } = useT();
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -47,7 +51,7 @@ export default function DoctorProfileScreen() {
           consultationFee: value.consultationFee ? String(value.consultationFee) : '',
         });
       }
-    }, (value) => setError(value.message));
+    }, () => setLoadFailed(true));
   }, [uid]);
 
   const save = async () => {
@@ -66,8 +70,8 @@ export default function DoctorProfileScreen() {
       // doc, so the doctor's name reads the same everywhere in the app.
       if (form.fullName.trim()) await updateDisplayName(form.fullName);
       setSaved(true);
-    } catch (value) {
-      setError(value instanceof Error ? value.message : 'Unable to save your profile.');
+    } catch {
+      setError(t('doctor.profile.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -77,12 +81,12 @@ export default function DoctorProfileScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title="My Profile" subtitle="How patients see you" />
+      <DoctorHeader title={t('doctor.profile.title')} subtitle={t('doctor.profile.subtitle')} />
       <ScrollView contentContainerStyle={doctorStyles.scroll}>
         <View style={[doctorStyles.card, styles.identityCard]}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{(form.fullName || 'D').trim().charAt(0).toUpperCase()}</Text></View>
           <View style={styles.identityCopy}>
-            <Text style={styles.identityName}>{form.fullName || 'Your name'}</Text>
+            <Text style={styles.identityName}>{form.fullName || t('doctor.profile.yourName')}</Text>
             <Text style={styles.identityEmail}>{email}</Text>
             <View style={styles.badgeRow}>
               <View style={[styles.verifyBadge, profile?.isVerified ? styles.verifyBadgeOn : styles.verifyBadgeOff]}>
@@ -92,7 +96,7 @@ export default function DoctorProfileScreen() {
                   tintColor={profile?.isVerified ? homeColors.green : '#B45309'}
                 />
                 <Text style={[styles.verifyText, { color: profile?.isVerified ? homeColors.green : '#B45309' }]}>
-                  {profile?.isVerified ? 'PRC Verified' : 'Pending verification'}
+                  {profile?.isVerified ? t('doctor.profile.verified') : t('doctor.profile.pending')}
                 </Text>
               </View>
             </View>
@@ -102,16 +106,17 @@ export default function DoctorProfileScreen() {
         {incomplete ? (
           <View style={styles.notice}>
             <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={15} tintColor={homeColors.orange} />
-            <Text style={styles.noticeText}>Complete every field below so patients can find and book you.</Text>
+            <Text style={styles.noticeText}>{t('doctor.profile.incomplete')}</Text>
           </View>
         ) : null}
 
-        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Professional Details</Text>
+        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>{t('doctor.profile.details')}</Text>
         <View style={[doctorStyles.card, styles.formCard]}>
           {fields.map((field) => (
             <View key={field.key} style={styles.field}>
-              <Text style={doctorStyles.label}>{field.label}</Text>
+              <Text style={doctorStyles.label}>{t(field.labelKey)}</Text>
               <TextInput
+                accessibilityLabel={t(field.labelKey)}
                 value={form[field.key]}
                 onChangeText={(value) => { setForm((current) => ({ ...current, [field.key]: value })); setSaved(false); }}
                 placeholder={field.placeholder}
@@ -121,20 +126,25 @@ export default function DoctorProfileScreen() {
               />
             </View>
           ))}
-          {error ? <Text style={doctorStyles.error}>{error}</Text> : null}
-          <Pressable style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={save} disabled={saving}>
-            <Text style={styles.saveButtonText}>{saving ? 'Saving...' : saved ? 'Saved ✓' : 'Save Profile'}</Text>
+          {error || loadFailed ? <Text style={doctorStyles.error}>{error || t('doctor.profile.loadFailed')}</Text> : null}
+          <Pressable accessibilityRole="button" style={[styles.saveButton, saving && styles.saveButtonDisabled]} onPress={save} disabled={saving}>
+            <Text style={styles.saveButtonText}>{saving ? t('common.saving') : saved ? t('doctor.profile.saved') : t('doctor.profile.save')}</Text>
           </Pressable>
         </View>
 
-        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>Account</Text>
-        <Pressable style={[doctorStyles.card, styles.linkRow]} onPress={() => router.push('/doctor/schedule')}>
+        <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>{t('doctor.profile.account')}</Text>
+        <Pressable accessibilityRole="button" style={[doctorStyles.card, styles.linkRow]} onPress={() => router.push('/doctor/schedule')}>
           <View style={styles.linkIcon}><SymbolView name={{ ios: 'clock.fill', android: 'schedule', web: 'schedule' }} size={16} tintColor={homeColors.green} /></View>
-          <Text style={styles.linkText}>Manage Schedule</Text>
+          <Text style={styles.linkText}>{t('doctor.manageSchedule')}</Text>
+          <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />
+        </Pressable>
+        <Pressable accessibilityRole="button" style={[doctorStyles.card, styles.linkRow, styles.linkGap]} onPress={() => router.push('/language-settings')}>
+          <View style={styles.linkIcon}><SymbolView name={{ ios: 'globe', android: 'language', web: 'language' }} size={16} tintColor={homeColors.green} /></View>
+          <Text style={styles.linkText}>{t('profile.menu.language')}</Text>
           <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />
         </Pressable>
 
-        <Pressable onPress={() => { signOut(); resetTo(router, '/'); }}><Text style={styles.logout}>Log out</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { signOut(); resetTo(router, '/'); }}><Text style={styles.logout}>{t('profile.logout.confirm')}</Text></Pressable>
       </ScrollView>
       <DoctorBottomNav active="profile" />
     </View>
@@ -143,6 +153,7 @@ export default function DoctorProfileScreen() {
 
 const styles = StyleSheet.create({
   identityCard: { alignItems: 'center', flexDirection: 'row', gap: 16 },
+  linkGap: { marginTop: 12 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
   avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 22, fontWeight: '800' },
   identityCopy: { flex: 1, gap: 2 },

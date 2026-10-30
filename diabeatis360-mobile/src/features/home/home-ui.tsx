@@ -4,6 +4,8 @@ import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 import { Brand, Fonts } from '@/constants/theme';
+import { useT } from '@/i18n/language-context';
+import type { MessageKey } from '@/i18n/translate';
 
 // Distinct palette for the dashboard/log screens — matches the Figma spec's exact
 // values rather than reusing authColors/bookingColors, which run a slightly
@@ -15,6 +17,8 @@ export const homeColors = {
   textMuted: Brand.colors.textMuted,
   textFaint: Brand.colors.textFaint,
   green: Brand.colors.primary,
+  /** Figma's brighter green, for the charts and the floating camera button only (D37). */
+  greenBright: Brand.colors.primaryBright,
   greenTint: Brand.colors.primaryTint,
   border: '#F1F5F9',
   borderSoft: '#F3F4F6',
@@ -29,16 +33,17 @@ export const homeColors = {
 type NavTarget = 'home' | 'log' | 'doctors' | 'profile';
 
 const navItems = [
-  { key: 'home', label: 'Home', href: '/user-home', icon: 'house.fill', iconAndroid: 'home' },
-  { key: 'log', label: 'Log', href: '/glucose-log', icon: 'drop.fill', iconAndroid: 'water_drop' },
-  { key: 'doctors', label: 'Doctors', href: '/booking/find-doctor', icon: 'stethoscope', iconAndroid: 'medical_services' },
-  { key: 'profile', label: 'Profile', href: '/profile', icon: 'person.fill', iconAndroid: 'person' },
-] as const satisfies { key: NavTarget; label: string; href: Href; icon: string; iconAndroid: string }[];
+  { key: 'home', labelKey: 'nav.home', href: '/user-home', icon: 'house.fill', iconAndroid: 'home' },
+  { key: 'log', labelKey: 'nav.log', href: '/glucose-log', icon: 'drop.fill', iconAndroid: 'water_drop' },
+  { key: 'doctors', labelKey: 'nav.doctors', href: '/booking/find-doctor', icon: 'stethoscope', iconAndroid: 'medical_services' },
+  { key: 'profile', labelKey: 'nav.profile', href: '/profile', icon: 'person.fill', iconAndroid: 'person' },
+] as const satisfies { key: NavTarget; labelKey: MessageKey; href: Href; icon: string; iconAndroid: string }[];
 
 // Shared bottom tab bar for the dashboard/log/doctors/profile screens, with a
 // raised center action that opens the nutrition-label scanner.
 export function BottomNav({ active }: { active: NavTarget }) {
   const router = useRouter();
+  const { t } = useT();
   const [before, after] = [navItems.slice(0, 2), navItems.slice(2)];
 
   // dismissTo, not push: a tab bar is not a history. push stacked a fresh copy
@@ -53,9 +58,9 @@ export function BottomNav({ active }: { active: NavTarget }) {
     const isActive = item.key === active;
     const color = isActive ? homeColors.green : homeColors.textMuted;
     return (
-      <Pressable key={item.key} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
+      <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: isActive }} accessibilityLabel={t(item.labelKey)} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
         <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={20} tintColor={color} />
-        <Text style={[styles.navLabel, { color }]}>{item.label}</Text>
+        <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.navLabel, { color }]}>{t(item.labelKey)}</Text>
       </Pressable>
     );
   };
@@ -63,7 +68,7 @@ export function BottomNav({ active }: { active: NavTarget }) {
   return (
     <View style={styles.nav}>
       {before.map(renderItem)}
-      <Pressable onPress={() => router.push('/scanner' as Href)} style={styles.fab}>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('nav.scanner')} onPress={() => router.push('/scanner' as Href)} style={styles.fab}>
         <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={24} tintColor="#FFF" />
       </Pressable>
       {after.map(renderItem)}
@@ -74,7 +79,8 @@ export function BottomNav({ active }: { active: NavTarget }) {
 // Minimal SVG line chart for a week of readings — no smoothing, just straight
 // segments between points, which is all react-native-svg needs here.
 export function Sparkline({ values, width = 262, height = 96 }: { values: number[]; width?: number; height?: number }) {
-  if (values.length < 2) return <Text style={styles.sparklineEmpty}>Log a few more readings to see your trend.</Text>;
+  const { t } = useT();
+  if (values.length < 2) return <Text style={styles.sparklineEmpty}>{t('home.trendEmpty')}</Text>;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -86,8 +92,8 @@ export function Sparkline({ values, width = 262, height = 96 }: { values: number
   });
   return (
     <Svg width={width} height={height}>
-      <Polyline points={points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke={homeColors.green} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-      {points.map((point, index) => <Circle key={index} cx={point.x} cy={point.y} r={4} fill={homeColors.green} />)}
+      <Polyline points={points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke={homeColors.greenBright} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      {points.map((point, index) => <Circle key={index} cx={point.x} cy={point.y} r={4} fill={homeColors.greenBright} />)}
     </Svg>
   );
 }
@@ -97,8 +103,9 @@ export function Sparkline({ values, width = 262, height = 96 }: { values: number
 // across whichever days actually have a reading, rather than fabricating a
 // value for days with no logged data.
 export function WeeklyChart({ days, width = 264, height = 140 }: { days: { label: string; value: number | null }[]; width?: number; height?: number }) {
+  const { t } = useT();
   const present = days.map((day, index) => ({ ...day, index })).filter((day): day is typeof day & { value: number } => day.value !== null);
-  if (present.length < 2) return <Text style={styles.sparklineEmpty}>Log a few more readings this week to see your trend.</Text>;
+  if (present.length < 2) return <Text style={styles.sparklineEmpty}>{t('home.trendEmptyWeek')}</Text>;
 
   const values = present.map((day) => day.value);
   const niceMin = Math.floor(Math.min(...values) / 20) * 20;
@@ -119,9 +126,9 @@ export function WeeklyChart({ days, width = 264, height = 140 }: { days: { label
         </View>
         <Svg width={width} height={height}>
           {gridValues.map((value) => <Line key={value} x1={0} y1={plotY(value)} x2={width} y2={plotY(value)} stroke={homeColors.borderSoft} strokeWidth={1} />)}
-          <Polygon points={areaAttr} fill={homeColors.green} fillOpacity={0.08} />
-          <Polyline points={pointsAttr} fill="none" stroke={homeColors.green} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-          {points.map((point, index) => <Circle key={index} cx={point.x} cy={point.y} r={4} fill={homeColors.green} />)}
+          <Polygon points={areaAttr} fill={homeColors.greenBright} fillOpacity={0.08} />
+          <Polyline points={pointsAttr} fill="none" stroke={homeColors.greenBright} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+          {points.map((point, index) => <Circle key={index} cx={point.x} cy={point.y} r={4} fill={homeColors.greenBright} />)}
         </Svg>
       </View>
       <View style={[styles.chartDayRow, { paddingLeft: styles.chartAxis.width }]}>
@@ -149,7 +156,7 @@ const styles = StyleSheet.create({
   nav: { alignItems: 'center', backgroundColor: homeColors.card, borderTopColor: homeColors.borderSoft, borderTopWidth: 1, bottom: 0, flexDirection: 'row', justifyContent: 'space-around', left: 0, paddingBottom: 24, paddingTop: 10, position: 'absolute', right: 0 },
   navItem: { alignItems: 'center', gap: 4, minWidth: 56 },
   navLabel: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  fab: { alignItems: 'center', backgroundColor: homeColors.green, borderColor: '#FFF', borderRadius: 32, borderWidth: 4, elevation: 4, height: 64, justifyContent: 'center', marginTop: -32, shadowColor: homeColors.green, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.3, shadowRadius: 10, width: 64 },
+  fab: { alignItems: 'center', backgroundColor: homeColors.greenBright, borderColor: '#FFF', borderRadius: 32, borderWidth: 4, elevation: 4, height: 64, justifyContent: 'center', marginTop: -32, shadowColor: homeColors.greenBright, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.3, shadowRadius: 10, width: 64 },
   sparklineEmpty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 13, paddingVertical: 30, textAlign: 'center' },
   chartRow: { flexDirection: 'row' },
   chartAxis: { justifyContent: 'space-between', paddingBottom: 2, paddingRight: 8, width: 28 },

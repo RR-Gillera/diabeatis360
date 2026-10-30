@@ -9,7 +9,7 @@ import { AppText } from '@/components/ui/app-text';
 import { LimitReached } from '@/components/ui/limit-reached';
 import { PrimaryButton } from '@/components/ui/primary-button';
 import { RoundBackButton } from '@/components/ui/round-back-button';
-import { FREE_LIMITS } from '@/constants/plans';
+import { FREE_LIMITS, PREMIUM_FAIR_USE } from '@/constants/plans';
 import { Brand } from '@/constants/theme';
 import type { LabelAnalysis } from '@/features/ai/types';
 import { useAuth } from '@/features/auth/auth-context';
@@ -17,8 +17,9 @@ import { saveProduct } from '@/features/scanner/product-service';
 import { ScanResult } from '@/features/scanner/scan-result';
 import { canUseFeature } from '@/features/subscription/subscription-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
 import { AiError, requestLabelAnalysis, requestProductLookup } from '@/lib/ai';
-import { FEATURE_UNAVAILABLE_DETAIL, FEATURE_UNAVAILABLE_TITLE } from '@/lib/feature-unavailable';
+import { aiErrorText } from '@/lib/ai-error-text';
 
 type Phase = 'camera' | 'analyzing' | 'result' | 'retry';
 
@@ -40,6 +41,7 @@ export default function ScannerScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/user-home');
   const { uid } = useAuth();
+  const { t, language } = useT();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [ready, setReady] = useState(false);
@@ -48,7 +50,7 @@ export default function ScannerScreen() {
   const [analysis, setAnalysis] = useState<Extract<LabelAnalysis, { readable: true }> | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState<AiError | null>(null);
-  const [usage, setUsage] = useState('');
+  const [usage, setUsage] = useState<{ premium: boolean; left: number; limit: number } | null>(null);
   const [allowed, setAllowed] = useState(true);
   // The barcode seen by the camera. `lastCode` stops the camera (which reports the same code many times a second)
   // from starting a second lookup.
@@ -69,11 +71,13 @@ export default function ScannerScreen() {
       .then((value) => {
         if (cancelled) return;
         setAllowed(value.allowed);
-        setUsage(value.premium ? 'Premium: unlimited scans' : `Free plan: ${Math.max(0, (value.limit ?? 0) - value.used)} of ${value.limit} scans left today`);
+        setUsage({ premium: value.premium, left: Math.max(0, (value.limit ?? 0) - value.used), limit: value.limit ?? 0 });
       })
-      .catch(() => { if (!cancelled) setUsage(''); });
+      .catch(() => { if (!cancelled) setUsage(null); });
     return () => { cancelled = true; };
   }, [uid, usageTick]);
+  // Premium is unlimited with a fair-use ceiling (D20); the ceiling is said next to the word.
+  const usageText = usage ? (usage.premium ? t('scan.usage.premium', { limit: PREMIUM_FAIR_USE.scan }) : t('scan.usage.free', { left: usage.left, limit: usage.limit })) : '';
 
   const scanAgain = () => {
     setPhase('camera');
@@ -90,7 +94,7 @@ export default function ScannerScreen() {
     setError(null);
     try {
       const photo = await cameraRef.current?.takePictureAsync({ quality: 0.5, base64: true });
-      if (!photo?.base64) throw new AiError('unknown', 'We could not take the photo. Please try again.');
+      if (!photo?.base64) throw new AiError('unknown', t('ai.error.unknown'));
       setPhase('analyzing');
       const { base64, mimeType } = splitDataUrl(photo.base64);
       const result = await requestLabelAnalysis(base64, mimeType, barcode ?? undefined);
@@ -102,7 +106,7 @@ export default function ScannerScreen() {
         setPhase('retry');
       }
     } catch (value) {
-      setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
+      setError(value instanceof AiError ? value : new AiError('unknown', t('ai.error.unknown')));
       setPhase('retry');
     } finally {
       refreshUsage();
@@ -124,7 +128,7 @@ export default function ScannerScreen() {
         setPhase('camera'); // a new product: the person now photographs its label
       }
     } catch (value) {
-      setError(value instanceof AiError ? value : new AiError('unknown', 'Something went wrong. Please try again.'));
+      setError(value instanceof AiError ? value : new AiError('unknown', t('ai.error.unknown')));
       setPhase('retry');
     } finally {
       refreshUsage();
@@ -137,10 +141,10 @@ export default function ScannerScreen() {
     return (
       <View style={[styles.dark, styles.center]}>
         <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={40} tintColor="#FFF" />
-        <AppText weight="bold" style={styles.permissionTitle}>Camera access needed</AppText>
-        <AppText style={styles.permissionText}>Diabeatis360 uses the camera only to read nutrition labels. Photos are not saved.</AppText>
-        <PrimaryButton title="Allow camera" onPress={requestPermission} style={styles.permissionButton} />
-        <PrimaryButton title="Not now" variant="outline" onPress={() => goBack()} style={styles.permissionButton} />
+        <AppText weight="bold" style={styles.permissionTitle}>{t('scan.permission.title')}</AppText>
+        <AppText style={styles.permissionText}>{t('scan.permission.text')}</AppText>
+        <PrimaryButton title={t('scan.permission.allow')} onPress={requestPermission} style={styles.permissionButton} />
+        <PrimaryButton title={t('scan.permission.notNow')} variant="outline" onPress={() => goBack()} style={styles.permissionButton} />
       </View>
     );
   }
@@ -150,10 +154,10 @@ export default function ScannerScreen() {
     return (
       <View style={styles.light}>
         <View style={[styles.resultHeader, { paddingTop: statusBarHeight + 12 }]}>
-          <Pressable style={styles.closeLight} onPress={scanAgain} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('scan.closeResult')} style={styles.closeLight} onPress={scanAgain} hitSlop={8}>
             <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor={Brand.colors.text} />
           </Pressable>
-          <AppText weight="extraBold" style={styles.resultTitle}>Scan Result</AppText>
+          <AppText accessibilityRole="header" weight="extraBold" style={styles.resultTitle}>{t('scan.resultTitle')}</AppText>
         </View>
         <ScrollView contentContainerStyle={styles.resultScroll}>
           <ScanResult
@@ -163,7 +167,7 @@ export default function ScannerScreen() {
             onScanAgain={scanAgain}
             onShare={barcode && uid && !analysis.from_memory ? (name, brand) => saveProduct(uid, barcode, analysis, name, brand) : undefined}
           />
-          <AppText style={styles.usageLight}>{usage}</AppText>
+          <AppText style={styles.usageLight}>{usageText}</AppText>
         </ScrollView>
       </View>
     );
@@ -174,16 +178,16 @@ export default function ScannerScreen() {
     return (
       <ScrollView style={styles.light} contentContainerStyle={[styles.limitScroll, { paddingTop: statusBarHeight + 16 }]}>
         <RoundBackButton onPress={() => goBack()} />
-        <AppText weight="extraBold" style={styles.limitTitle}>Scan Nutrition Label</AppText>
+        <AppText accessibilityRole="header" weight="extraBold" style={styles.limitTitle}>{t('scan.title')}</AppText>
         <LimitReached
           icon={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }}
-          title={`You've used ${FREE_LIMITS.scan} of ${FREE_LIMITS.scan} free scans today`}
-          text="Premium gives you unlimited label scans."
-          footer="Your free scans reset tomorrow"
+          title={t('scan.limit.title', { count: FREE_LIMITS.scan })}
+          text={t('scan.limit.text', { limit: PREMIUM_FAIR_USE.scan })}
+          footer={t('scan.limit.footer')}
           onUpgrade={() => router.push('/subscription')}
         />
-        <PrimaryButton title="Scan a barcode instead" variant="outline" onPress={() => { scanAgain(); setBarcodeOnly(true); setMode('barcode'); }} />
-        <AppText style={styles.limitNote}>Products other patients already shared are looked up by barcode without using a scan.</AppText>
+        <PrimaryButton title={t('scan.barcodeInstead')} variant="outline" onPress={() => { scanAgain(); setBarcodeOnly(true); setMode('barcode'); }} />
+        <AppText style={styles.limitNote}>{t('scan.barcodeNote')}</AppText>
       </ScrollView>
     );
   }
@@ -194,9 +198,9 @@ export default function ScannerScreen() {
       <View style={[styles.dark, styles.cantRead]}>
         <View style={styles.cantReadCard}>
           <View style={styles.cantReadIcon}><SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={26} tintColor="#F59E0B" /></View>
-          <AppText weight="extraBold" style={styles.cantReadTitle}>We couldn&apos;t read that label. Try better light</AppText>
-          <AppText style={styles.cantReadText}>{message || 'Hold your phone steady and keep the whole label in the frame.'}</AppText>
-          <PrimaryButton title="Retake photo" onPress={scanAgain} style={styles.retryButton} />
+          <AppText weight="extraBold" style={styles.cantReadTitle}>{t('scan.cantRead.title')}</AppText>
+          <AppText style={styles.cantReadText}>{message || t('scan.cantRead.text')}</AppText>
+          <PrimaryButton title={t('scan.retake')} onPress={scanAgain} style={styles.retryButton} />
         </View>
       </View>
     );
@@ -211,16 +215,16 @@ export default function ScannerScreen() {
     return (
       <View style={[styles.light, styles.center]}>
         <SymbolView name={{ ios: 'exclamationmark.circle', android: 'error', web: 'error' }} size={40} tintColor={Brand.colors.warning} />
-        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? FEATURE_UNAVAILABLE_TITLE : error?.code === 'limit' || capped ? 'Daily scan limit reached' : error?.code === 'allergies-missing' ? 'Add your allergies first' : 'Let\'s try that again'}</AppText>
-        <AppText style={styles.retryText}>{unavailable ? FEATURE_UNAVAILABLE_DETAIL : error ? error.message : message}</AppText>
+        <AppText weight="bold" style={styles.retryTitle}>{unavailable ? t('ai.notYetTitle') : error?.code === 'limit' || capped ? t('scan.retry.limit') : error?.code === 'allergies-missing' ? t('scan.retry.allergies') : t('scan.retry.other')}</AppText>
+        <AppText style={styles.retryText}>{unavailable ? t('ai.notYetDetail') : error ? aiErrorText(error, language) : message}</AppText>
         {error?.code === 'limit' ? (
-          <PrimaryButton title="Upgrade to Premium" onPress={() => router.push('/subscription')} style={styles.retryButton} />
+          <PrimaryButton title={t('ai.upgrade')} onPress={() => router.push('/subscription')} style={styles.retryButton} />
         ) : error?.code === 'allergies-missing' ? (
-          <PrimaryButton title="Add my allergies" onPress={() => router.push('/profile')} style={styles.retryButton} />
+          <PrimaryButton title={t('ai.addAllergies')} onPress={() => router.push('/health-profile/edit')} style={styles.retryButton} />
         ) : unavailable || capped ? null : (
-          <PrimaryButton title="Scan Again" onPress={scanAgain} style={styles.retryButton} />
+          <PrimaryButton title={t('scan.again')} onPress={scanAgain} style={styles.retryButton} />
         )}
-        <PrimaryButton title="Back" variant="outline" onPress={() => goBack()} style={styles.retryButton} />
+        <PrimaryButton title={t('common.back')} variant="outline" onPress={() => goBack()} style={styles.retryButton} />
       </View>
     );
   }
@@ -234,11 +238,11 @@ export default function ScannerScreen() {
       />
 
       <View style={[styles.topBar, { paddingTop: statusBarHeight + 8 }]}>
-        <Pressable style={styles.round} onPress={() => goBack()} hitSlop={8}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('scan.closeScanner')} style={styles.round} onPress={() => goBack()} hitSlop={8}>
           <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#FFF" />
         </Pressable>
-        <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{mode === 'barcode' ? 'Scan Barcode' : 'Scan Nutrition Label'}</AppText></View>
-        <Pressable style={[styles.round, torch && styles.roundOn]} onPress={() => setTorch((value) => !value)} hitSlop={8}>
+        <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{mode === 'barcode' ? t('scan.barcodeTitle') : t('scan.title')}</AppText></View>
+        <Pressable accessibilityRole="switch" accessibilityLabel={t('scan.torch')} accessibilityState={{ checked: torch }} style={[styles.round, torch && styles.roundOn]} onPress={() => setTorch((value) => !value)} hitSlop={8}>
           <SymbolView name={{ ios: 'bolt.fill', android: 'flash_on', web: 'flash_on' }} size={16} tintColor="#FFF" />
         </Pressable>
       </View>
@@ -249,34 +253,34 @@ export default function ScannerScreen() {
         </View>
         <AppText style={styles.hint}>
           {barcode
-            ? 'New product. Now fit its nutrition facts label inside the frame'
-            : mode === 'barcode' ? 'Point the camera at the barcode' : 'Fit the nutrition facts label inside the frame'}
+            ? t('scan.hint.newProduct')
+            : mode === 'barcode' ? t('scan.hint.barcode') : t('scan.hint.label')}
         </AppText>
       </View>
 
       <View style={styles.bottomBar}>
-        {usage ? <AppText style={styles.usageDark}>{usage}</AppText> : null}
+        {usageText ? <AppText style={styles.usageDark}>{usageText}</AppText> : null}
         <View style={styles.modes}>
           {(['barcode', 'label'] as const).map((option) => (
             <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: mode === option }} style={[styles.modeButton, mode === option && styles.modeActive]} onPress={() => setMode(option)}>
               {option === 'barcode' ? <SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={14} tintColor="#FFF" /> : null}
-              <AppText weight="bold" style={styles.modeText}>{option === 'barcode' ? 'Barcode' : 'Scan nutrition label'}</AppText>
+              <AppText weight="bold" style={styles.modeText}>{option === 'barcode' ? t('scan.mode.barcode') : t('scan.mode.label')}</AppText>
             </Pressable>
           ))}
         </View>
         {allowed ? (
-          <Pressable style={[styles.shutter, (!ready || phase === 'analyzing') && styles.shutterDisabled]} onPress={capture} disabled={!ready || phase === 'analyzing'}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('scan.shutter')} accessibilityState={{ disabled: !ready || phase === 'analyzing' }} style={[styles.shutter, (!ready || phase === 'analyzing') && styles.shutterDisabled]} onPress={capture} disabled={!ready || phase === 'analyzing'}>
             <View style={styles.shutterInner} />
           </Pressable>
         ) : (
-          <PrimaryButton title="Upgrade for unlimited scans" onPress={() => router.push('/subscription')} style={styles.upgrade} />
+          <PrimaryButton title={t('scan.upgrade')} onPress={() => router.push('/subscription')} style={styles.upgrade} />
         )}
       </View>
 
       {phase === 'analyzing' ? (
         <View style={styles.overlay}>
           <ActivityIndicator color="#FFF" size="large" />
-          <AppText weight="bold" style={styles.overlayText}>Analyzing label…</AppText>
+          <AppText weight="bold" style={styles.overlayText}>{t('scan.analyzing')}</AppText>
         </View>
       ) : null}
     </View>

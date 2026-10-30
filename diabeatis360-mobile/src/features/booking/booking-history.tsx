@@ -4,15 +4,16 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { bookingColors, formatDate, formatFee } from './booking-ui';
 import { subscribeToBookingHistory, subscribeToProviders } from './booking-service';
-import { enumLabel } from '@/constants/enums';
+import { useT } from '@/i18n/language-context';
 import type { AppointmentHistoryEntry, BookingStatus, Provider } from './types';
 
-const statusCopy: Record<BookingStatus, { label: string; color: string; background: string }> = {
-  pending: { label: enumLabel('bookingStatus', 'pending'), color: '#B45309', background: '#FEF3C7' },
-  confirmed: { label: enumLabel('bookingStatus', 'confirmed'), color: bookingColors.green, background: '#E6F6EF' },
-  completed: { label: enumLabel('bookingStatus', 'completed'), color: '#475569', background: '#F1F5F9' },
-  declined: { label: enumLabel('bookingStatus', 'declined'), color: '#D9364F', background: '#FBE6E9' },
-  cancelled: { label: enumLabel('bookingStatus', 'cancelled'), color: '#D9364F', background: '#FBE6E9' },
+// The badge colours per status; the words come from constants/enums.ts in the person's language.
+const statusCopy: Record<BookingStatus, { color: string; background: string }> = {
+  pending: { color: '#B45309', background: '#FEF3C7' },
+  confirmed: { color: bookingColors.green, background: '#E6F6EF' },
+  completed: { color: '#475569', background: '#F1F5F9' },
+  declined: { color: '#D9364F', background: '#FBE6E9' },
+  cancelled: { color: '#D9364F', background: '#FBE6E9' },
 };
 
 // Shared "Appointment History" list — tap any entry to open its full detail
@@ -20,36 +21,37 @@ const statusCopy: Record<BookingStatus, { label: string; color: string; backgrou
 // Profile tab so the two never drift out of sync.
 export function AppointmentHistoryList({ patientId }: { patientId: string | null }) {
   const router = useRouter();
+  const { t, label, language } = useT();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [entries, setEntries] = useState<AppointmentHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => subscribeToProviders(setProviders, () => {}), []);
 
   useEffect(() => {
     if (!patientId) return;
-    return subscribeToBookingHistory(patientId, providers, (value) => { setEntries(value); setLoading(false); }, (value) => { setError(value.message); setLoading(false); });
+    return subscribeToBookingHistory(patientId, providers, (value) => { setEntries(value); setLoading(false); }, () => { setFailed(true); setLoading(false); });
   }, [patientId, providers]);
 
-  if (!patientId) return <Text style={styles.empty}>No appointments booked yet.</Text>;
-  if (error) return <Text style={styles.error}>{error}</Text>;
+  if (!patientId) return <Text style={styles.empty}>{t('booking.history.none')}</Text>;
+  if (failed) return <Text style={styles.error}>{t('booking.history.loadFailed')}</Text>;
   if (loading) return <ActivityIndicator color={bookingColors.green} />;
-  if (entries.length === 0) return <Text style={styles.empty}>No appointments booked yet.</Text>;
+  if (entries.length === 0) return <Text style={styles.empty}>{t('booking.history.none')}</Text>;
 
   return (
     <View style={styles.list}>
       {entries.map((entry) => {
         const status = statusCopy[entry.status as BookingStatus] ?? statusCopy.pending;
         return (
-          <Pressable key={entry.id} onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })} style={styles.card}>
+          <Pressable key={entry.id} accessibilityRole="button" onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })} style={styles.card}>
             <View style={styles.copy}>
-              <Text style={styles.name}>{entry.provider?.fullName ?? 'Unknown provider'}</Text>
-              <Text style={styles.meta}>{entry.scheduledAt ? formatDate(entry.scheduledAt) : '—'} · {formatFee(entry.fee)}</Text>
-              {entry.queueNumber ? <Text style={styles.queue}>Queue #{entry.queueNumber}</Text> : null}
+              <Text style={styles.name}>{entry.provider?.fullName ?? t('booking.history.unknownDoctor')}</Text>
+              <Text style={styles.meta}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'} · {formatFee(entry.fee)}</Text>
+              {entry.queueNumber ? <Text style={styles.queue}>{t('booking.queue', { number: entry.queueNumber })}</Text> : null}
             </View>
             <View style={[styles.badge, { backgroundColor: status.background }]}>
-              <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
+              <Text style={[styles.badgeText, { color: status.color }]}>{label('bookingStatus', entry.status)}</Text>
             </View>
           </Pressable>
         );

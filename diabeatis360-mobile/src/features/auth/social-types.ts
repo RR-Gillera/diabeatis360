@@ -1,8 +1,10 @@
-// What the Google and Facebook sign-in buttons share (DECISIONS.md D23). No imports on purpose, so plain Node can test it
-// (social-types.test.mjs). The three jobs are split across files:
+// What the Google and Facebook sign-in buttons share (DECISIONS.md D23). No Firebase or React imports, so plain Node can
+// test it (social-types.test.mjs). The three jobs are split across files:
 //   social-login.ts    asks Google or Facebook who the person is (native code, phone only)
 //   social-service.ts  gives that answer to Firebase and applies our rules to it
 //   auth-context.tsx   turns the Firebase login into the app's session, like any other login
+
+import { translate, type Language } from '@/i18n/translate';
 
 export type SocialProvider = 'google' | 'facebook';
 
@@ -46,40 +48,41 @@ function codeOf(value: unknown) {
 }
 
 /** A plain-language reason for a failed Google/Facebook sign-in, from our own error or a Firebase error code. */
-export function socialErrorMessage(value: unknown, provider: SocialProvider) {
+export function socialErrorMessage(value: unknown, provider: SocialProvider, language: Language = 'English') {
   const name = providerName(provider);
+  const say = (key: Parameters<typeof translate>[1]) => translate(language, key, { name });
 
   if (value instanceof SocialLoginError) {
     switch (value.failure) {
       case 'cancelled':
         return '';
       case 'unavailable':
-        return `${name} sign-in works in the installed Diabeatis360 app. It is not available in Expo Go or a web browser.`;
+        return say('social.unavailable');
       case 'not-configured':
-        return `${name} sign-in is not set up in this version of the app yet. Please use your email and password for now.`;
+        return say('social.notConfigured');
       case 'play-services':
-        return 'Google Play services is missing or out of date on this phone. Update it in the Play Store, then try again.';
+        return say('social.playServices');
       case 'no-email':
-        return `${name} did not share an email address, and we need one to confirm your account. Add an email to your ${name} account, or sign up with your email and password.`;
+        return say('social.noEmail');
       default:
-        return `We could not sign you in with ${name}. Please try again.`;
+        return say('social.failed');
     }
   }
 
   switch (codeOf(value)) {
     case 'auth/account-exists-with-different-credential':
     case 'auth/email-already-in-use':
-      return 'This email already has a Diabeatis360 account that signs in another way. Log in with that one instead (your email and password, or the other button).';
+      return say('social.otherMethod');
     case 'auth/network-request-failed':
-      return 'No internet connection. Check your connection and try again.';
+      return say('verify.error.offline');
     case 'auth/user-disabled':
     case 'app/account-deactivated':
-      return 'This account has been deactivated. Please contact support.';
+      return say('auth.error.deactivated');
     case 'auth/operation-not-allowed':
-      return `${name} sign-in is not switched on for this project yet. Please use your email and password for now.`;
+      return say('social.notEnabled');
     case 'auth/too-many-requests':
-      return 'Too many attempts. Please wait a moment and try again.';
+      return say('auth.error.tooMany');
     default:
-      return `We could not sign you in with ${name}. Please try again.`;
+      return say('social.failed');
   }
 }

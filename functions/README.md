@@ -49,8 +49,12 @@ firebase emulators:exec --only firestore --project demo-diabeatis360 "node --tes
                               # handlers against the Firestore emulator with a fake Gemini
 firebase emulators:exec --only firestore --project demo-diabeatis360 "node --test functions/test/calls.test.js"
                               # joinCall against the Firestore emulator with a fake Daily
+firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node --test functions/test/live-cleanup.test.js"
+                              # the pre-launch clean-up and the Philippine food seed (D32)
 ```
 Run each emulator file in its own command: they reset the same test documents, so running them together can fail.
+The one-off scripts in `scripts/` (Pre-Diabetic fix D25, clean start and food seed D32) are dry runs unless given `--apply`, and refuse
+the live project unless given `--live`.
 
 ## Local development against the emulators
 `firebase emulators:start --only auth,firestore,functions` and set `EXPO_PUBLIC_USE_EMULATORS=true` in the mobile app.

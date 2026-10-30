@@ -3,6 +3,7 @@ import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, T
 import { db } from '@/firebase';
 import { glucoseDirection, interpretGlucose } from '@/constants/glucose';
 import type { MealContext } from '@/constants/enums';
+import { translate, type Language } from '@/i18n/translate';
 
 export type NotificationType =
   | 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification' | 'doctor_verification';
@@ -53,28 +54,29 @@ export async function createNotification(
 // NOTE: these are safety prompts, not a diagnosis. The cut-offs come from constants/glucose.ts (DECISIONS.md D4).
 // Critical readings always tell the person to contact their doctor or seek emergency care (root CLAUDE.md
 // health-safety rules); the app never suggests a medication change or an insulin dose.
-export function glucoseAlert(readingMgdl: number, context: MealContext): { message: string; severity: NotificationEntry['severity'] } | null {
+export function glucoseAlert(readingMgdl: number, context: MealContext, language: Language = 'English'): { message: string; severity: NotificationEntry['severity'] } | null {
   const interpretation = interpretGlucose(readingMgdl, context);
+  const say = (key: Parameters<typeof translate>[1]) => translate(language, key, { value: readingMgdl });
   if (interpretation === 'critical') {
     return glucoseDirection(readingMgdl, context) === 'low'
       ? {
-          message: `Your reading of ${readingMgdl} mg/dL is dangerously low. Take fast-acting sugar now and seek medical help immediately.`,
+          message: say('alert.criticalLow'),
           severity: 'critical',
         }
       : {
-          message: `Your reading of ${readingMgdl} mg/dL is very high. Please contact your doctor or go to the nearest hospital now.`,
+          message: say('alert.criticalHigh'),
           severity: 'critical',
         };
   }
   if (interpretation === 'high') {
     return {
-      message: `Your reading of ${readingMgdl} mg/dL is above your target range. Consider booking a consultation with your doctor.`,
+      message: say('alert.high'),
       severity: 'warning',
     };
   }
   if (interpretation === 'low') {
     return {
-      message: `Your reading of ${readingMgdl} mg/dL is below your target range. Have a fast-acting snack and re-check in 15 minutes.`,
+      message: say('alert.low'),
       severity: 'warning',
     };
   }

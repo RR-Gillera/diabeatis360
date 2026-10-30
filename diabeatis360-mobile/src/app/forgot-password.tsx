@@ -8,10 +8,13 @@ import { AuthButton, AuthField, authColors, authStyles } from '@/features/auth/a
 import { useAuth } from '@/features/auth/auth-context';
 import { RESET_RESEND_SECONDS, errorCode, formatCountdown, maskEmail } from '@/features/auth/verification';
 import { useSafeBack } from '@/hooks/use-safe-back';
+import { useT } from '@/i18n/language-context';
+import type { MessageKey } from '@/i18n/translate';
 
 // "Reset your password" (Figma P-01, doctors D-01) and, once the email has gone out, "Check your email" (P-02, D-02).
 // Login's "Forgot?" opens this screen with whatever was typed in its email field.
 export default function ForgotPasswordScreen() {
+  const { t } = useT();
   const router = useRouter();
   const goBack = useSafeBack('/login');
   const { email: typed } = useLocalSearchParams<{ email?: string }>();
@@ -30,7 +33,7 @@ export default function ForgotPasswordScreen() {
 
   const send = async () => {
     const address = email.trim();
-    if (!address) { setError('Please fill in all required fields.'); return; }
+    if (!address) { setError(t('auth.error.required')); return; }
     if (sending || secondsLeft > 0) return;
     setError(''); setSending(true);
     try {
@@ -40,7 +43,7 @@ export default function ForgotPasswordScreen() {
       setSentTo(address);
       setSecondsLeft(RESET_RESEND_SECONDS);
     } catch (value) {
-      setError(resetErrorMessage(errorCode(value)));
+      setError(t(resetErrorKey(errorCode(value))));
     } finally {
       setSending(false);
     }
@@ -50,15 +53,15 @@ export default function ForgotPasswordScreen() {
     return <View style={[authStyles.screen, styles.sentScreen]}>
       <View style={styles.sentBody}>
         <View style={styles.check}><SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} size={44} tintColor="#FFFFFF" /></View>
-        <Text style={styles.sentTitle}>Check your email</Text>
-        <Text style={styles.sentText}>We sent a reset link to{'\n'}{maskEmail(sentTo)}</Text>
-        <Text style={styles.hint}>Can&apos;t find it? Look in your Spam or Junk folder.</Text>
+        <Text style={styles.sentTitle}>{t('reset.sentTitle')}</Text>
+        <Text style={styles.sentText}>{t('reset.sentTo', { email: maskEmail(sentTo) })}</Text>
+        <Text style={styles.hint}>{t('reset.spamHint')}</Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
-      <AuthButton title="Back to Login" onPress={() => router.replace('/login')} />
+      <AuthButton title={t('verify.backToLogin')} onPress={() => router.replace('/login')} />
       <Pressable disabled={secondsLeft > 0 || sending} onPress={send}>
         <Text style={[styles.resend, secondsLeft === 0 && styles.resendReady]}>
-          {sending ? 'Sending...' : secondsLeft > 0 ? `Resend link in ${formatCountdown(secondsLeft).padStart(5, '0')}` : 'Resend link'}
+          {sending ? t('verify.sending') : secondsLeft > 0 ? t('reset.resendIn', { time: formatCountdown(secondsLeft).padStart(5, '0') }) : t('reset.resend')}
         </Text>
       </Pressable>
     </View>;
@@ -66,21 +69,22 @@ export default function ForgotPasswordScreen() {
 
   return <ScrollView style={authStyles.screen} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
     <RoundBackButton onPress={goBack} />
-    <Text style={styles.title}>Reset your password</Text>
-    <Text style={styles.subtitle}>Enter the email you signed up with and we&apos;ll send you a reset link.</Text>
+    <Text style={styles.title}>{t('reset.title')}</Text>
+    <Text style={styles.subtitle}>{t('reset.subtitle')}</Text>
     <View style={styles.form}>
-      <AuthField label="Email address" value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" icon="mail" />
+      <AuthField label={t('reset.emailLabel')} value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" icon="mail" />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <AuthButton title={sending ? 'Sending...' : 'Send reset link'} onPress={send} disabled={sending} />
+      <AuthButton title={sending ? t('verify.sending') : t('reset.send')} onPress={send} disabled={sending} />
     </View>
   </ScrollView>;
 }
 
-function resetErrorMessage(code: string | undefined) {
-  if (code === 'auth/invalid-email') return 'Enter a valid email address.';
-  if (code === 'auth/too-many-requests') return 'Too many attempts. Please wait a few minutes and try again.';
-  if (code === 'auth/network-request-failed') return 'No internet connection. Check your connection and try again.';
-  return 'We could not send the reset email. Please try again.';
+/** Which message explains a failed reset email (the text itself is in en.ts / fil.ts). */
+function resetErrorKey(code: string | undefined): MessageKey {
+  if (code === 'auth/invalid-email') return 'auth.error.invalidEmail';
+  if (code === 'auth/too-many-requests') return 'reset.error.tooMany';
+  if (code === 'auth/network-request-failed') return 'verify.error.offline';
+  return 'reset.error.generic';
 }
 
 const styles = StyleSheet.create({

@@ -5,6 +5,7 @@ import { checkReading, interpretGlucose } from '@/constants/glucose';
 import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
 
 import { doctorCriticalAlert } from './doctor-alert';
+import type { Language } from '@/i18n/translate';
 import type { GlucoseLogEntry, GlucoseLogRecord, MealContext } from './types';
 
 // Impossible values (outside 20-600 mg/dL, or decimals) never reach Firestore (DECISIONS.md D25); the rules refuse them too.
@@ -37,7 +38,7 @@ async function notifyDoctorsOfCriticalReading(patientId: string, readingMgdl: nu
 }
 
 /** Saves a new reading. `doctorsNotified` is how many doctors were sent a critical-reading alert (0 unless critical). */
-export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date) {
+export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date, language: Language = 'English') {
   assertPossibleReading(readingMgdl);
   const record: GlucoseLogRecord = {
     patient_id: patientId,
@@ -53,7 +54,8 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
   // A reading outside the target range raises a real notification, so the
   // patient still gets told to see a doctor even if they leave the result
   // screen immediately. Failing to notify must never fail the log itself.
-  const alert = glucoseAlert(readingMgdl, context);
+  // The patient's own alert is written in their language (D33); the doctor's alert stays English (doctor-alert.ts).
+  const alert = glucoseAlert(readingMgdl, context, language);
   if (alert) {
     try {
       await createNotification(patientId, 'glucose_alert', alert.message, alert.severity);
