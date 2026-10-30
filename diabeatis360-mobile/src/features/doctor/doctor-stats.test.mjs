@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { REQUEST_TABS, ageFrom, dashboardStats, requestTabFor, weeklyInsights } from './doctor-stats.ts';
+import { manilaInstant } from '../booking/manila-time.ts';
 
 test('requests are split like the frame; finished ones belong to History', () => {
   assert.deepEqual(REQUEST_TABS.map((tab) => tab.label), ['Pending', 'Accepted', 'Declined']);
@@ -14,8 +15,9 @@ test('requests are split like the frame; finished ones belong to History', () =>
 });
 
 test('dashboard counts and earnings (fee minus the 15% commission, finished consultations paid online only, D37)', () => {
-  const now = new Date(2026, 9, 24, 9, 0);
-  const at = (day, hour) => new Date(2026, 9, day, hour, 0);
+  // "Today" is the Philippine day (D26), so the test says its times in Philippine time too, whatever zone the test host is in.
+  const now = manilaInstant(2026, 9, 24, 9, 0);
+  const at = (day, hour) => manilaInstant(2026, 9, day, hour, 0);
   const bookings = [
     { status: 'confirmed', scheduledAt: at(24, 10), fee: 500, paymentStatus: 'paid' },
     { status: 'completed', scheduledAt: at(24, 8), fee: 500, paymentStatus: 'onsite' },

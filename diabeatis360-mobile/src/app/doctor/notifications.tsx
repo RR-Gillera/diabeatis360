@@ -6,13 +6,13 @@ import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
-import { formatFee } from '@/features/booking/booking-ui';
+import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/booking-ui';
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
 import { useT } from '@/i18n/language-context';
-import { shortDay, type Language, type MessageKey } from '@/i18n/translate';
+import { type Language, type MessageKey } from '@/i18n/translate';
 
 type Notice = {
   id: string;
@@ -45,7 +45,7 @@ function toNotices(appointments: ProviderBookingEntry[], t: Translate, language:
         id: entry.id, patientId: entry.patientId,
         title: t('doctor.notif.newRequest'), pending: true,
         detail: when
-          ? t('doctor.notif.requestOn', { name: entry.patientName, date: shortDay(when, language), time: when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }), fee: formatFee(entry.fee) })
+          ? t('doctor.notif.requestOn', { name: entry.patientName, date: shortApptDay(when, language), time: formatApptTime(when), fee: formatFee(entry.fee) })
           : t('doctor.notif.request', { name: entry.patientName, fee: formatFee(entry.fee) }),
         when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: '#B45309', background: '#FEF3C7',
       };
@@ -54,7 +54,7 @@ function toNotices(appointments: ProviderBookingEntry[], t: Translate, language:
       return {
         id: entry.id, patientId: entry.patientId,
         title: t('doctor.notif.confirmed'),
-        detail: when ? t('doctor.notif.confirmedOn', { name: entry.patientName, date: shortDay(when, language) }) : t('doctor.notif.confirmedText', { name: entry.patientName }),
+        detail: when ? t('doctor.notif.confirmedOn', { name: entry.patientName, date: shortApptDay(when, language) }) : t('doctor.notif.confirmedText', { name: entry.patientName }),
         when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint,
       };
     }

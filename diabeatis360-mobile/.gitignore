@@ -7,7 +7,7 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+# expo-env.d.ts is committed on purpose: tsconfig.json includes it, so a fresh clone fails `npx tsc --noEmit` without it.
 
 # Native
 .kotlin/

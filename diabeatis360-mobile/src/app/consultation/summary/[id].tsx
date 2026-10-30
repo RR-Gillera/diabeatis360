@@ -8,7 +8,7 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { formatDate } from '@/features/booking/booking-ui';
+import { formatApptDate, formatDate } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { durationLabel } from '@/features/consultation/consultation-format';
 import { subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
@@ -70,7 +70,7 @@ export default function ConsultationSummaryScreen() {
               </View>
             </View>
             <View style={styles.divider} />
-            <View style={styles.row}><Text style={styles.label}>{t('summary.date')}</Text><Text style={styles.value}>{date ? formatDate(date, language) : '—'}</Text></View>
+            <View style={styles.row}><Text style={styles.label}>{t('summary.date')}</Text><Text style={styles.value}>{date ? formatApptDate(date, language) : '—'}</Text></View>
             {duration ? <View style={styles.row}><Text style={styles.label}>{t('summary.duration')}</Text><Text style={styles.value}>{duration}</Text></View> : null}
           </View>
 

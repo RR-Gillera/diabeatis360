@@ -6,7 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { DECLINE_REASON_LIMIT, subscribeToBooking, updateBookingStatus } from '@/features/booking/booking-service';
-import { formatDate, formatFee } from '@/features/booking/booking-ui';
+import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { ageFrom } from '@/features/doctor/doctor-stats';
@@ -75,8 +75,8 @@ export default function RequestDetailsScreen() {
               <Text style={styles.age}>{age !== null ? t('doctor.request.age', { age }) : t('doctor.request.noAge')}</Text>
               <View style={styles.divider} />
               <View style={styles.grid}>
-                <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatDate(booking.scheduledAt, language) : '—'}</Text></View>
-                <View style={styles.cell}><Text style={styles.label}>{t('appt.time')}</Text><Text style={styles.value}>{booking.scheduledAt ? booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatApptDate(booking.scheduledAt, language) : '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('appt.time')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatApptTime(booking.scheduledAt) : '—'}</Text></View>
                 <View style={styles.cell}><Text style={styles.label}>{t('doctor.request.type')}</Text><Text style={[styles.value, styles.green]}>{t('doctor.request.online')}</Text></View>
                 <View style={styles.cell}><Text style={styles.label}>{t('doctors.fee')}</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
               </View>

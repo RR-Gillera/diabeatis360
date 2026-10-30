@@ -8,7 +8,8 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
-import { formatFee } from '@/features/booking/booking-ui';
+import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/booking-ui';
+import { manilaDayKey } from '@/features/booking/manila-time';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { dashboardStats } from '@/features/doctor/doctor-stats';
 import { isProfileComplete } from '@/features/doctor/profile-complete';
@@ -64,7 +65,8 @@ export default function DoctorHomeScreen() {
   const dateLine = `${t(`weekday.long.${WEEKDAYS[openedAt.getDay()]}`)}, ${shortDay(openedAt, language)}`;
   // A doctor with no specialty/licence/fee can't be meaningfully booked, so the dashboard nudges them to finish it.
   const profileIncomplete = profile && !isProfileComplete(profile);
-  const nextIsToday = next?.scheduledAt ? next.scheduledAt.toDateString() === openedAt.toDateString() : false;
+  // "Today" is the clinic's day in the Philippines (D26), matching how the slot was booked.
+  const nextIsToday = next?.scheduledAt ? manilaDayKey(next.scheduledAt) === manilaDayKey(openedAt) : false;
 
   return (
     <View style={doctorStyles.screen}>
@@ -119,8 +121,8 @@ export default function DoctorHomeScreen() {
                 <Text style={styles.nextMeta}>{t('doctor.diabetesConsultation')}</Text>
               </View>
               <View style={styles.nextWhen}>
-                <Text style={styles.nextDay}>{nextIsToday ? t('doctor.today') : next.scheduledAt ? shortDay(next.scheduledAt, language) : ''}</Text>
-                <Text style={styles.nextTime}>{next.scheduledAt?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</Text>
+                <Text style={styles.nextDay}>{nextIsToday ? t('doctor.today') : next.scheduledAt ? shortApptDay(next.scheduledAt, language) : ''}</Text>
+                <Text style={styles.nextTime}>{next.scheduledAt ? formatApptTime(next.scheduledAt) : ''}</Text>
               </View>
             </View>
             <Pressable accessibilityRole="button" style={styles.primary} onPress={() => router.push({ pathname: '/consultation/[id]', params: { id: next.id } })}>

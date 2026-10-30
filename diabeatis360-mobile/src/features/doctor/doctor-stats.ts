@@ -1,5 +1,8 @@
-// Numbers on the doctor's screens (Figma: Dashboard, D-06 Insights, D-11 Requests; DECISIONS D24). No imports on purpose,
-// so plain Node can test them (doctor-stats.test.mjs). Callers pass in what they need, such as the commission rate.
+// Numbers on the doctor's screens (Figma: Dashboard, D-06 Insights, D-11 Requests; DECISIONS D24). No app imports
+// except manila-time (itself import-free), so plain Node can test them (doctor-stats.test.mjs). Callers pass in what
+// they need, such as the commission rate.
+
+import { manilaDayKey } from '@/features/booking/manila-time';
 
 type Booking = { status: string; scheduledAt: Date | null; fee: number; paymentStatus: string };
 type Reading = { readingMgdl: number; interpretation?: string | null; loggedAt: Date | null };
@@ -20,7 +23,8 @@ export function requestTabFor(status: string): RequestTab | null {
   return null;
 }
 
-const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+// Appointments belong to the clinic's day in the Philippines (DECISIONS D26), whatever time zone the phone is set to.
+const sameDay = (a: Date, b: Date) => manilaDayKey(a) === manilaDayKey(b);
 
 /**
  * The four dashboard cards. Earnings are what the doctor keeps from finished consultations that were paid (online or

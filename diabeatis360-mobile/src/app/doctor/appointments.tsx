@@ -7,13 +7,12 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
-import { formatFee } from '@/features/booking/booking-ui';
+import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/booking-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { REQUEST_TABS, requestTabFor, type RequestTab } from '@/features/doctor/doctor-stats';
 import { DoctorBottomNav, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useT } from '@/i18n/language-context';
-import { shortDay } from '@/i18n/translate';
 
 // "Appointment Requests" (Figma D-11): the doctor's bookings in three tabs. A pending request opens Request Details,
 // where it is accepted or declined. Finished consultations are under History.
@@ -69,7 +68,7 @@ export default function DoctorRequestsScreen() {
               <View style={styles.copy}>
                 <Text style={styles.name}>{entry.patientName}</Text>
                 <Text style={styles.meta}>
-                  {entry.scheduledAt ? `${shortDay(entry.scheduledAt, language)} · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '—'} · {formatFee(entry.fee)}
+                  {entry.scheduledAt ? `${shortApptDay(entry.scheduledAt, language)} · ${formatApptTime(entry.scheduledAt)}` : '—'} · {formatFee(entry.fee)}
                 </Text>
               </View>
               <StatusPill status={entry.status} />

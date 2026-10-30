@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
-import { BookingHeader, BookingHeaderActions, bookingColors, formatDate, formatFee, PAYMENT_METHOD_KEYS, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { BookingHeader, BookingHeaderActions, bookingColors, formatApptDate, formatApptTime, formatFee, PAYMENT_METHOD_KEYS, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { payForBooking, subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, PaymentMethod } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -102,8 +102,8 @@ export default function ConsultationFeeScreen() {
           <View style={styles.slotLine}>
             <Text style={styles.muted}>{t('pay.slot')}</Text>
             <Text style={styles.strong}>
-              {booking.scheduledAt ? formatDate(booking.scheduledAt, language) : '—'}
-              {booking.scheduledAt ? ` • ${booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+              {booking.scheduledAt ? formatApptDate(booking.scheduledAt, language) : '—'}
+              {booking.scheduledAt ? ` • ${formatApptTime(booking.scheduledAt)}` : ''}
             </Text>
           </View>
         </View>

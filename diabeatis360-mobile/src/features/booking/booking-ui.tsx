@@ -6,9 +6,9 @@ import { MoreMenu } from '@/components/ui/more-menu';
 import { Brand, Fonts, Spacing } from '@/constants/theme';
 import { NotificationBell } from '@/features/notifications/notification-bell';
 import { useT } from '@/i18n/language-context';
-import { shortDay, type Language, type MessageKey } from '@/i18n/translate';
+import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
 
-import { slotInstant } from './manila-time';
+import { manilaWallClock, slotInstant } from './manila-time';
 import type { PaymentMethod } from './types';
 
 export const bookingColors = {
@@ -78,6 +78,25 @@ export function formatFee(value: number) {
 /** "Oct 29, 2026" in English, "Okt 29, 2026" in Filipino. */
 export function formatDate(value: Date, language: Language = 'English') {
   return `${shortDay(value, language)}, ${value.getFullYear()}`;
+}
+
+// A booking's scheduled_at is an exact moment whose meaning is Philippine clinic time (DECISIONS.md D26). These three
+// show that moment as the clinic's date and time, so a phone set to another time zone still reads the slot the patient
+// picked ("09:30 AM"), not a shifted local time. Only booking moments go through these; a chat or call timestamp is an
+// ordinary event on the phone and keeps the phone's own time.
+/** "Oct 29, 2026" — the Philippine date of a booking moment. */
+export function formatApptDate(instant: Date, language: Language = 'English') {
+  return formatDate(manilaWallClock(instant), language);
+}
+
+/** "Oct 29" — the short Philippine date of a booking moment. */
+export function shortApptDay(instant: Date, language: Language) {
+  return shortDay(manilaWallClock(instant), language);
+}
+
+/** "9:30 AM" — the Philippine clock time of a booking moment. */
+export function formatApptTime(instant: Date) {
+  return clockTime(manilaWallClock(instant));
 }
 
 /** The words for each payment method. The stored value stays English, because the rules and the admin panel read it. */

@@ -8,6 +8,7 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
+import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
 import { endConsultation, saveConsultationNotes, sendMessage, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
 import { DoctorNotesForm } from '@/features/consultation/doctor-notes-form';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
@@ -82,6 +83,7 @@ export default function ConsultationScreen() {
     const text = draft;
     setDraft('');
     setSending(true);
+    setError(''); // an earlier "could not send" note must not stay up once a later send works
     try {
       await sendMessage(id, uid, isDoctor ? 'doctor' : 'patient', text);
     } catch {
@@ -150,7 +152,7 @@ export default function ConsultationScreen() {
   // Naming the slot in the header is what stops two people from typing into
   // different appointments and assuming the chat is broken.
   const appointmentLabel = booking?.scheduledAt
-    ? `${shortDay(booking.scheduledAt, language)} · ${booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    ? `${shortApptDay(booking.scheduledAt, language)} · ${formatApptTime(booking.scheduledAt)}`
     : ended ? t('chat.ended') : t('chat.consultation');
 
   const body = () => {

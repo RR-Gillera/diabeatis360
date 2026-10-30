@@ -7,6 +7,7 @@ import { Fonts } from '@/constants/theme';
 import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
+import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
@@ -190,8 +191,8 @@ export default function DoctorPatientDetailScreen() {
                         <View style={styles.consultCopy}>
                           <Text style={styles.consultTitle}>{t('appt.openChat')}</Text>
                           <Text style={styles.consultMeta}>
-                            {entry.scheduledAt ? shortDay(entry.scheduledAt, language) : t('doctor.patient.appointment')}
-                            {entry.scheduledAt ? ` · ${entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
+                            {entry.scheduledAt ? shortApptDay(entry.scheduledAt, language) : t('doctor.patient.appointment')}
+                            {entry.scheduledAt ? ` · ${formatApptTime(entry.scheduledAt)}` : ''}
                           </Text>
                         </View>
                         <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />

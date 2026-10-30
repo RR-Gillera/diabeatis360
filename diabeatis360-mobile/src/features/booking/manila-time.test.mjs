@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { isPastSlot, isSameManilaDay, manilaInstant, manilaParts, manilaSlotLabel, manilaToday, parseSlotLabel, slotInstant } from './manila-time.ts';
+import { isPastSlot, isSameManilaDay, manilaDayKey, manilaInstant, manilaParts, manilaSlotLabel, manilaToday, manilaWallClock, parseSlotLabel, slotInstant } from './manila-time.ts';
 
 test('a Philippine date and time is UTC minus 8 hours', () => {
   assert.equal(manilaInstant(2026, 9, 18, 9, 30).toISOString(), '2026-10-18T01:30:00.000Z');
@@ -34,4 +34,18 @@ test('"today" and same-day checks follow the Philippine date, not UTC', () => {
   assert.deepEqual([today.getFullYear(), today.getMonth(), today.getDate()], [2026, 9, 19]);
   assert.equal(isSameManilaDay(lateEvening, new Date(2026, 9, 19)), true);
   assert.equal(isSameManilaDay(lateEvening, new Date(2026, 9, 18)), false);
+});
+
+test('two moments share a day key only when they fall on the same Philippine date', () => {
+  assert.equal(manilaDayKey(new Date('2026-10-18T17:00:00Z')), '2026-10-19'); // 1:00 AM on 19 October in the Philippines
+  assert.equal(manilaDayKey(new Date('2026-10-18T15:00:00Z')), '2026-10-18'); // 11:00 PM on 18 October
+  assert.notEqual(manilaDayKey(new Date('2026-10-18T17:00:00Z')), manilaDayKey(new Date('2026-10-18T15:00:00Z')));
+});
+
+test('the wall clock of a moment carries the Philippine date and time whatever the host time zone is', () => {
+  const wall = manilaWallClock(new Date('2026-10-18T05:00:00Z')); // 1:00 PM on 18 October in the Philippines
+  assert.deepEqual(
+    [wall.getFullYear(), wall.getMonth(), wall.getDate(), wall.getHours(), wall.getMinutes()],
+    [2026, 9, 18, 13, 0],
+  );
 });

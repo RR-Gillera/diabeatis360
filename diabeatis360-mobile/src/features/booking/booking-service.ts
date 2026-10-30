@@ -6,7 +6,8 @@ import { isProfileComplete } from '@/features/doctor/profile-complete';
 import { platformCommission } from '@/constants/commission';
 import { createNotification } from '@/features/notifications/notification-service';
 
-import { isSameManilaDay, manilaSlotLabel } from './manila-time';
+import { isSameManilaDay, manilaDayKey, manilaSlotLabel, manilaWallClock } from './manila-time';
+import { clockTime, monthNames } from '@/i18n/translate';
 import type { AppointmentHistoryEntry, BookingRecord, BookingStatus, PaymentMethod, PaymentStatus, Provider, ProviderBookingEntry } from './types';
 
 // Shared Firestore-doc-to-Provider mapping, used by both subscribeToProviders
@@ -290,7 +291,9 @@ async function resequenceQueue(providerId: string, day: Date) {
     .filter((entry) => {
       const data = entry.data();
       const scheduledAt = (data.scheduled_at as Timestamp | undefined)?.toDate();
-      return data.status === 'confirmed' && scheduledAt?.toDateString() === day.toDateString();
+      // "That day" is the clinic's day in the Philippines (DECISIONS.md D26), not the phone's: a 9:00 AM and an
+      // 11:00 PM Manila booking belong to one queue even when the doctor's phone is set to another time zone.
+      return data.status === 'confirmed' && Boolean(scheduledAt) && manilaDayKey(scheduledAt as Date) === manilaDayKey(day);
     })
     .sort((a, b) => {
       const left = (a.data().scheduled_at as Timestamp | undefined)?.toDate()?.getTime() ?? 0;
@@ -345,7 +348,10 @@ export async function updateBookingStatus(bookingId: string, status: BookingStat
   const providerSnapshot = await getDoc(doc(db, 'Providers', providerId));
   const doctorName = String(providerSnapshot.data()?.full_name ?? 'your doctor');
   const queueNumber = positions.get(bookingId);
-  const when = scheduledAt.toLocaleString('en-US', { month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  // The notification names the slot in Philippine time (D26) — the time the patient actually picked — and stays
+  // English like every other stored notification (stored data is never translated, i18n/en.ts).
+  const wall = manilaWallClock(scheduledAt);
+  const when = `${monthNames('English')[wall.getMonth()]} ${wall.getDate()}, ${clockTime(wall)}`;
   if (status === 'declined') {
     // The patient learns about a decline (and the doctor's reason, D24) without having to open the app's lists.
     const why = reason.trim() ? ` Reason: ${reason.trim().slice(0, DECLINE_REASON_LIMIT)}` : '';
