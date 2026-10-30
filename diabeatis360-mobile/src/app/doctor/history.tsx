@@ -7,7 +7,7 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
-import { formatDate, formatFee } from '@/features/booking/booking-ui';
+import { formatApptDate, formatFee } from '@/features/booking/booking-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { DoctorBottomNav, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
@@ -48,7 +48,7 @@ export default function DoctorHistoryScreen() {
             <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(entry.patientName)}</Text></View>
             <View style={styles.copy}>
               <Text style={styles.name}>{entry.patientName}</Text>
-              <Text style={styles.meta}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'} · {formatFee(entry.fee)}</Text>
+              <Text style={styles.meta}>{entry.scheduledAt ? formatApptDate(entry.scheduledAt, language) : '—'} · {formatFee(entry.fee)}</Text>
             </View>
             <StatusPill status={entry.status} />
           </Pressable>

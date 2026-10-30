@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
-import { bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { bookingColors, formatApptDate, formatApptTime, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { useT } from '@/i18n/language-context';
@@ -22,7 +22,7 @@ export default function PaymentSuccessfulScreen() {
 
   const provider = booking?.provider ?? null;
   const selectedDate = booking?.scheduledAt ?? null;
-  const selectedTime = booking?.scheduledAt ? booking.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null;
+  const selectedTime = booking?.scheduledAt ? formatApptTime(booking.scheduledAt) : null;
   const fee = booking?.fee ?? 0;
   const bookingId = id ?? null;
   const onsite = booking?.paymentStatus === 'onsite';
@@ -56,7 +56,7 @@ export default function PaymentSuccessfulScreen() {
             ) : null}
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>{t('paid.dateTime')}</Text>
-              <Text style={styles.receiptValue}>{formatDate(selectedDate, language)} • {selectedTime}</Text>
+              <Text style={styles.receiptValue}>{formatApptDate(selectedDate, language)} • {selectedTime}</Text>
             </View>
             <View style={[styles.receiptRow, styles.receiptTotalRow]}>
               <Text style={styles.receiptTotalLabel}>{onsite ? t('paid.payOnsite') : t('paid.amountDemo')}</Text>

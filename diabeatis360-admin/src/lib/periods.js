@@ -64,7 +64,9 @@ export function bucketsFor(range) {
   const days = Math.round((range.end.getTime() - range.start.getTime()) / DAY)
   const buckets = []
 
-  if (days < 1) {
+  // A one-day range (start 00:00 to end 23:59:59.999) rounds to 1, so "<= 1" is what makes the Today chart hourly;
+  // "< 1" never matched and the chart collapsed into a single point.
+  if (days <= 1) {
     for (let hour = 0; hour < 24; hour += 1) {
       const start = new Date(range.start.getFullYear(), range.start.getMonth(), range.start.getDate(), hour)
       buckets.push({ label: `${hour}:00`, start, end: new Date(start.getTime() + 60 * 60 * 1000) })

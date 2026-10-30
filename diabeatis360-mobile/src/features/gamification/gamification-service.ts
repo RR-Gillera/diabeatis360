@@ -39,8 +39,8 @@ function parseCriteria(criteria: string): { threshold: number; kind: BadgeKind }
   return { threshold: amount || 0, kind: 'other' };
 }
 
-/** Points are earned per reading logged, with a bonus for keeping a streak. */
-const POINTS_PER_LOG = 5;
+/** Points are earned per reading logged, with a bonus for keeping a streak. Exported so screens quote the same number. */
+export const POINTS_PER_LOG = 5;
 const POINTS_PER_STREAK_DAY = 2;
 
 export function wellnessStats(entries: GlucoseLogEntry[]): WellnessStats {

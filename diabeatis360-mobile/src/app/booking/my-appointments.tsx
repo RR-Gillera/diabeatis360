@@ -7,7 +7,7 @@ import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { APPOINTMENT_TABS, initialsOf, tabFor, type AppointmentTab } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
-import { formatDate } from '@/features/booking/booking-ui';
+import { formatApptDate, formatApptTime } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry, Provider } from '@/features/booking/types';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useT } from '@/i18n/language-context';
@@ -81,11 +81,11 @@ export default function MyAppointmentsScreen() {
               <View style={styles.when}>
                 <View style={styles.whenItem}>
                   <SymbolView name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }} size={14} tintColor="#64748B" />
-                  <Text style={styles.whenText}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'}</Text>
+                  <Text style={styles.whenText}>{entry.scheduledAt ? formatApptDate(entry.scheduledAt, language) : '—'}</Text>
                 </View>
                 <View style={styles.whenItem}>
                   <SymbolView name={{ ios: 'clock', android: 'schedule', web: 'schedule' }} size={14} tintColor="#64748B" />
-                  <Text style={styles.whenText}>{entry.scheduledAt ? entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text>
+                  <Text style={styles.whenText}>{entry.scheduledAt ? formatApptTime(entry.scheduledAt) : '—'}</Text>
                 </View>
               </View>
               </Pressable>

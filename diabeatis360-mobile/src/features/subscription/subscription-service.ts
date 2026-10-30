@@ -3,6 +3,7 @@ import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, T
 import { db } from '@/firebase';
 import type { SubscriptionStatus } from '@/constants/enums';
 import { FREE_LIMITS, type LimitedFeature } from '@/constants/plans';
+import { manilaInstant, manilaParts } from '@/features/booking/manila-time';
 
 export type { SubscriptionStatus };
 
@@ -141,8 +142,10 @@ export async function canUseFeature(userId: string, feature: LimitedFeature) {
 
   const { collection: name, dateField } = usageSource[feature];
   const usage = await getDocs(query(collection(db, name), where('user_id', '==', userId)));
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  // The server resets the free limits at midnight Manila time (functions/lib/limits.js), so this counter counts the
+  // same day — a phone set to another time zone would otherwise show the wrong "left today".
+  const { year, month, day } = manilaParts(new Date());
+  const startOfDay = manilaInstant(year, month, day);
   const used = usage.docs.filter((document) => {
     const at = (document.data()[dateField] as Timestamp | undefined)?.toDate?.();
     return at ? at >= startOfDay : false;
