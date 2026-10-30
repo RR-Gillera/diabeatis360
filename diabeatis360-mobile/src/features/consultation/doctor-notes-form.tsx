@@ -6,6 +6,7 @@ import { RoundBackButton } from '@/components/ui/round-back-button';
 import { Fonts } from '@/constants/theme';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
 import { parseBirthdate } from '@/features/auth/birthdate';
+import { manilaInstant, manilaWallClock } from '@/features/booking/manila-time';
 import { TimePickerSheet } from '@/features/doctor/time-picker';
 import { labelFromMinutes, minutesFromLabel } from '@/features/doctor/time-slots';
 import { homeColors } from '@/features/home/home-ui';
@@ -19,6 +20,15 @@ const ADVICE_LIMIT = 2000;
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const dateText = (date: Date) => `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+
+// The follow-up is a clinic appointment, so like a booking it means Philippine time (DECISIONS.md D38): a stored
+// follow-up seeds the pickers with its Manila date and time, whatever time zone the doctor's phone is set to.
+const seedDay = (followUpAt: Date | null | undefined) => (followUpAt ? dateText(manilaWallClock(followUpAt)) : '');
+function seedTime(followUpAt: Date | null | undefined) {
+  if (!followUpAt) return '09:00 AM';
+  const wall = manilaWallClock(followUpAt);
+  return labelFromMinutes(wall.getHours() * 60 + wall.getMinutes());
+}
 
 /**
  * The doctor's notes (Figma D-07 Notes, DECISIONS D24): Diagnosis notes, Advice and an optional Follow-up date and time,
@@ -38,8 +48,8 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
   const { t } = useT();
   const [summary, setSummary] = useState(initial?.summary ?? '');
   const [advice, setAdvice] = useState(initial?.advice ?? '');
-  const [day, setDay] = useState(initial?.followUpAt ? dateText(initial.followUpAt) : '');
-  const [time, setTime] = useState(initial?.followUpAt ? labelFromMinutes(initial.followUpAt.getHours() * 60 + initial.followUpAt.getMinutes()) : '09:00 AM');
+  const [day, setDay] = useState(seedDay(initial?.followUpAt));
+  const [time, setTime] = useState(seedTime(initial?.followUpAt));
   const [pickingTime, setPickingTime] = useState(false);
   const [problem, setProblem] = useState('');
   // Ending with nothing written asks first (QA F-EMPTY-NOTES): the patient would only see "No summary recorded yet".
@@ -52,8 +62,8 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
     setSeededFrom(seedKey);
     setSummary(initial?.summary ?? '');
     setAdvice(initial?.advice ?? '');
-    setDay(initial?.followUpAt ? dateText(initial.followUpAt) : '');
-    setTime(initial?.followUpAt ? labelFromMinutes(initial.followUpAt.getHours() * 60 + initial.followUpAt.getMinutes()) : '09:00 AM');
+    setDay(seedDay(initial?.followUpAt));
+    setTime(seedTime(initial?.followUpAt));
     setProblem('');
     setConfirmEmpty(false);
   }
@@ -62,8 +72,8 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
     const date = parseBirthdate(day);
     if (!date) return null;
     const minutes = minutesFromLabel(time) ?? 9 * 60;
-    date.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
-    return date;
+    // The picked date and time mean Philippine time (D38), the same way a booking slot does.
+    return manilaInstant(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(minutes / 60), minutes % 60);
   };
 
   const submit = () => {
