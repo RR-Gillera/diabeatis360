@@ -162,4 +162,10 @@ Append newest at the bottom. Format:
 - **Also fixed:** the "left today" counter (`canUseFeature`) now counts from Manila midnight like the server's limits; the chat's "could not send" note is cleared when a later send works; `POINTS_PER_LOG` is exported from the gamification service instead of duplicated on Home; Home's bell and avatar got accessibility labels; the admin Analytics "Today" chart was collapsing into one point (`periods.js` hourly branch was unreachable).
 - **Files:** mobile `features/booking/{manila-time,booking-ui,booking-service}`, `features/doctor/doctor-stats`, `features/subscription/subscription-service`, `features/gamification/gamification-service`, 12 screens under `app/`; admin `lib/periods.js`; `expo-env.d.ts`.
 - **Verified:** unit 130 (124 pass, 6 skipped, 2 new Manila-time tests); tsc and both lints clean; admin build clean; functions 83 (45 pass, 38 need the emulator).
-- **Known gap:** the doctor's follow-up date is still picked and shown in the phone's own time zone (consistent with itself); decide in DECISIONS.md whether it should be Manila time like bookings.
+- **Known gap (closed later the same day, D38):** the doctor's follow-up date was still picked and shown in the phone's own time zone.
+
+## 2026-10-30 (later) — Claude Code — follow-up dates are Philippine time (D38)
+- **Built:** the team chose Manila time for the consultation follow-up, like bookings (closes the gap noted this morning). The notes form builds `follow_up_at` with `manilaInstant` and re-seeds its pickers from the stored moment's Manila date and time; the doctor's consultation details and the patient's summary show it through `formatApptDate`/`formatApptTime`.
+- **Files:** mobile `features/consultation/doctor-notes-form.tsx`, `app/doctor/consultation/[id].tsx`, `app/consultation/summary/[id].tsx`; `docs/DECISIONS.md` (D38).
+- **Verified:** unit 130 (124 pass, 6 skipped); tsc and lint clean.
+- **No data migration:** on a Manila phone the saved values are identical to before.

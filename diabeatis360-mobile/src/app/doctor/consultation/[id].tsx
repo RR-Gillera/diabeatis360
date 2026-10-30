@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { formatApptDate, formatDate, formatFee } from '@/features/booking/booking-ui';
+import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { durationLabel } from '@/features/consultation/consultation-format';
 import { saveConsultationNotes, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
@@ -116,7 +116,7 @@ export default function ConsultationDetailsScreen() {
               ) : null}
               <View style={styles.extra}>
                 <Text style={styles.label}>{t('doctor.consult.followUp')}</Text>
-                <Text style={styles.notesText}>{consultation?.followUpAt ? `${formatDate(consultation.followUpAt, language)}, ${consultation.followUpAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : t('doctor.consult.noneSet')}</Text>
+                <Text style={styles.notesText}>{consultation?.followUpAt ? `${formatApptDate(consultation.followUpAt, language)}, ${formatApptTime(consultation.followUpAt)}` : t('doctor.consult.noneSet')}</Text>
               </View>
               <Pressable accessibilityRole="button" onPress={() => setEditing(true)} hitSlop={8}><Text style={styles.edit}>{t('doctor.consult.edit')}</Text></Pressable>
               <TextInput
