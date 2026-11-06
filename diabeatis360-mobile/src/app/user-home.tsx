@@ -9,7 +9,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AddReadingModal, AiRecommendations } from '@/features/glucose/glucose-ui';
-import { wellnessStats } from '@/features/gamification/gamification-service';
+import { POINTS_PER_LOG, wellnessStats } from '@/features/gamification/gamification-service';
 import { subscribeToNotifications } from '@/features/notifications/notification-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { BottomNav, homeColors, Sparkline } from '@/features/home/home-ui';
@@ -22,8 +22,6 @@ import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/tran
 // so these two cards used to show made-up numbers (45 mins, 1.5 L) to everyone. Now they show what is real: the day's
 // movement and water reminder times (reminder-plan.ts), and open Exercise Tips / Notifications (D34).
 const reminderTimes = (times: [number, number][]) => times.map(([hour, minute]) => clockTime(new Date(2000, 0, 1, hour, minute))).join(' · ');
-
-const POINTS_PER_LOG = 5;
 
 // Recent Activity is now driven by real Glucose_Logs: each of the last two
 // readings is one activity row, worth the same points the rewards screen
@@ -107,11 +105,11 @@ export default function UserHomeScreen() {
             <Text style={styles.greeting}>{greeting},{'\n'}{firstName}!</Text>
           </View>
           <View style={styles.headerActions}>
-            <Pressable style={styles.bellButton} onPress={() => router.navigate('/notifications')} hitSlop={8}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('notif.title')} style={styles.bellButton} onPress={() => router.navigate('/notifications')} hitSlop={8}>
               <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
               {unreadCount ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}
             </Pressable>
-            <Pressable style={styles.avatar} onPress={() => router.navigate('/profile')}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('nav.profile')} style={styles.avatar} onPress={() => router.navigate('/profile')}>
               <Text style={styles.avatarText}>{initial}</Text>
             </Pressable>
           </View>

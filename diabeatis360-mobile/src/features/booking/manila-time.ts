@@ -59,3 +59,19 @@ export function isSameManilaDay(instant: Date, day: Date): boolean {
   const parts = manilaParts(instant);
   return parts.year === day.getFullYear() && parts.month === day.getMonth() && parts.day === day.getDate();
 }
+
+/** "2026-10-30": the Philippine calendar day of a moment, so two moments can be grouped into the same clinic day. */
+export function manilaDayKey(instant: Date): string {
+  const { year, month, day } = manilaParts(instant);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * The Philippine wall-clock of a moment, as a plain local Date carrying those fields. Screens pass this to the ordinary
+ * date/time formatters (shortDay, clockTime, formatDate) so an appointment always reads as the clinic's 09:30 AM,
+ * whatever time zone the phone is set to.
+ */
+export function manilaWallClock(instant: Date): Date {
+  const { year, month, day, hour, minute } = manilaParts(instant);
+  return new Date(year, month, day, hour, minute);
+}

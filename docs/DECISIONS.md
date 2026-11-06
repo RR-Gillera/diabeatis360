@@ -595,3 +595,13 @@ Also: the common allergy list comes from `COMMON_ALLERGIES` everywhere.
 4. **Video calls move to LiveKit's free plan** (replaces Daily.co in D27, which needs a credit card). A build plan is proposed to the team first (it changes the server endpoint and the call screen); until it is built, video calls stay as they are.
 **Checked:** unit 128 (122 pass, 6 skipped; the earnings test now expects paid-only); mobile and admin lint and build; a browser check on the emulators, 3/3 (sign-up refuses a 7-character password; the main button and the admin buttons are #4D7C22).
 **Manuscript:** the commission is earned only on consultations paid through the app; passwords have at least 8 characters; the design meets AA contrast (MANUSCRIPT_CHANGES).
+
+### D38 — The follow-up date is Philippine time, like a booking — CLOSED 2026-10-30 (team choice in session; extends D26)
+The follow-up a doctor writes into the consultation notes is a clinic appointment, so it means Philippine time whatever
+time zone either phone is set to — the same rule D26 set for booking slots. The notes form builds `follow_up_at` with
+`manilaInstant` and re-seeds its pickers from the stored moment's Manila date and time (`doctor-notes-form.tsx`), and the
+two screens that show it (the doctor's consultation details and the patient's summary) format it with
+`formatApptDate`/`formatApptTime` like every other appointment. Nothing stored changes shape (`follow_up_at` stays a
+timestamp), and on a phone set to Philippine time the saved values are the same as before, so no data migration.
+**Checked:** unit 130 (124 pass, 6 skipped); tsc and lint clean.
+**Manuscript:** consultation follow-ups, like bookings, are in Philippine time.

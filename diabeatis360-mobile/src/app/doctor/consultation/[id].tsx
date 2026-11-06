@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { formatDate, formatFee } from '@/features/booking/booking-ui';
+import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { durationLabel } from '@/features/consultation/consultation-format';
 import { saveConsultationNotes, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
@@ -99,7 +99,7 @@ export default function ConsultationDetailsScreen() {
               <View style={styles.pill}><Text style={styles.pillText}>{booking.status === 'completed' ? `✓ ${label('bookingStatus', 'completed').toUpperCase()}` : label('bookingStatus', booking.status).toUpperCase()}</Text></View>
               <View style={styles.divider} />
               <View style={styles.grid}>
-                <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatDate(booking.scheduledAt, language) : '—'}</Text></View>
+                <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatApptDate(booking.scheduledAt, language) : '—'}</Text></View>
                 <View style={styles.cell}><Text style={styles.label}>{t('doctor.consult.duration')}</Text><Text style={styles.value}>{duration ?? '—'}</Text></View>
                 <View style={styles.cell}><Text style={styles.label}>{t('booking.fee')}</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
                 <View style={styles.cell}><Text style={styles.label}>{t('doctor.consult.ref')}</Text><Text style={styles.value} selectable>#{booking.id.slice(-6).toUpperCase()}</Text></View>
@@ -116,7 +116,7 @@ export default function ConsultationDetailsScreen() {
               ) : null}
               <View style={styles.extra}>
                 <Text style={styles.label}>{t('doctor.consult.followUp')}</Text>
-                <Text style={styles.notesText}>{consultation?.followUpAt ? `${formatDate(consultation.followUpAt, language)}, ${consultation.followUpAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : t('doctor.consult.noneSet')}</Text>
+                <Text style={styles.notesText}>{consultation?.followUpAt ? `${formatApptDate(consultation.followUpAt, language)}, ${formatApptTime(consultation.followUpAt)}` : t('doctor.consult.noneSet')}</Text>
               </View>
               <Pressable accessibilityRole="button" onPress={() => setEditing(true)} hitSlop={8}><Text style={styles.edit}>{t('doctor.consult.edit')}</Text></Pressable>
               <TextInput

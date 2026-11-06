@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { BookingHeader, bookingColors, formatDate, formatFee, paymentMethodLabel, styles as ui } from '@/features/booking/booking-ui';
+import { BookingHeader, bookingColors, formatApptDate, formatApptTime, formatFee, paymentMethodLabel, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, BookingStatus, PaymentStatus } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -68,8 +68,8 @@ export default function AppointmentScreen() {
                 <Text style={styles.queueHint}>{t('appt.queueHint')}</Text>
               </View>
             ) : null}
-            <View style={styles.line}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{entry.scheduledAt ? formatDate(entry.scheduledAt, language) : '—'}</Text></View>
-            <View style={styles.line}><Text style={styles.label}>{t('appt.time')}</Text><Text style={styles.value}>{entry.scheduledAt ? entry.scheduledAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text></View>
+            <View style={styles.line}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{entry.scheduledAt ? formatApptDate(entry.scheduledAt, language) : '—'}</Text></View>
+            <View style={styles.line}><Text style={styles.label}>{t('appt.time')}</Text><Text style={styles.value}>{entry.scheduledAt ? formatApptTime(entry.scheduledAt) : '—'}</Text></View>
             <View style={styles.line}><Text style={styles.label}>{t('booking.fee')}</Text><Text style={styles.value}>{formatFee(entry.fee)}</Text></View>
             <View style={styles.line}>
               <Text style={styles.label}>{t('appt.payment')}</Text>
