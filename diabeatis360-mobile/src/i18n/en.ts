@@ -777,7 +777,6 @@ export const en = {
   'call.error.notYours': 'You are not part of this call.',
   'call.error.notConfirmed': 'Video calls are only for a confirmed appointment.',
   'call.error.notActive': 'This call is not active any more.',
-  'call.error.busy': 'The video service is busy right now. Please try again in a moment.',
   'call.error.room': 'We could not open the video room.',
   'call.error.appointmentGone': 'This appointment no longer exists.',
   'call.error.alreadyCalling': 'You are already calling. Please wait for an answer.',

@@ -179,7 +179,7 @@ being called. Proposed design (not built):
    callee, and shows a full-screen incoming-call screen (Accept / Decline), like Messenger.
 4. Accept → `accepted`, and both sides navigate to the call screen at the same time. Decline → `declined`.
    No answer within ~30 s → `missed`, and the caller is told in-app.
-5. **Replaced by D27 (2026-10-18): the video is a private Daily.co room.** Originally: video transport stays Jitsi (`meet.jit.si/diabeatis360-<bookingId>`) but loads inside the app with
+5. **Replaced by D27 (2026-10-18), then by D39 (2026-11-06): the video is now a LiveKit room on our own call page.** Originally: video transport stays Jitsi (`meet.jit.si/diabeatis360-<bookingId>`) but loads inside the app with
    `react-native-webview` instead of an external browser tab. This works in Expo Go (no development build).
 6. **Known limitation:** it only rings while the app is open (foreground/background). Ringing when the app is
    fully closed needs push notifications (FCM), which are out of scope.
@@ -215,7 +215,7 @@ ARE shown to other patients, labelled "Not yet verified", until an admin verifie
 Each is added with `npx expo install` (mobile) or `npm install` (admin/functions) in the work item that needs
 it, and that item's notes say why.
 - Mobile: `@expo-google-fonts/inter` + `expo-font` (Figma font), `eslint` (so `npm run lint` works),
-  `expo-notifications` (reminders), `expo-camera` (scanner + barcode), `react-native-webview` (in-app video call; Jitsi until D27, now Daily.co).
+  `expo-notifications` (reminders), `expo-camera` (scanner + barcode), `react-native-webview` (in-app video call; Jitsi until D27, Daily.co until D39, now our call page with LiveKit).
   All work in Expo Go.
 - Admin: `react-router-dom`, `tailwindcss`, `recharts`.
 - Cloud Functions (`functions/`, per D1): `firebase-functions`, `firebase-admin`, `@google/genai`.
@@ -470,6 +470,7 @@ Figma sidebar (Overview, Users, Providers, Content, Analytics, Revenue, Settings
 **Deploy together:** the rule refuses past bookings from any app version; deploy it with the new APK.
 
 ### D27 — Video calls through private Daily.co rooms — CLOSED 2026-10-18 (team choice "plan a" after the QA run; amends D11 point 5)
+**Replaced by D39 (2026-11-06):** the video service is now LiveKit. Who may join, the signalling in Firestore and the permission checks below still apply.
 **Context:** QA (group VC, docs/reports/qa-2026-10-18.md) found that ringing, Accept, Decline, missed and hang-up all work, but the call itself does not: the public meet.jit.si server shows an interstitial and a pre-join page, the in-app WebView gets no camera or microphone, and then it waits for "a moderator to log in". The public Jitsi server now requires a signed-in moderator, so it cannot carry a patient–doctor call. The options compared were Daily.co, Jitsi as a Service (JaaS), Agora and LiveKit; the team chose **Daily.co** (10,000 participant-minutes a month included, then about $0.004 a minute).
 **Cost (checked at sign-up, 2026-10-19):** Daily requires a **credit card** on the account, even to stay inside the included minutes, and bills anything over them to that card ("you only pay for what you use"; a $15 starting credit). No spending cap was found. The app never turns on the paid extras (recording, live streaming), and a room is only made for an accepted call on a confirmed booking, holds 2 people and closes after 90 minutes, so 10,000 minutes is about 55 full-length calls a month. **OPEN:** enter a card on Daily (built and tested), or switch to LiveKit Cloud's free plan (no card, about 5,000 minutes a month, stops at the limit instead of charging; about half a day of work: our own call page and server-signed passes). The team decides.
 **Decided:**
@@ -592,7 +593,7 @@ Also: the common allergy list comes from `COMMON_ALLERGIES` everywhere.
 1. **Revenue and earnings count only consultations paid online** (amends D3). An on-site fee is paid to the doctor at the clinic and never passes through the platform, so it earns no commission and is not "recorded" money. The doctor's Total Earnings and every admin revenue figure (Overview chart, Revenue page, Analytics weekly revenue, the appointments report) now use one rule: `status == 'completed' && payment_status == 'paid'` (`earnsCommission` in `diabeatis360-admin/src/lib/revenue.js`; `dashboardStats` in the app, tested). The doctor's note says on-site payments are not counted.
 2. **Green for text and buttons: #4D7C22** (4.98:1 on white, WCAG AA for normal text). Figma's #629C2C (3.33:1) stays only for large shapes without text, which need 3:1: the chart lines, points and area, the floating camera button and the Log tab's + button (`Brand.colors.primaryBright` / `homeColors.greenBright`). Admin: `--color-brand` is #4D7C22 (hover #3D641B); its charts keep #629C2C. A deliberate difference from the Figma frames, recorded in FIGMA_MAP.
 3. **Passwords need at least 8 characters** (`constants/account.ts`, checked on sign-up with a message). Firebase's own minimum is 6; the console's password policy (Authentication → Settings) can also enforce 8 on the server and on the reset page, if the team turns it on.
-4. **Video calls move to LiveKit's free plan** (replaces Daily.co in D27, which needs a credit card). A build plan is proposed to the team first (it changes the server endpoint and the call screen); until it is built, video calls stay as they are.
+4. **Video calls move to LiveKit's free plan** (replaces Daily.co in D27, which needs a credit card). A build plan is proposed to the team first (it changes the server endpoint and the call screen); until it is built, video calls stay as they are. **Built as D39.**
 **Checked:** unit 128 (122 pass, 6 skipped; the earnings test now expects paid-only); mobile and admin lint and build; a browser check on the emulators, 3/3 (sign-up refuses a 7-character password; the main button and the admin buttons are #4D7C22).
 **Manuscript:** the commission is earned only on consultations paid through the app; passwords have at least 8 characters; the design meets AA contrast (MANUSCRIPT_CHANGES).
 
@@ -605,3 +606,23 @@ two screens that show it (the doctor's consultation details and the patient's su
 timestamp), and on a phone set to Philippine time the saved values are the same as before, so no data migration.
 **Checked:** unit 130 (124 pass, 6 skipped); tsc and lint clean.
 **Manuscript:** consultation follow-ups, like bookings, are in Philippine time.
+
+### D39 — Video calls through LiveKit, on our own small call page — CLOSED 2026-11-06 (team choices in session: LiveKit's free plan, D37 point 4, and this plan; replaces Daily.co in D27)
+**Why:** Daily needs a credit card on the account. LiveKit Cloud's free Build plan does not ("No credit card required") and includes 5,000 WebRTC minutes and 50 GB of data a month (livekit.io/pricing, checked 2026-11-06). A 30-minute consultation uses 60 minutes (two people), so about 80 consultations a month.
+**Decided:**
+- **The pass** is a small token (a JWT) that our server signs with the LiveKit secret, using Node's own crypto, so no new package (`functions/lib/video.js`). It is for one person (their uid and display name) in one room, to send camera and microphone and to receive the other person, with no recording or room control, and must be used within 90 minutes. The server no longer asks the video service anything over the network, so the old "video service is busy" message is gone.
+- **Who gets in is unchanged** (D27): `/api/joinCall` answers only a confirmed person who is on an accepted call of a confirmed booking. With any of `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` missing it says "not set up yet".
+- **Our own call page**, `functions/public/call.html`, on the same Vercel site. The app still loads an address in its existing WebView (an iframe on the web build), so there is **no new native code and no new APK**: it ships as an over-the-air update. The alternative, LiveKit's native SDK (`@livekit/react-native`), would give smoother video but needs a new APK and more native setup.
+- **The pass travels after the "#" of the address**, the part a browser never sends to a server. The page reads it, then removes it from the address. It is never stored.
+- **The browser library** is `livekit-client` 2.22.4 from jsDelivr: one exact version with an integrity hash, so the browser refuses any other file. It is not a dependency of any package.json.
+- **No Leave button on the page** (a change from the plan, which had one that told the app to hang up). The app's red End button stays the only way out, so leaving always ends the call for both people, and it works even if the page fails to load. This closes F-VC-LEAVE. The page's microphone and camera buttons sit either side of End, which closes F-VC-OVERLAY. The page also has a switch-camera button and its own messages in English and Filipino (the app passes the language).
+**Different from Daily, worth knowing for the defense:**
+- "At most two people" is no longer a room setting. Only the caller and the person called can ever get a pass, and a second connection with the same pass replaces the first.
+- The 90 minutes limits when a pass can be used, not how long a call lasts: LiveKit does not remove people when the pass expires. A call ends when someone presses End.
+- LiveKit opens the room when the first person joins and closes it soon after both have left. Nothing is recorded: recording needs a separate request signed with the secret, and our server never makes one.
+**Privacy:** the video and sound pass through LiveKit's servers, which may be outside the Philippines. LiveKit receives only the room name and each person's uid and display name. jsDelivr serves the library file, so it sees the request like any file host. The in-app Privacy Policy does not name outside services yet; the team should add them with the final policy text.
+**Checked:** `video.test.js` 4, `calls.test.js` 3, `vercel-e2e.test.js` including joinCall through the real Firebase client (functions 83 in all, on the emulators, with made-up LiveKit settings); mobile unit 130 (124 pass, 6 skipped), tsc and lint. In a browser with a fake camera and microphone: the call page 28/28 (the real pinned library loads and passes its hash, every library name the page uses exists in that version, and each screen state against a stand-in for the library) and the whole call on the real app screens 14/14 (patient in English, doctor in Filipino). Screenshots in docs/reports/d39-2026-11-06.
+**Not checked:** a real LiveKit connection, real video and sound, or a real phone. Those need the LiveKit project (GO_LIVE A11).
+**Known gap:** the app's timer starts when the call page opens, not when the video connects, so it can run while the page says it cannot reach the service (the page does not report back to the app). Low: it never stores anything; it is only the number shown on screen.
+**Still needs a person:** create the LiveKit project, add the three Vercel variables and redeploy, publish the over-the-air update, then a two-phone test (GO_LIVE A11).
+**Manuscript:** LiveKit replaces Daily.co in the Technology Stack, the software table, the Network Model, E2 and the limits (MANUSCRIPT_CHANGES).

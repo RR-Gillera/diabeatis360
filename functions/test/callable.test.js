@@ -34,8 +34,9 @@ test('a signed-in request runs the handler with the caller uid and the data, and
   let seen
   const handler = makeCallable(async (input) => { seen = input; return { items: [1, 2] } }, { verifyToken })
   const res = fakeRes()
-  await handler(req({ body: { data: { kind: 'meal' } } }), res)
-  assert.deepEqual(seen, { uid: 'patient-1', data: { kind: 'meal' } })
+  const request = req({ body: { data: { kind: 'meal' } } })
+  await handler(request, res)
+  assert.deepEqual(seen, { uid: 'patient-1', data: { kind: 'meal' }, req: request })
   assert.equal(res.statusCode, 200)
   assert.deepEqual(res.json, { result: { items: [1, 2] } })
 })

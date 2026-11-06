@@ -1,0 +1,252 @@
+<!doctype html>
+<!--
+  The video call page (DECISIONS.md D39). The app opens this inside its call frame once a call is accepted; the address
+  comes from /api/joinCall and carries the LiveKit server and this person's pass after "#". That part of an address is
+  never sent to any server, including this one.
+
+  The app draws the other person's name, the timer and the red End button on top of this page, so this page only has the
+  video and the buttons beside End. There is no Leave button here on purpose: End is the only way out, so leaving always
+  ends the call for both people.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <title>Diabeatis360 video call</title>
+  <style>
+    [hidden] { display: none !important; }
+    html, body { background: #172030; color: #fff; font-family: system-ui, -apple-system, Roboto, sans-serif; height: 100%; margin: 0; overflow: hidden; }
+    button { cursor: pointer; font: inherit; }
+    #remote { background: #172030; height: 100%; inset: 0; object-fit: cover; position: fixed; width: 100%; }
+    /* Above the buttons, clear of the app's name and timer at the top of the screen. */
+    #self { background: #0f172a; border: 2px solid rgba(255, 255, 255, 0.7); border-radius: 16px; bottom: 148px; height: 128px; object-fit: cover; position: fixed; right: 16px; width: 96px; }
+    #self.mirror { transform: scaleX(-1); }
+    /* On the top-left corner of the small picture of yourself. */
+    #flip { bottom: 232px; height: 44px; position: fixed; right: 68px; width: 44px; }
+    #message { align-items: center; display: flex; flex-direction: column; gap: 16px; left: 24px; position: fixed; right: 24px; text-align: center; top: 38%; }
+    #status { color: #cbd5e1; font-size: 16px; line-height: 1.5; margin: 0; }
+    #status:empty { display: none; }
+    .wide { background: #4d7c22; border: 0; border-radius: 14px; color: #fff; font-size: 16px; font-weight: 700; min-height: 48px; padding: 0 24px; }
+    /* Centred on the same line as the app's End button (72 px wide, 60 px from the bottom), one on each side of it. */
+    #controls { bottom: 68px; display: flex; gap: 104px; justify-content: center; left: 0; position: fixed; right: 0; }
+    .round { align-items: center; background: rgba(15, 23, 42, 0.75); border: 0; border-radius: 50%; color: #fff; display: flex; height: 56px; justify-content: center; padding: 0; width: 56px; }
+    .round.off { background: #fff; color: #111827; }
+    #flip.round svg { height: 20px; width: 20px; }
+    .round svg { fill: currentColor; height: 26px; width: 26px; }
+  </style>
+</head>
+<body>
+  <video id="remote" autoplay playsinline hidden></video>
+  <video id="self" class="mirror" autoplay muted playsinline hidden></video>
+  <button id="flip" class="round" type="button" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 7h-1l-1-1h-4L9 7H8c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm-4 7c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM8.57.51l4.48 4.48V2.04c4.72.47 8.48 4.23 8.95 8.95h2C23.34 3.02 15.49-1.59 8.57.51zm2.38 21.45c-4.72-.47-8.48-4.23-8.95-8.95H0c.66 7.97 8.51 12.58 15.43 10.48l-4.48-4.48v2.95z"/></svg>
+  </button>
+  <div id="message">
+    <p id="status" role="status" aria-live="polite"></p>
+    <button id="rejoin" class="wide" type="button" hidden></button>
+    <button id="sound" class="wide" type="button" hidden></button>
+  </div>
+  <div id="controls" hidden>
+    <button id="mic" class="round" type="button"></button>
+    <button id="camera" class="round" type="button"></button>
+  </div>
+
+  <script>
+    'use strict'
+
+    // The browser library, pinned to one exact version. "integrity" makes the browser refuse the file if the CDN ever
+    // serves anything else, because this page handles the camera, the microphone and the pass.
+    const LIBRARY = 'https://cdn.jsdelivr.net/npm/livekit-client@2.22.4/dist/livekit-client.umd.js'
+    const LIBRARY_HASH = 'sha384-5qI/UmLG0CvuWCt6vqjMW1oRwzXu+MNhbw4x6yo9NARdlqi94LwQfq9wvDTIcfrD'
+
+    const WORDS = {
+      en: {
+        connecting: 'Connecting…',
+        waiting: 'Waiting for the other person to join…',
+        cameraOff: 'The other person\'s camera is off.',
+        reconnecting: 'Connection lost. Reconnecting…',
+        disconnected: 'You were disconnected from the call.',
+        noService: 'We couldn\'t reach the video service. Check your internet, then tap Rejoin.',
+        noDevices: 'We couldn\'t use your camera or microphone. Allow them for this app in your phone\'s Settings, then tap Rejoin.',
+        badLink: 'This call could not be opened. Go back and open the call again.',
+        rejoin: 'Rejoin',
+        sound: 'Tap to turn on sound',
+        micOn: 'Turn on microphone',
+        micOff: 'Turn off microphone',
+        cameraOn: 'Turn on camera',
+        cameraOffButton: 'Turn off camera',
+        flip: 'Switch camera',
+      },
+      fil: {
+        connecting: 'Kumokonekta…',
+        waiting: 'Hinihintay pang sumali ang kausap mo…',
+        cameraOff: 'Naka-off ang camera ng kausap mo.',
+        reconnecting: 'Nawala ang koneksyon. Kumokonekta ulit…',
+        disconnected: 'Naputol ang koneksyon mo sa tawag.',
+        noService: 'Hindi namin maabot ang video service. Tingnan ang internet mo, saka i-tap ang Sumali ulit.',
+        noDevices: 'Hindi magamit ang camera o mikropono mo. Payagan ang mga ito para sa app na ito sa Settings ng phone mo, saka i-tap ang Sumali ulit.',
+        badLink: 'Hindi mabuksan ang tawag na ito. Bumalik at buksan ulit ang tawag.',
+        rejoin: 'Sumali ulit',
+        sound: 'I-tap para marinig ang tunog',
+        micOn: 'I-on ang mikropono',
+        micOff: 'I-off ang mikropono',
+        cameraOn: 'I-on ang camera',
+        cameraOffButton: 'I-off ang camera',
+        flip: 'Palitan ang camera',
+      },
+    }
+
+    const ICONS = {
+      micOn: 'M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
+      micOff: 'M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z',
+      cameraOn: 'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z',
+      cameraOff: 'M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z',
+    }
+
+    const element = (id) => document.getElementById(id)
+    const remote = element('remote')
+    const self = element('self')
+
+    // Read the address once, then take the pass out of it so it is not left in the page's history.
+    const params = new URLSearchParams(location.hash.slice(1))
+    const server = params.get('server') || ''
+    const token = params.get('token') || ''
+    const language = params.get('lang') === 'fil' ? 'fil' : 'en'
+    const words = WORDS[language]
+    history.replaceState(null, '', location.pathname)
+    document.documentElement.lang = language
+    element('rejoin').textContent = words.rejoin
+    element('sound').textContent = words.sound
+    element('flip').setAttribute('aria-label', words.flip)
+
+    let room = null
+    let problem = '' // what went wrong, shown with the Rejoin button until the next try
+    let reconnecting = false
+    let facing = 'user'
+
+    function show(text, canRetry = false) {
+      element('status').textContent = text
+      element('rejoin').hidden = !canRetry
+    }
+
+    /** What the screen says follows from the room's state, so it is worked out in one place. */
+    function refresh() {
+      const { Track } = LivekitClient
+      const other = [...room.remoteParticipants.values()][0]
+      const camera = other && other.getTrackPublication(Track.Source.Camera)
+      const seeing = Boolean(camera && camera.track && !camera.isMuted)
+      remote.hidden = !seeing
+      if (problem) show(problem, true)
+      else if (reconnecting) show(words.reconnecting)
+      else if (!other) show(words.waiting)
+      else show(seeing ? '' : words.cameraOff)
+      paintButtons()
+    }
+
+    function paintButton(button, on, offLabel, onLabel, onIcon, offIcon) {
+      button.classList.toggle('off', !on)
+      button.setAttribute('aria-label', on ? offLabel : onLabel)
+      button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${on ? onIcon : offIcon}"/></svg>`
+    }
+
+    function paintButtons() {
+      const me = room.localParticipant
+      const connected = room.state === LivekitClient.ConnectionState.Connected
+      element('controls').hidden = !connected
+      paintButton(element('mic'), me.isMicrophoneEnabled, words.micOff, words.micOn, ICONS.micOn, ICONS.micOff)
+      paintButton(element('camera'), me.isCameraEnabled, words.cameraOffButton, words.cameraOn, ICONS.cameraOn, ICONS.cameraOff)
+      self.hidden = !connected || !me.isCameraEnabled
+      element('flip').hidden = self.hidden
+    }
+
+    function makeRoom() {
+      const { Room, RoomEvent, Track, VideoPresets } = LivekitClient
+      // 360p, because most people will be on mobile data. LiveKit lowers it further when the connection is poor.
+      const created = new Room({ adaptiveStream: true, dynacast: true, videoCaptureDefaults: { facingMode: 'user', resolution: VideoPresets.h360.resolution } })
+      created.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === Track.Kind.Video) track.attach(remote)
+        else document.body.appendChild(track.attach()) // the other person's sound plays from its own hidden element
+        refresh()
+      })
+      created.on(RoomEvent.TrackUnsubscribed, (track) => {
+        track.detach().forEach((attached) => { if (attached !== remote) attached.remove() })
+        refresh()
+      })
+      created.on(RoomEvent.LocalTrackPublished, (publication) => {
+        if (publication.source === Track.Source.Camera && publication.track) publication.track.attach(self)
+        refresh()
+      })
+      for (const event of [RoomEvent.LocalTrackUnpublished, RoomEvent.TrackMuted, RoomEvent.TrackUnmuted, RoomEvent.ParticipantConnected, RoomEvent.ParticipantDisconnected]) {
+        created.on(event, refresh)
+      }
+      created.on(RoomEvent.Reconnecting, () => { reconnecting = true; refresh() })
+      created.on(RoomEvent.Reconnected, () => { reconnecting = false; refresh() })
+      created.on(RoomEvent.Disconnected, () => { reconnecting = false; problem = words.disconnected; refresh() })
+      created.on(RoomEvent.AudioPlaybackStatusChanged, () => { element('sound').hidden = created.canPlaybackAudio })
+      return created
+    }
+
+    function loadLibrary() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = LIBRARY
+        script.integrity = LIBRARY_HASH
+        script.crossOrigin = 'anonymous'
+        script.onload = resolve
+        script.onerror = () => { script.remove(); reject(new Error('library')) }
+        document.head.appendChild(script)
+      })
+    }
+
+    async function join() {
+      problem = ''
+      show(words.connecting)
+      try {
+        if (!window.LivekitClient) await loadLibrary()
+        if (!room) room = makeRoom()
+        if (room.state !== LivekitClient.ConnectionState.Connected) await room.connect(server, token)
+      } catch (error) {
+        console.error('Could not connect to the video service:', error && error.name) // never the address: it holds the pass
+        show(words.noService, true)
+        return
+      }
+      try {
+        await room.localParticipant.enableCameraAndMicrophone()
+      } catch (error) {
+        console.error('Could not use the camera or microphone:', error && error.name)
+        problem = words.noDevices
+      }
+      refresh()
+    }
+
+    element('rejoin').addEventListener('click', join)
+    element('sound').addEventListener('click', () => { room.startAudio().catch(() => {}) })
+    element('mic').addEventListener('click', async () => {
+      await room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled).catch(() => {})
+      refresh()
+    })
+    element('camera').addEventListener('click', async () => {
+      await room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled).catch(() => {})
+      refresh()
+    })
+    element('flip').addEventListener('click', async () => {
+      const { Track, VideoPresets } = LivekitClient
+      const publication = room.localParticipant.getTrackPublication(Track.Source.Camera)
+      if (!publication || !publication.track) return
+      const next = facing === 'user' ? 'environment' : 'user'
+      try {
+        await publication.track.restartTrack({ facingMode: next, resolution: VideoPresets.h360.resolution })
+        facing = next
+        self.classList.toggle('mirror', facing === 'user') // only the front camera is shown like a mirror
+      } catch {
+        // A device with one camera: nothing changes.
+      }
+    })
+
+    if (/^(wss?|https?):\/\//.test(server) && token) join()
+    else show(words.badLink)
+  </script>
+</body>
+</html>

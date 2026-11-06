@@ -10,7 +10,7 @@ import { CallError } from './join-error';
 //   ringing -> accepted -> ended          (normal call)
 //   ringing -> declined | missed | ended  (not answered / cancelled)
 // The other person's app listens for a ringing call and shows an incoming-call screen (features/calls/incoming-call-host).
-// The video itself is a private Daily.co room, opened inside the app once the call is accepted (video-room.ts, D27).
+// The video itself is a LiveKit room, opened inside the app once the call is accepted (video-room.ts, D39).
 // Known limitation: it only rings while the app is open; ringing an app that is fully closed needs push notifications,
 // which are out of scope.
 
@@ -21,7 +21,7 @@ export type CallRecord = {
   callerId: string;
   calleeId: string;
   status: CallStatus;
-  /** Random per call. The server names the Daily room after THIS, not the booking id (which is guessable). */
+  /** Random per call. The server names the LiveKit room after THIS, not the booking id (which is guessable). */
   room: string;
   createdAt: Date | null;
 };

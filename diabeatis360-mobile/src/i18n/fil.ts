@@ -777,7 +777,6 @@ export const fil: Record<MessageKey, string> = {
   'call.error.notYours': 'Hindi ka kasali sa tawag na ito.',
   'call.error.notConfirmed': 'Para lang sa kumpirmadong appointment ang video call.',
   'call.error.notActive': 'Hindi na aktibo ang tawag na ito.',
-  'call.error.busy': 'Abala ang video service ngayon. Pakisubukan ulit maya-maya.',
   'call.error.room': 'Hindi namin mabuksan ang video room.',
   'call.error.appointmentGone': 'Wala na ang appointment na ito.',
   'call.error.alreadyCalling': 'Tumatawag ka na. Hintayin ang sagot.',

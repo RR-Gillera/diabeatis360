@@ -1,68 +1,35 @@
 'use strict'
 
-// Daily.co, the video service behind in-app calls (DECISIONS.md D27). Only the server talks to Daily: the API key is
-// a Vercel secret (DAILY_API_KEY), never in the app. Plain fetch, no extra package.
-//   - A room is PRIVATE (nobody gets in without a pass), holds at most 2 people, has no recording, no knock or
-//     pre-join screen, and expires (removing everyone) 90 minutes after it was made.
-//   - A pass ("meeting token") is made for ONE person, with their name, and expires at the same time.
-// `baseUrl` and `fetchImpl` exist so tests can use a fake Daily, like GEMINI_BASE_URL for Gemini.
+// LiveKit, the video service behind in-app calls (DECISIONS.md D39, replaces Daily.co from D27). Nothing to ask LiveKit
+// over the network: a pass ("access token") is a small JWT that this server SIGNS with the LiveKit API secret, and
+// LiveKit lets someone in only if the signature is ours. The secret is a Vercel variable (LIVEKIT_API_SECRET), never in
+// the app. Signed with Node's own crypto, so there is no extra package.
+//   - A pass lets ONE person (their Firebase uid, with their display name) into ONE room, to send their camera and
+//     microphone and to see and hear the other person. It cannot record, manage the room or join hidden.
+//   - It must be used within 90 minutes. LiveKit opens the room when the first person joins and closes it by itself a
+//     short while after both have left.
+// Token format: https://docs.livekit.io/home/get-started/authentication/
 
-const DAILY_API = 'https://api.daily.co/v1'
+const crypto = require('node:crypto')
+
 const CALL_MINUTES = 90
 
-class DailyError extends Error {}
+const base64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url')
 
-async function daily({ apiKey, baseUrl, fetchImpl }, method, path, body) {
-  const doFetch = fetchImpl || fetch
-  const response = await doFetch(`${baseUrl || DAILY_API}${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const text = await response.text()
-  let json = {}
-  try { json = text ? JSON.parse(text) : {} } catch { json = {} }
-  if (!response.ok) throw Object.assign(new DailyError(`Daily ${method} ${path} -> ${response.status} ${json.info || json.error || ''}`.trim()), { status: response.status, info: String(json.info || '') })
-  return json
-}
-
-/** The room for a call, made if it does not exist yet. `name` must be unguessable (it comes from the call's random token). */
-async function ensureRoom(config, name, nowSeconds) {
-  try {
-    return await daily(config, 'POST', '/rooms', {
-      name,
-      privacy: 'private',
-      properties: {
-        exp: nowSeconds + CALL_MINUTES * 60,
-        eject_at_room_exp: true,
-        max_participants: 2,
-        enable_prejoin_ui: false,
-        enable_knocking: false,
-        enable_chat: false,
-        enable_screenshare: false,
-        lang: 'en',
-      },
-    })
-  } catch (error) {
-    // The other person's phone made it a moment ago: use that one.
-    if (error instanceof DailyError && /already exists/i.test(error.info || error.message)) return daily(config, 'GET', `/rooms/${encodeURIComponent(name)}`)
-    throw error
+/** A signed pass for one person into one room (an HS256 JWT in LiveKit's format). */
+function makePass({ apiKey, apiSecret }, { roomName, userId, userName, nowSeconds }) {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const claims = {
+    iss: apiKey, // which LiveKit key signed it
+    sub: userId, // who this person is in the room
+    name: userName, // the name the other person sees
+    nbf: nowSeconds,
+    exp: nowSeconds + CALL_MINUTES * 60,
+    video: { room: roomName, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: false },
   }
+  const unsigned = `${base64url(header)}.${base64url(claims)}`
+  const signature = crypto.createHmac('sha256', apiSecret).update(unsigned).digest('base64url')
+  return `${unsigned}.${signature}`
 }
 
-/** A pass for one person into one room. Not an owner pass: nobody can change the room's settings from the call. */
-async function makePass(config, { roomName, userId, userName, nowSeconds }) {
-  const { token } = await daily(config, 'POST', '/meeting-tokens', {
-    properties: {
-      room_name: roomName,
-      user_id: userId,
-      user_name: userName,
-      is_owner: false,
-      exp: nowSeconds + CALL_MINUTES * 60,
-      eject_at_token_exp: true,
-    },
-  })
-  return token
-}
-
-module.exports = { ensureRoom, makePass, DailyError, CALL_MINUTES }
+module.exports = { makePass, CALL_MINUTES }

@@ -169,3 +169,10 @@ Append newest at the bottom. Format:
 - **Files:** mobile `features/consultation/doctor-notes-form.tsx`, `app/doctor/consultation/[id].tsx`, `app/consultation/summary/[id].tsx`; `docs/DECISIONS.md` (D38).
 - **Verified:** unit 130 (124 pass, 6 skipped); tsc and lint clean.
 - **No data migration:** on a Manila phone the saved values are identical to before.
+
+## 2026-11-06 — Claude Code — video calls move to LiveKit (D39)
+- **Built:** the server signs a LiveKit pass with Node's crypto (no new package) and `/api/joinCall` returns our own call page with the pass after "#". The new page (`functions/public/call.html`) has the microphone, camera and switch-camera buttons and its own messages in English and Filipino. The app keeps its WebView and End button, so no new APK.
+- **Files:** functions `lib/{video,calls}.js`, `api/joinCall.js`, `index.js`, `server/callable.js`, `public/call.html`, tests; mobile `features/calls/*`, `app/video-call/[id].tsx`, i18n; docs DECISIONS, GO_LIVE A11, MANUSCRIPT_CHANGES, FIRESTORE_SCHEMA, findings.
+- **Verified:** functions 83 on the emulators; unit 130 (124 pass, 6 skipped); tsc and lint; browser 28/28 (page) and 14/14 (whole call).
+- **Known gaps:** no real LiveKit connection yet (needs the project and three Vercel variables, GO_LIVE A11); the timer starts when the page opens, not when the video connects.
+- **Manuscript:** LiveKit replaces Daily.co (MANUSCRIPT_CHANGES).

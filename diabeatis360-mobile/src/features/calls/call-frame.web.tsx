@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 
-/** Web build of the call frame: the Daily room in an iframe (react-native-webview does not run on the web). */
+/** Web build of the call frame: our call page in an iframe (react-native-webview does not run on the web). */
 export function CallFrame({ url }: { url: string }) {
   return createElement('iframe', {
     src: url,
