@@ -6,10 +6,10 @@ import { translate, type Language } from '@/i18n/translate';
 
 import { CallError, joinErrorMessage } from './join-error';
 
-// The video room of an accepted call (DECISIONS.md D27). The room is a PRIVATE Daily.co room: the app asks our server
-// (/api/joinCall on Vercel, the same place as the AI functions) and gets back the room address with a pass for THIS
-// person only. The server checks that the call is accepted and that this person is on it; the Daily key never exists in
-// the app, and the pass is never stored. The ringing / accept / hang-up part stays in Firestore (call-service.ts).
+// The video room of an accepted call (DECISIONS.md D27, D39). The room is a LiveKit room: the app asks our server
+// (/api/joinCall on Vercel, the same place as the AI functions) and gets back our call page's address with a pass for
+// THIS person only. The server checks that the call is accepted and that this person is on it; the LiveKit secret never
+// exists in the app, and the pass is never stored. The ringing / accept / hang-up part stays in Firestore (call-service.ts).
 const SERVER_URL = (process.env.EXPO_PUBLIC_AI_BASE_URL ?? '').replace(/\/+$/, '');
 
 /** The address to load in the call frame. Throws a CallError whose message can be shown as it is. */
@@ -24,7 +24,8 @@ export async function requestCallUrl(bookingId: string, language: Language = 'En
     throw new CallError(joinErrorMessage(error, language));
   }
   if (typeof url !== 'string' || !/^https?:\/\//.test(url)) throw new CallError(joinErrorMessage(null, language));
-  return url;
+  // The call page has a few words of its own ("Reconnecting…"), so it is told the language after the "#", beside the pass.
+  return language === 'Filipino' && url.includes('#') ? `${url}&lang=fil` : url;
 }
 
 /**

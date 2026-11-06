@@ -31,7 +31,7 @@ test('a signed-out person is asked to sign in again', () => {
 
 test('in Filipino, the server\'s refusals and the fallbacks are said in Filipino (D33)', () => {
   assert.equal(joinErrorMessage(failed('functions/failed-precondition', 'This call is not active any more. [400]'), 'Filipino'), 'Hindi na aktibo ang tawag na ito.');
-  assert.equal(joinErrorMessage(failed('functions/unavailable', 'The video service is busy right now. Please try again in a moment.'), 'Filipino'), 'Abala ang video service ngayon. Pakisubukan ulit maya-maya.');
+  assert.equal(joinErrorMessage(failed('functions/unavailable', 'Video calls are not set up yet. Please use the chat for now.'), 'Filipino'), 'Hindi pa naka-set up ang video call. Gamitin muna ang chat.');
   assert.equal(joinErrorMessage(failed('functions/not-found', 'not-found [404]'), 'Filipino'), 'Hindi pa naka-set up ang video call. Gamitin muna ang chat.');
   assert.equal(joinErrorMessage(new Error('Failed to fetch'), 'Filipino'), 'Hindi namin maabot ang video service. Tingnan ang internet mo at subukang muli.');
   assert.equal(joinErrorMessage(failed('functions/unauthenticated', 'Please sign in.'), 'Filipino'), 'Mag-sign in ulit para makasali sa tawag.');
@@ -41,7 +41,7 @@ test('every refusal worded by the server has a Filipino version', () => {
   const server = readFileSync(new URL('../../../../functions/lib/calls.js', import.meta.url), 'utf8');
   const worded = [
     ...[...server.matchAll(/new HttpsError\('[a-z-]+', '([^']+)'\)/g)].map((match) => match[1]),
-    ...[...server.matchAll(/^const (?:NOT_SET_UP|BUSY) = '([^']+)'/gm)].map((match) => match[1]),
+    ...[...server.matchAll(/^const NOT_SET_UP = '([^']+)'/gm)].map((match) => match[1]),
   ];
   assert.ok(worded.length >= 6, 'the server file was read');
   for (const message of worded) assert.ok(SERVER_WORDING[message], `no Filipino version for: ${message}`);

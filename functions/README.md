@@ -23,7 +23,7 @@ firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node 
 | `generateRecommendations` | `{ kind: 'meal' \| 'exercise' }` | Reads the signed-in user's profile and latest glucose reading **on the server**, asks Gemini for 3 suggestions, removes anything that mentions the user's allergens, saves it to `AI_Suggestions`. |
 | `analyzeLabel` | `{ imageBase64, mimeType, barcode? }` | Sends a nutrition-label photo to Gemini, returns the nutrients, a personalised rating and healthier Filipino swaps, saves it to `Nutrition_Scans`. **The photo is never stored** (D2). |
 | `lookupProduct` | `{ barcode }` | Looks the barcode up in the shared `Products` collection (D12). Found: rates the saved nutrients for this person and returns the analysis with **no Gemini call** and no Free scan used. Not found: `{ found: false }`. |
-| `joinCall` | `{ bookingId }` | Not AI (D27). For the caller or callee of an **accepted** call on a **confirmed** booking only: makes (or reuses) the call's **private** Daily.co room (2 people, no recording, closes after 90 min) and returns `{ url }` with a pass for that one person. The pass is never stored. Needs `DAILY_API_KEY` (Vercel variable, or a Firebase secret on Blaze); without it: "Video calls are not set up yet". Steps: `../docs/GO_LIVE.md` A11. |
+| `joinCall` | `{ bookingId }` | Not AI (D39). For the caller or callee of an **accepted** call on a **confirmed** booking only: signs a LiveKit pass for that one person (no recording, must be used within 90 min) and returns `{ url }`, our call page (`public/call.html`) with the pass after "#". The pass is never stored. Needs `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` (Vercel variables); without them: "Video calls are not set up yet". Steps: `../docs/GO_LIVE.md` A11. |
 
 Rules enforced here (the app cannot be trusted with them):
 - the caller must be signed in;
@@ -48,7 +48,7 @@ npm test                      # pure logic: prompts, allergen filtering, limits,
 firebase emulators:exec --only firestore --project demo-diabeatis360 "node --test functions/test/handlers.test.js"
                               # handlers against the Firestore emulator with a fake Gemini
 firebase emulators:exec --only firestore --project demo-diabeatis360 "node --test functions/test/calls.test.js"
-                              # joinCall against the Firestore emulator with a fake Daily
+                              # joinCall against the Firestore emulator with a made-up LiveKit key
 firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node --test functions/test/live-cleanup.test.js"
                               # the pre-launch clean-up and the Philippine food seed (D32)
 ```

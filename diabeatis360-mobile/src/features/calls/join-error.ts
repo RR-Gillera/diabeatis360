@@ -1,7 +1,7 @@
 import { translate, type Language, type MessageKey } from '@/i18n/translate';
 import { isFunctionMissing } from '@/lib/feature-unavailable';
 
-// What a person sees when the video room cannot be opened (DECISIONS.md D27). No Firebase import, so `npm test` can
+// What a person sees when the video room cannot be opened (DECISIONS.md D27, D39). No Firebase import, so `npm test` can
 // check it. The server (functions/lib/calls.js) already words its refusals for people ("This call is not active any
 // more.", "Video calls are not set up yet..."), so in English those are shown as they are, and in Filipino the same
 // refusal is said in Filipino (D33). Anything else becomes a plain message.
@@ -23,7 +23,6 @@ export const SERVER_WORDING: Record<string, MessageKey> = {
   'Video calls are only for a confirmed appointment.': 'call.error.notConfirmed',
   'This call is not active any more.': 'call.error.notActive',
   'Video calls are not set up yet. Please use the chat for now.': 'call.error.notSetUp',
-  'The video service is busy right now. Please try again in a moment.': 'call.error.busy',
 };
 
 export function joinErrorMessage(error: unknown, language: Language = 'English'): string {

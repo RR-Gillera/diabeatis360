@@ -21,7 +21,7 @@ import { shortDay } from '@/i18n/translate';
 // The video call screen (DECISIONS.md D11; Figma P-26 to P-29, D-08 to D-10). Both people are here once the call is
 // accepted. What is shown depends only on the Calls/{bookingId} document, so both phones always agree:
 //   ringing  -> caller: "Calling..." (30 s, then missed)   callee: Accept / Decline
-//   accepted -> "Connecting...", then the private Daily room (D27), with the elapsed time and an End button
+//   accepted -> "Connecting...", then our call page with the LiveKit room (D39), with the elapsed time and an End button
 //   declined / missed / ended -> what happened, and where to go next (chat, summary, call back)
 export default function VideoCallScreen() {
   const router = useRouter();

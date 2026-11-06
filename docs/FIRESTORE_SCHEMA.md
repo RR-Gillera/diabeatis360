@@ -65,13 +65,13 @@ Collections for DECISIONS.md D11 (closed; `Calls` is built) and D12 (`Products`,
 
 | Collection | Doc ID | Fields |
 |---|---|---|
-| Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), room (random token, 16+ chars; the server names the private Daily room `d360-<room>` after it, D27), created_at, ended_at |
+| Calls | booking_id | caller_id, callee_id, booking_id, status (`ringing`/`accepted`/`declined`/`missed`/`ended`), room (random token, 16+ chars; the server names the LiveKit room `d360-<room>` after it, D39), created_at, ended_at |
 | Products | barcode | barcode, product_name, brand, serving_size, nutrients (map: calories, carbs_g, sugar_g, fiber_g, protein_g, sodium_mg), ingredients_text, alternatives (list of instead_of/try), source (`gemini_label`), created_by, verified (bool), verified_by, verified_at, created_at |
 
 Rules intent:
 - **Calls:** read/update only when `request.auth.uid` is the caller or callee AND they are that booking's
   `patient_id` / `provider_id`; create only as the caller, with `status == 'ringing'`, on a `confirmed` booking;
-  no delete. A missed call is set by the caller's app after ~30 s. The `room` token is random per call, so the video room cannot be guessed from the booking id; only the two participants can read it. Calling again after a finished call reuses the same doc (a new token). Since D27 the room is also **private** on Daily's side: knowing its name is not enough, because `/api/joinCall` hands a one-person pass only to the caller or callee of an accepted call on a confirmed booking. The pass is never written to Firestore, so the `Calls` fields and rules did not change.
+  no delete. A missed call is set by the caller's app after ~30 s. The `room` token is random per call, so the video room cannot be guessed from the booking id; only the two participants can read it. Calling again after a finished call reuses the same doc (a new token). Since D27 the room is also **private** on the video service's side (LiveKit since D39): knowing its name is not enough, because `/api/joinCall` hands a one-person pass only to the caller or callee of an accepted call on a confirmed booking. The pass is never written to Firestore, so the `Calls` fields and rules did not change.
 - **Products:** signed-in read; signed-in create with `verified == false` and `created_by == request.auth.uid`;
   only admins update, and only `verified` / `verified_by` / `verified_at`; no delete. The document id must be 6 to 14 digits and equal the `barcode` field. Health ratings are never stored here (computed per user by the `lookupProduct` function from the nutrients and that user's allergies).
 - **Nutrition_Scans** gained `product_id` (the barcode, or null) and `source` (`gemini_label` or `product_memory`). A scan answered from Products makes no Gemini call and does not count toward the Free plan's 3 scans a day.

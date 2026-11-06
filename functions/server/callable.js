@@ -29,7 +29,7 @@ async function readBody(req) {
 }
 
 /**
- * Wraps `run({ uid, data })` as a callable endpoint. `verifyToken(idToken)` must resolve to the decoded token
+ * Wraps `run({ uid, data, req })` as a callable endpoint. `verifyToken(idToken)` must resolve to the decoded token
  * ({ uid, email_verified }) for a genuine Firebase sign-in and reject otherwise. Only signed-in users whose email
  * address is confirmed ever reach `run`.
  */
@@ -71,7 +71,7 @@ function makeCallable(run, { verifyToken, log = console.error }) {
         throw new HttpsError('invalid-argument', 'The request was not valid JSON.')
       }
 
-      const result = await run({ uid, data: (body && body.data) || {} })
+      const result = await run({ uid, data: (body && body.data) || {}, req })
       send(res, 200, { result: result === undefined ? null : result })
     } catch (error) {
       if (error instanceof HttpsError) return send(res, error.httpErrorCode.status, { error: error.toJSON() })
