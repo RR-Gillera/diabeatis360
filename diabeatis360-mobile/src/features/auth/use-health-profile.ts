@@ -46,7 +46,9 @@ export function useHealthProfile(uid: string | null | undefined, email: string |
         let form = stored;
         if (email) {
           for (const key of FORM_KEYS) {
-            if (!form[key]) form = { ...form, [key]: (await getOnboardingValue(email, key)) ?? '' };
+            // An empty list of ingredients not eaten is a real answer (D40); only a missing one is filled from this phone.
+            const answered = key === 'disliked' && 'disliked_ingredients' in data;
+            if (!form[key] && !answered) form = { ...form, [key]: (await getOnboardingValue(email, key)) ?? '' };
           }
         }
         const language = String(data.language_preference ?? '') || (email ? (await getOnboardingValue(email, 'language')) ?? '' : '');

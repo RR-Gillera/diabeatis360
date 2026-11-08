@@ -45,7 +45,7 @@ export default function GlucoseResultScreen() {
   }
 
   const badge = badgeStyle[latest.interpretation];
-  const alert = glucoseAlert(latest.readingMgdl, latest.context, language);
+  const alert = glucoseAlert(latest.readingMgdl, latest.context, language, latest.interpretation);
   const time = latest.loggedAt ? clockTime(latest.loggedAt) : '—';
   const critical = alert?.severity === 'critical';
 

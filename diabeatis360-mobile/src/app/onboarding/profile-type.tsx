@@ -4,20 +4,20 @@ import { useRouter } from 'expo-router';
 import { AuthButton } from '@/features/auth/auth-ui';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { useAuth } from '@/features/auth/auth-context';
-import { SETUP_PROGRESS, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
+import { SETUP_PROGRESS, SetupNeedAnswer, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
 import { useT } from '@/i18n/language-context';
 
-// Figma "Role Selection Gate" (Choose Your Profile Type).
+// Figma "Role Selection Gate" (Choose Your Profile Type). Nothing is chosen in advance (D40).
 export default function ProfileTypeScreen() {
   const router = useRouter();
   const { email } = useAuth();
   const { t } = useT();
-  const [profileType, setProfileType] = useState<'patient' | 'doctor'>('patient');
+  const [profileType, setProfileType] = useState<'patient' | 'doctor' | null>(null);
   // The two roles have different numbers of steps left, so the bar tracks the
   // role actually selected rather than quoting the patient's progress at a doctor.
   const percent = profileType === 'doctor' ? 50 : SETUP_PROGRESS.profileType;
   const finish = async () => {
-    if (!email) return;
+    if (!email || !profileType) return;
     await saveOnboardingValue(email, 'profileType', profileType);
     // Doctors continue to the credentials step, which is what creates their
     // Providers doc and marks onboarding complete. Finishing here instead would
@@ -32,7 +32,10 @@ export default function ProfileTypeScreen() {
       percent={percent}
       title={t('setup.role.title')}
       subtitle={t('setup.role.subtitle')}
-      footer={<AuthButton title={t('common.next')} icon="arrow" onPress={finish} />}
+      footer={<>
+        {!profileType ? <SetupNeedAnswer>{t('setup.chooseOne')}</SetupNeedAnswer> : null}
+        <AuthButton title={t('common.next')} icon="arrow" onPress={finish} disabled={!profileType} />
+      </>}
     >
       <SetupOption
         icon={{ ios: 'heart.text.square.fill', android: 'monitor_heart' }}

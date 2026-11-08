@@ -17,6 +17,8 @@ const firestoreFields: Record<string, string> = {
   allergy: 'allergies',
   activity: 'activity_level',
   diet: 'dietary_preference',
+  // The ingredients the person does not eat (D40): text like allergies; '' (none) is a valid answer.
+  disliked: 'disliked_ingredients',
   language: 'language_preference',
   // 'self' or 'minor' (DECISIONS.md D16) — already the lowercase code the rules and enums.ts expect.
   accountType: 'account_type',

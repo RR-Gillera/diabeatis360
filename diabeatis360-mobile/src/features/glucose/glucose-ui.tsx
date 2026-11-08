@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
+import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { homeColors } from '@/features/home/home-ui';
 import { checkReading, interpretGlucose, READING_LIMITS } from '@/constants/glucose';
 import { addGlucoseLog, deleteGlucoseLog, updateGlucoseLog } from './glucose-service';
@@ -32,8 +33,10 @@ export const readingColors: Record<Interpretation, { color: string; background: 
 // `onSaved` receives how many doctors were sent a critical-reading alert for a NEW reading (D28); 0 for an edit or delete.
 export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible: boolean; onClose: () => void; onSaved: (doctorsNotified: number) => void; entry?: GlucoseLogEntry | null }) {
   const editing = Boolean(entry);
-  const { uid } = useAuth();
+  const { uid, email } = useAuth();
   const { t, label, language } = useT();
+  // What counts as high depends on the person's diabetes type (D40); until the profile loads, the D4 targets.
+  const diabetesType = useHealthProfile(uid, email)?.form.condition ?? '';
   const [reading, setReading] = useState('');
   const [context, setContext] = useState<MealContext>('before_meal');
   const [notes, setNotes] = useState('');
@@ -65,7 +68,7 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   // Impossible values are refused with the reason shown under the field; rare ones ask for a check first (D25).
   const check = reading.trim() !== '' ? checkReading(readingValue) : null;
   const isValidReading = check?.ok === true;
-  const liveLevel = isValidReading ? interpretGlucose(readingValue, context) : null;
+  const liveLevel = isValidReading ? interpretGlucose(readingValue, context, diabetesType) : null;
   const livePreview = liveLevel ? { ...readingColors[liveLevel], label: label('interpretation', liveLevel) } : null;
 
   const reset = () => { setReading(''); setNotes(''); setContext('before_meal'); setError(''); setConfirming(false); setConfirmDelete(false); };
@@ -84,8 +87,8 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
     const slow = setTimeout(() => { if (activeSave.current === id) setOffline(true); }, OFFLINE_NOTICE_MS);
     try {
       let doctorsNotified = 0;
-      if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes);
-      else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date(), language)).doctorsNotified;
+      if (entry) await updateGlucoseLog(entry.id, readingValue, context, notes, diabetesType);
+      else doctorsNotified = (await addGlucoseLog(uid, readingValue, context, notes, new Date(), language, diabetesType)).doctorsNotified;
       if (activeSave.current !== id) return;
       setOffline(false);
       reset();

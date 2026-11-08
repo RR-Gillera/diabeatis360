@@ -2,7 +2,7 @@ import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, T
 
 import { db } from '@/firebase';
 import { glucoseDirection, interpretGlucose } from '@/constants/glucose';
-import type { MealContext } from '@/constants/enums';
+import type { Interpretation, MealContext } from '@/constants/enums';
 import { translate, type Language } from '@/i18n/translate';
 
 export type NotificationType =
@@ -54,8 +54,14 @@ export async function createNotification(
 // NOTE: these are safety prompts, not a diagnosis. The cut-offs come from constants/glucose.ts (DECISIONS.md D4).
 // Critical readings always tell the person to contact their doctor or seek emergency care (root CLAUDE.md
 // health-safety rules); the app never suggests a medication change or an insulin dose.
-export function glucoseAlert(readingMgdl: number, context: MealContext, language: Language = 'English'): { message: string; severity: NotificationEntry['severity'] } | null {
-  const interpretation = interpretGlucose(readingMgdl, context);
+// `interpretation` is the class saved with the reading, worked out for the person's diabetes type (D40); left out, the
+// reading is classified with the D4 targets.
+export function glucoseAlert(
+  readingMgdl: number,
+  context: MealContext,
+  language: Language = 'English',
+  interpretation: Interpretation = interpretGlucose(readingMgdl, context),
+): { message: string; severity: NotificationEntry['severity'] } | null {
   const say = (key: Parameters<typeof translate>[1]) => translate(language, key, { value: readingMgdl });
   if (interpretation === 'critical') {
     return glucoseDirection(readingMgdl, context) === 'low'

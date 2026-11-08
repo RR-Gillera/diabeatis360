@@ -79,3 +79,30 @@ test('reading limits: everyday readings save without a question', () => {
     assert.deepEqual(checkReading(value), { ok: true, needsConfirmation: false }, `${value}`);
   }
 });
+
+test('prediabetes (D40): normal is 70-99 before a meal and 70-139 after; above that is high', () => {
+  assert.equal(interpretGlucose(99, 'before_meal', 'Prediabetes'), 'normal');
+  assert.equal(interpretGlucose(100, 'before_meal', 'Prediabetes'), 'high');
+  assert.equal(interpretGlucose(115, 'before_meal', 'Prediabetes'), 'high');
+  assert.equal(interpretGlucose(139, 'after_meal', 'Prediabetes'), 'normal');
+  assert.equal(interpretGlucose(140, 'after_meal', 'Prediabetes'), 'high');
+  assert.equal(glucoseDirection(115, 'before_meal', 'Prediabetes'), 'high');
+});
+
+test('prediabetes (D40): low and critical are the same as for everyone', () => {
+  for (const context of ['before_meal', 'after_meal']) {
+    assert.equal(interpretGlucose(53, context, 'Prediabetes'), 'critical');
+    assert.equal(interpretGlucose(60, context, 'Prediabetes'), 'low');
+    assert.equal(interpretGlucose(70, context, 'Prediabetes'), 'normal');
+    assert.equal(interpretGlucose(250, context, 'Prediabetes'), 'critical');
+  }
+});
+
+test('Type 1, Type 2 and a type not stated keep the D4 targets (D40)', () => {
+  for (const type of ['Type 1', 'Type 2', '', undefined]) {
+    assert.equal(interpretGlucose(130, 'before_meal', type), 'normal');
+    assert.equal(interpretGlucose(131, 'before_meal', type), 'high');
+    assert.equal(interpretGlucose(179, 'after_meal', type), 'normal');
+    assert.equal(interpretGlucose(180, 'after_meal', type), 'high');
+  }
+});

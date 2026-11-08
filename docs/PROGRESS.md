@@ -176,3 +176,9 @@ Append newest at the bottom. Format:
 - **Verified:** functions 83 on the emulators; unit 130 (124 pass, 6 skipped); tsc and lint; browser 28/28 (page) and 14/14 (whole call).
 - **Known gaps:** no real LiveKit connection yet (needs the project and three Vercel variables, GO_LIVE A11); the timer starts when the page opens, not when the video connects.
 - **Manuscript:** LiveKit replaces Daily.co (MANUSCRIPT_CHANGES).
+
+## 2026-11-08 — Claude Code — setup choices, allergy and ingredient search, advice by diabetes type (D40)
+- **Built:** no setup answer is chosen in advance; allergies by search (English, Filipino and other names) with an "I don't have food allergies" button; diets Everything / Vegetarian plus an optional "ingredients you don't eat" search (new field `disliked_ingredients`); AI advice per diabetes type; meals and alternatives with a disliked ingredient are dropped; the safety check knows each food's other names; prediabetes readings use the non-diabetic normal ranges, classified once when saved.
+- **Files:** functions `lib/{food-words,prompts,handlers,rating,glucose}.js` + tests; mobile `constants/{food-words,glucose,enums}.ts`, `features/auth/{food-search.tsx,health-profile.ts,setup-kit.tsx,onboarding.tsx,use-health-profile.ts}`, the setup screens, Health Profile, Dietary Preference, the doctor's patient view, glucose service and sheet, i18n; `firestore.rules` + tests; docs.
+- **Verified:** unit 141 (135 pass, 6 skipped); tsc and lint; functions 93; rules 407; browser 27/27 on the emulators.
+- **Known gaps:** not tried on a phone or with real Gemini answers; the prediabetes ranges and the food lists need the adviser's (and a Filipino speaker's) review; deploy in the GO_LIVE A14 order.

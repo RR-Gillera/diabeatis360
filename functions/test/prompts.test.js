@@ -4,7 +4,8 @@ const assert = require('node:assert/strict')
 const { test } = require('node:test')
 
 const {
-  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, containsAllergen, parseAllergens, SYSTEM_RULES,
+  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, containsAllergen, dislikedIngredients, parseAllergens,
+  SYSTEM_RULES, TYPE_GUIDANCE,
 } = require('../lib/prompts')
 
 test('parseAllergens splits, lowercases and ignores "none"', () => {
@@ -29,13 +30,17 @@ test('the meal prompt carries diabetes type, allergies and the safety rules', ()
   })
   assert.match(user, /Type 2/)
   assert.match(user, /peanuts, shellfish/)
-  assert.match(user, /No Pork/)
+  // An old 'No Pork' answer (D40): the diet is Everything and pork is among the ingredients not eaten.
+  assert.match(user, /Dietary preference: Everything/)
+  assert.match(user, /do not eat \(never use\): pork/)
+  assert.ok(user.includes(TYPE_GUIDANCE['Type 2'].meal), 'the Type 2 advice for meals')
   assert.match(user, /190 mg\/dL after a meal/)
   assert.match(user, /Filipino \(Tagalog\)/)
   assert.match(user, /Brown Rice \(GI 68/)
   assert.match(system, /NEVER diagnose/)
   assert.match(system, /insulin or drug doses/)
   assert.match(system, /MUST avoid every allergen/)
+  assert.match(system, /leave out every ingredient the user says they do not eat/)
   assert.equal(system, SYSTEM_RULES)
 })
 
@@ -121,4 +126,75 @@ test('containsAllergen matches singular and plural on whole words only', () => {
   assert.deepEqual(containsAllergen('mixed nuts', ['nuts']), ['nuts'])
   assert.deepEqual(containsAllergen('Shellfish soup', ['shellfish']), ['shellfish'])
   assert.deepEqual(containsAllergen('tree nuts, sugar', ['tree nuts']), ['tree nuts'])
+})
+
+// ---- D40: the diabetes type, the ingredients someone does not eat, and the other names of each food
+
+test('each diabetes type gets its own advice for meals, exercise and labels; no type, no extra advice', () => {
+  for (const type of ['Type 1', 'Type 2', 'Prediabetes']) {
+    for (const kind of ['meal', 'exercise']) {
+      const { user } = buildRecommendationPrompt({ kind, profile: { diabetes_type: type }, reading: null, foods: [] })
+      assert.ok(user.includes(TYPE_GUIDANCE[type][kind]), `${type} ${kind}`)
+    }
+    assert.ok(buildLabelPrompt({ profile: { diabetes_type: type } }).user.includes(TYPE_GUIDANCE[type].label), `${type} label`)
+  }
+  const { user } = buildRecommendationPrompt({ kind: 'meal', profile: {}, reading: null, foods: [] })
+  for (const advice of Object.values(TYPE_GUIDANCE)) assert.ok(!user.includes(advice.meal))
+  assert.match(user, /Diabetes type: not stated/)
+  // The old label still finds its advice.
+  assert.ok(buildRecommendationPrompt({ kind: 'exercise', profile: { diabetes_type: 'Pre-Diabetic' }, reading: null, foods: [] }).user.includes(TYPE_GUIDANCE.Prediabetes.exercise))
+})
+
+test('no type advice mentions an insulin amount or a medicine change', () => {
+  for (const advice of Object.values(TYPE_GUIDANCE)) {
+    for (const text of Object.values(advice)) assert.doesNotMatch(text, /\bunits?\b|\bdose|\bdosage|stop (taking|your)|change your (medicine|medication)/i)
+  }
+})
+
+test('the ingredients someone does not eat are in the prompt, and an old No Pork answer adds pork once', () => {
+  assert.deepEqual(dislikedIngredients({ disliked_ingredients: 'Ampalaya, Liver' }), ['ampalaya', 'liver'])
+  assert.deepEqual(dislikedIngredients({ disliked_ingredients: '', dietary_preference: 'No Pork' }), ['pork'])
+  assert.deepEqual(dislikedIngredients({ disliked_ingredients: 'Pork', dietary_preference: 'No Pork' }), ['pork'])
+  assert.deepEqual(dislikedIngredients({}), [])
+  const { user } = buildRecommendationPrompt({ kind: 'meal', profile: { disliked_ingredients: 'Ampalaya', dietary_preference: 'Vegetarian' }, reading: null, foods: [] })
+  assert.match(user, /do not eat \(never use\): ampalaya/)
+  assert.match(user, /Dietary preference: Vegetarian/)
+  assert.match(buildRecommendationPrompt({ kind: 'meal', profile: { dietary_preference: 'Diabetic Diet' }, reading: null, foods: [] }).user, /Dietary preference: Everything/)
+})
+
+test('a listed food is also caught under its other names, in English or Filipino', () => {
+  assert.deepEqual(containsAllergen('Sinigang na Hipon', ['seafood']), ['seafood'])
+  assert.deepEqual(containsAllergen('Lechon kawali with rice', ['pork']), ['pork'])
+  assert.deepEqual(containsAllergen('Ginisang baboy', ['Pork']), ['Pork'])
+  assert.deepEqual(containsAllergen('Kare-kare', ['peanuts']), ['peanuts'])
+  assert.deepEqual(containsAllergen('Pancit with shrimp', ['Hipon']), ['Hipon'], 'stored by its Filipino name')
+  assert.deepEqual(containsAllergen('Adobong pusit', ['shellfish']), [], 'squid is not shellfish')
+  assert.deepEqual(containsAllergen('Adobong pusit', ['seafood']), ['seafood'])
+})
+
+test('other names do not cause false alarms', () => {
+  assert.deepEqual(containsAllergen('Ginataang kalabasa', ['dairy']), [], 'coconut milk is not dairy')
+  assert.deepEqual(containsAllergen('Champorado with gatas', ['coconut milk']), [], '"gatas" (milk) is not "gata"')
+  assert.deepEqual(containsAllergen('Tortang talong', ['eggs']), [], 'no egg word in the name')
+  assert.deepEqual(containsAllergen('Eggplant salad', ['eggs']), [], '"eggplant" is not "egg"')
+  assert.deepEqual(containsAllergen('Grilled tilapia', ['pork', 'beef']), [])
+})
+
+test('cleanMeals drops a meal with an ingredient the person does not eat, under any of its names', () => {
+  const meal = (name, ingredients) => ({ name, tagline: 't', calories: 300, protein_g: 20, carbs_g: 30, fiber_g: 4, sugar_g: 3, insight: 'ok', ingredients })
+  const meals = cleanMeals([
+    meal('Ginisang Ampalaya', ['bitter gourd', 'egg', 'tomato']),
+    meal('Lechon Kawali', ['liempo', 'salt']),
+    meal('Chicken Tinola', ['chicken', 'papaya', 'ginger']),
+  ], ['bitter gourd', 'pork'])
+  assert.deepEqual(meals.map((entry) => entry.name), ['Chicken Tinola'])
+})
+
+test('cleanLabel: a healthier alternative with an ingredient the person does not eat is dropped', () => {
+  const result = cleanLabel({
+    readable: true, product_name: 'Soda', ingredients_text: 'water, sugar', calories: 150, carbs_g: 39, sugar_g: 39, health_rating: 'unsuitable', insight: 'x',
+    alternatives: [{ instead_of: 'Soda', try: 'Ampalaya juice' }, { instead_of: 'Soda', try: 'Water with calamansi' }],
+  }, [], ['bitter gourd'])
+  assert.deepEqual(result.allergen_warnings, [], 'an ingredient someone does not eat is not an allergy warning')
+  assert.deepEqual(result.alternatives.map((entry) => entry.try), ['Water with calamansi'])
 })

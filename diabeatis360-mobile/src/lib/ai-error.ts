@@ -35,7 +35,7 @@ export function toAiError(error: unknown): AiError {
   }
   if (code === 'functions/unauthenticated') return new AiError('signed-out', 'Please sign in again to use this feature.');
   if (code === 'functions/permission-denied') return new AiError('unverified', message || 'Please verify your email address first.');
-  if (code === 'functions/failed-precondition') return new AiError('allergies-missing', message || 'Add your allergies first (or choose None) in Profile > Health Profile.');
+  if (code === 'functions/failed-precondition') return new AiError('allergies-missing', message || 'Add your allergies first (or tap "I don\'t have food allergies") in Profile > Health Profile.');
   if (code === 'functions/invalid-argument') return new AiError('invalid', message || 'That request was not valid.');
   if (code === 'functions/unavailable' || code === 'functions/not-found' || code === 'functions/internal' || code === 'functions/deadline-exceeded') {
     return new AiError('unavailable', 'The AI service is not reachable right now. Please try again in a moment.');

@@ -44,8 +44,10 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
   diabetes type (Type 1 / Type 2 / Prediabetes), food allergies, activity level, dietary preference,
   then Complete Setup. Reminders are always on (no notification toggles since DECISIONS.md D29; the phone asks for
   notification permission itself). Stored on the Users doc (fields per FIRESTORE_SCHEMA.md).
-- Figma options — activity: Sedentary / Light / Active / Very Active; diet: Everything / Vegetarian /
-  No Pork / Diabetic Diet. These differ from the data dictionary enums → DECISIONS.md D6.
+- Options — activity: Sedentary / Light / Active / Very Active; diet: Everything / Vegetarian, plus optional
+  "ingredients you don't eat" (team change, DECISIONS.md D40: "No Pork" became an ingredient not eaten and "Diabetic
+  Diet" was dropped; the Figma frame still shows four). Allergies are chosen with a search, or "I don't have food
+  allergies" (D40). No answer is chosen in advance. These differ from the data dictionary enums → DECISIONS.md D6.
 - Doctor can view a patient's health profile ONLY for patients who have a booking with them (UT-023).
 - IT-001: registration data populates profile. IT-002: profile data feeds the AI prompts.
 
@@ -61,7 +63,8 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 
 - Add: value (mg/dL, integer), meal context (stored `before_meal` / `after_meal`, shown as "Before Meal" / "After Meal"), optional notes, logged_at (UT-006).
 - On save, **automatically** classify Low / Normal / High / Critical using `src/constants/glucose.ts`
-  (thresholds = DECISIONS.md D4) and store the result on the log doc; navigate to the
+  (thresholds = DECISIONS.md D4; prediabetes uses the normal ranges for people without diabetes, D40) and store the
+  result on the log doc; navigate to the
   Interpretation screen showing result + real-time meal & exercise feedback (rule-based text per class;
   "AI Recommendations" buttons link to module 4).
 - Critical results show urgent guidance to contact a doctor / emergency services.
@@ -76,7 +79,8 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
 | Generate Meal Recommendation | ✓ |
 | Generate Exercise Recommendation | ✓ |
 
-- Prompt built from the user's profile (diabetes type, diet, allergies, activity level, language),
+- Prompt built from the user's profile (diabetes type, with advice for that type; diet; allergies; ingredients not
+  eaten; activity level; language; DECISIONS.md D40),
   latest interpretation, and grounding rows from the Food_Database (Filipino dishes + GI + calories).
 - Ask Gemini for **structured JSON** (list of meals: name, why, GI note, calories; list of exercises:
   name, duration, intensity, cautions) and render cards (Figma: Meal Suggestions, Meal Details,

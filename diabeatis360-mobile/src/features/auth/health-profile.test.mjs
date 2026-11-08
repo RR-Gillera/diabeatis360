@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  ACTIVITY_LEVELS, allergiesDeclared, allergyList, allergyText, birthdateText, changedHealthFields, DIETS, healthFormProblem, optionDetail,
-  profileToForm, toggleAllergy,
+  ACTIVITY_LEVELS, allergiesDeclared, allergyList, allergyText, birthdateText, changedHealthFields, DIETS, dislikedText, foodList,
+  healthFormProblem, normalizeDiet, optionDetail, profileToForm, toggleAllergy,
 } from './health-profile.ts';
 
 const stored = {
@@ -12,11 +12,23 @@ const stored = {
   diabetes_type: 'Type 2',
   allergies: 'Peanuts, Shellfish',
   activity_level: 'Light',
-  dietary_preference: 'No Pork',
+  dietary_preference: 'Vegetarian',
+  disliked_ingredients: 'Bitter gourd, Liver',
 };
 
 test('the form is filled from the stored profile (so a new phone is not blank)', () => {
-  assert.deepEqual(profileToForm(stored), { dateOfBirth: 'March 15, 1985', condition: 'Type 2', allergy: 'Peanuts, Shellfish', activity: 'Light', diet: 'No Pork' });
+  assert.deepEqual(profileToForm(stored), { dateOfBirth: 'March 15, 1985', condition: 'Type 2', allergy: 'Peanuts, Shellfish', activity: 'Light', diet: 'Vegetarian', disliked: 'Bitter gourd, Liver' });
+});
+
+test('old diet answers read as today\'s choices (D40): Diabetic Diet is Everything, No Pork adds Pork once', () => {
+  assert.equal(normalizeDiet('Diabetic Diet'), 'Everything');
+  assert.equal(normalizeDiet('No Pork'), 'Everything');
+  assert.equal(normalizeDiet('Vegetarian'), 'Vegetarian');
+  assert.equal(normalizeDiet(''), '');
+  assert.deepEqual(profileToForm({ dietary_preference: 'No Pork' }), { dateOfBirth: '', condition: '', allergy: '', activity: '', diet: 'Everything', disliked: 'Pork' });
+  assert.equal(dislikedText('Okra, pork', 'No Pork'), 'Okra, pork', 'pork is not added twice');
+  assert.equal(dislikedText(undefined, 'Everything'), '');
+  assert.deepEqual(foodList(' Okra ,, okra, Liver '), ['Okra', 'Liver']);
 });
 
 test('the old Pre-Diabetic label is shown as Prediabetes', () => {
@@ -31,12 +43,17 @@ test('only changed fields are saved', () => {
 
 test('a blank field never overwrites what is stored (the QA data-loss bug)', () => {
   const before = profileToForm(stored);
-  const blankForm = { dateOfBirth: '', condition: 'Type 1', allergy: '', activity: '', diet: '' };
+  const blankForm = { dateOfBirth: '', condition: 'Type 1', allergy: '', activity: '', diet: '', disliked: before.disliked };
   assert.deepEqual(changedHealthFields(before, blankForm), { condition: 'Type 1' });
 });
 
+test('the ingredients not eaten can be cleared: "none" is a real answer there (D40)', () => {
+  const before = profileToForm(stored);
+  assert.deepEqual(changedHealthFields(before, { ...before, disliked: '' }), { disliked: '' });
+});
+
 test('allergies must be answered; None counts as an answer', () => {
-  assert.match(healthFormProblem({ ...profileToForm(stored), allergy: '  ' }), /or None if you have none/);
+  assert.match(healthFormProblem({ ...profileToForm(stored), allergy: '  ' }), /I don't have food allergies/);
   assert.equal(healthFormProblem({ ...profileToForm(stored), allergy: 'None' }), null);
   assert.equal(allergiesDeclared('None'), true);
   assert.equal(allergiesDeclared(''), false);
@@ -64,7 +81,7 @@ test('allergies are stored as text but edited as chips; "None" can only be alone
 
 test('the activity and diet lists match the setup screens (Figma Step 8, 9)', () => {
   assert.deepEqual(ACTIVITY_LEVELS.map((option) => option.value), ['Sedentary', 'Light', 'Active', 'Very Active']);
-  assert.deepEqual(DIETS.map((option) => option.value), ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet']);
+  assert.deepEqual(DIETS.map((option) => option.value), ['Everything', 'Vegetarian'], 'D40: two diets; no pork is an ingredient not eaten');
   assert.equal(optionDetail(ACTIVITY_LEVELS, 'Light'), '1-2 days of light activity/week');
   assert.equal(optionDetail(DIETS, 'Keto'), '');
 });

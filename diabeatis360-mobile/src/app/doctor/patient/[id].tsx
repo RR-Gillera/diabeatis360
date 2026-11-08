@@ -19,7 +19,8 @@ import { glucoseDirection } from '@/constants/glucose';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { ageFrom, weeklyInsights } from '@/features/doctor/doctor-stats';
-import { ACTIVITY_LEVELS, COMMON_ALLERGIES, DIETS } from '@/features/auth/health-profile';
+import { ACTIVITY_LEVELS, DIETS, dislikedText, foodList, normalizeDiet } from '@/features/auth/health-profile';
+import { foodLabel } from '@/constants/food-words';
 import { useT } from '@/i18n/language-context';
 import { shortDay, type MessageKey } from '@/i18n/translate';
 
@@ -42,11 +43,6 @@ function healthLabel(value: string, t: (key: MessageKey) => string) {
   if (['Type 1', 'Type 2', 'Prediabetes'].includes(value)) return t(`condition.${value}` as MessageKey);
   const option = [...ACTIVITY_LEVELS, ...DIETS].find((item) => item.value === value);
   return option ? t(option.labelKey) : value;
-}
-
-/** A common allergy in the reader's language ("Nuts" -> "Mani"); one the patient typed is shown as typed. */
-function allergyLabel(item: string, t: (key: MessageKey) => string) {
-  return COMMON_ALLERGIES.includes(item) ? t(`allergy.${item}` as MessageKey) : item;
 }
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
@@ -88,9 +84,11 @@ export default function DoctorPatientDetailScreen() {
 
   const { days: weekDays, average: weekAverage } = useMemo(() => bucketCurrentWeek(entries), [entries]);
   const latest = entries[0];
-  // A critical reading still counts as high or low, depending on which way it is off.
-  const highCount = entries.filter((entry) => glucoseDirection(entry.readingMgdl, entry.context) === 'high' && entry.interpretation !== 'normal').length;
-  const lowCount = entries.filter((entry) => glucoseDirection(entry.readingMgdl, entry.context) === 'low' && entry.interpretation !== 'normal').length;
+  // The class saved with each reading, which was worked out for the patient's diabetes type (D40). A critical reading
+  // still counts as high or low, depending on which way it is off.
+  const offBy = (entry: GlucoseLogEntry) => (entry.interpretation === 'critical' ? glucoseDirection(entry.readingMgdl, entry.context) : entry.interpretation);
+  const highCount = entries.filter((entry) => offBy(entry) === 'high').length;
+  const lowCount = entries.filter((entry) => offBy(entry) === 'low').length;
 
   const consultations = useMemo(() => appointments
     .filter((entry) => entry.patientId === id && isChatAvailable(entry.status))
@@ -138,11 +136,12 @@ export default function DoctorPatientDetailScreen() {
                 <View style={[doctorStyles.card, styles.card]}>
                   <ProfileRow label={t('doctor.patient.diabetesType')} value={healthLabel(profile.diabetesType, t)} />
                   <ProfileRow label={t('doctor.patient.activity')} value={healthLabel(profile.activityLevel, t)} />
-                  <ProfileRow label={t('doctor.patient.diet')} value={healthLabel(profile.dietaryPreference, t)} />
+                  <ProfileRow label={t('doctor.patient.diet')} value={healthLabel(normalizeDiet(profile.dietaryPreference), t)} />
+                  <ProfileRow label={t('doctor.patient.disliked')} value={foodList(dislikedText(profile.dislikedIngredients, profile.dietaryPreference)).map((item) => foodLabel(item, language)).join(', ') || t('allergy.None')} />
                   <View style={styles.profileRow}>
                     <Text style={doctorStyles.label}>{t('doctor.patient.allergies')}</Text>
                     {allergyList.length ? (
-                      <View style={styles.chips}>{allergyList.map((item) => <View key={item} style={styles.chip}><Text style={styles.chipText}>{allergyLabel(item, t)}</Text></View>)}</View>
+                      <View style={styles.chips}>{allergyList.map((item) => <View key={item} style={styles.chip}><Text style={styles.chipText}>{foodLabel(item, language)}</Text></View>)}</View>
                     ) : <Text style={[styles.profileValue, styles.profileValueMissing]}>{t('doctor.patient.noAllergies')}</Text>}
                   </View>
                   {profile.location ? <ProfileRow label={t('doctor.patient.location')} value={profile.location} /> : null}

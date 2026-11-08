@@ -6,20 +6,21 @@ import { Brand } from '@/constants/theme';
 import { AuthButton } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import { BirthdateField } from '@/features/auth/birthdate-picker';
+import { FoodSearch, NoAllergiesButton } from '@/features/auth/food-search';
 import {
-  ACTIVITY_LEVELS, allergyList, allergyText, changedHealthFields, COMMON_ALLERGIES, DIETS, healthFormProblem, NO_ALLERGIES, toggleAllergy,
-  type HealthForm,
+  ACTIVITY_LEVELS, allergyList, allergyText, changedHealthFields, DIETS, healthFormProblem, NO_ALLERGIES, toggleAllergy, type HealthForm,
 } from '@/features/auth/health-profile';
+import { ALLERGY_CHOICES } from '@/constants/food-words';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { useHealthProfile, type HealthProfile } from '@/features/auth/use-health-profile';
 import { Chip, ChipRow, FieldLabel, ProfileTop, profileColors } from '@/features/profile/profile-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
-import type { MessageKey } from '@/i18n/translate';
 
-// Figma [P-12] Edit Health Profile. The safety rules of D25 stay: the allergy answer may not be left empty ("None" is
-// how someone says they have none), and only the fields the person changed are written, never a blank.
-// The chips show translated names; the stored codes stay English (D33).
+// Figma [P-12] Edit Health Profile. The safety rules of D25 stay: the allergy answer may not be left empty ("I don't
+// have food allergies", stored as None, is how someone says they have none), and only the fields the person changed
+// are written, never a blank. Allergies use the same search as setup (D40). Names are shown translated; the stored
+// codes stay English (D33).
 export default function EditHealthProfileScreen() {
   const goBack = useSafeBack('/health-profile');
   const { uid, email, displayName } = useAuth();
@@ -43,20 +44,12 @@ function EditForm({ profile, fallbackName, onDone }: { profile: HealthProfile; f
   const startName = profile.fullName || fallbackName;
   const [name, setName] = useState(startName);
   const [form, setForm] = useState<HealthForm>(profile.form);
-  const [adding, setAdding] = useState(false);
-  const [newAllergy, setNewAllergy] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const allergies = allergyList(form.allergy);
-  const custom = allergies.filter((item) => !COMMON_ALLERGIES.includes(item) && item !== NO_ALLERGIES);
   const set = (key: keyof HealthForm, value: string) => { setForm((current) => ({ ...current, [key]: value })); setError(''); };
   const tapAllergy = (item: string) => set('allergy', allergyText(toggleAllergy(allergies, item)));
-  const addAllergy = () => {
-    if (newAllergy.trim()) tapAllergy(newAllergy);
-    setNewAllergy('');
-    setAdding(false);
-  };
 
   const save = async () => {
     if (!email || saving) return;
@@ -85,18 +78,14 @@ function EditForm({ profile, fallbackName, onDone }: { profile: HealthProfile; f
       <ChipRow>{DIABETES_TYPES.map((item) => <Chip key={item} label={t(`condition.${item}`)} selected={form.condition === item} onPress={() => set('condition', item)} />)}</ChipRow>
 
       <FieldLabel>{t('health.allergies')}</FieldLabel>
-      <ChipRow>
-        {COMMON_ALLERGIES.map((item) => <Chip key={item} label={t(`allergy.${item}` as MessageKey)} selected={allergies.includes(item)} onPress={() => tapAllergy(item)} />)}
-        {custom.map((item) => <Chip key={item} label={item} selected removable onPress={() => tapAllergy(item)} />)}
-        <Chip label={t('allergy.None')} selected={allergies.includes(NO_ALLERGIES)} onPress={() => tapAllergy(NO_ALLERGIES)} />
-        {adding ? null : <Chip label={t('health.edit.addChip')} onPress={() => setAdding(true)} />}
-      </ChipRow>
-      {adding ? (
-        <View style={styles.addRow}>
-          <TextInput value={newAllergy} onChangeText={setNewAllergy} onSubmitEditing={addAllergy} placeholder={t('health.edit.newAllergy')} placeholderTextColor="#A7B8CD" autoFocus returnKeyType="done" accessibilityLabel={t('health.edit.newAllergy')} style={[styles.input, styles.addInput]} />
-          <Text accessibilityRole="button" onPress={addAllergy} style={styles.addButton}>{t('common.add')}</Text>
-        </View>
-      ) : null}
+      <FoodSearch
+        choices={ALLERGY_CHOICES}
+        selected={allergies.filter((item) => item !== NO_ALLERGIES)}
+        onAdd={tapAllergy}
+        onRemove={tapAllergy}
+        placeholder={t('setup.allergies.search')}
+      />
+      <NoAllergiesButton selected={allergies.includes(NO_ALLERGIES)} onPress={() => tapAllergy(NO_ALLERGIES)} />
 
       <FieldLabel>{t('health.activity')}</FieldLabel>
       <ChipRow>{ACTIVITY_LEVELS.map((item) => <Chip key={item.value} label={t(item.labelKey)} selected={form.activity === item.value} onPress={() => set('activity', item.value)} />)}</ChipRow>
@@ -115,9 +104,6 @@ const styles = StyleSheet.create({
   scroll: { padding: 24, paddingBottom: 60 },
   loading: { marginTop: 40 },
   input: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: 18, borderWidth: 1, color: profileColors.navy, fontFamily: Brand.font.medium, fontSize: 16, minHeight: 56, paddingHorizontal: 16 },
-  addRow: { alignItems: 'center', flexDirection: 'row', gap: 10, marginTop: 10 },
-  addInput: { flex: 1 },
-  addButton: { color: Brand.colors.primary, fontFamily: Brand.font.bold, fontSize: 15, paddingHorizontal: 10, paddingVertical: 12 },
   error: { color: Brand.colors.danger, fontFamily: Brand.font.medium, fontSize: 14, lineHeight: 20, marginTop: 18 },
   save: { marginTop: 24 },
 });

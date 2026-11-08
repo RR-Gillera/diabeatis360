@@ -13,6 +13,8 @@ const LIMITS = {
 const LABELS = { sugar_g: 'sugar', carbs_g: 'carbohydrates', sodium_mg: 'sodium' }
 const UNITS = { sugar_g: 'g', carbs_g: 'g', sodium_mg: 'mg' }
 const RANK = { suitable: 0, caution: 1, unsuitable: 2 }
+// Who the insight speaks about (D40). The limits above are the same for every type; only the wording changes.
+const WHO = { 'Type 1': 'someone with Type 1 diabetes', 'Type 2': 'someone with Type 2 diabetes', Prediabetes: 'someone with prediabetes' }
 
 function levelOf(key, value) {
   if (value >= LIMITS[key].unsuitable) return 'unsuitable'
@@ -21,7 +23,7 @@ function levelOf(key, value) {
 }
 
 /** { rating, insight } for one serving. The worst nutrient decides the rating and is named in the insight. */
-function rateNutrients(nutrients) {
+function rateNutrients(nutrients, diabetesType) {
   let rating = 'suitable'
   let worst = null
   for (const key of Object.keys(LIMITS)) {
@@ -37,7 +39,7 @@ function rateNutrients(nutrients) {
   return {
     rating,
     insight:
-      `One serving has ${worst.value} ${UNITS[worst.key]} of ${LABELS[worst.key]}, which is ${high ? 'high' : 'on the high side'} for someone managing diabetes. ` +
+      `One serving has ${worst.value} ${UNITS[worst.key]} of ${LABELS[worst.key]}, which is ${high ? 'high' : 'on the high side'} for ${WHO[diabetesType] ?? 'someone managing diabetes'}. ` +
       (high ? 'It is best to avoid it or take a very small portion.' : 'Take a small portion and check your blood sugar afterwards.'),
   }
 }

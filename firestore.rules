@@ -205,12 +205,15 @@ service cloud.firestore {
       // Health fields (DECISIONS.md D25): when one is written it must be a value the app itself offers, so a stray
       // 'Pre-Diabetic', an empty allergy list or a birthdate saved as text can never land in a profile again.
       // allergies is free text from the person; 'None' is how someone says they have none, so it cannot be empty.
+      // D40: the diets are Everything and Vegetarian (an old 'No Pork' or 'Diabetic Diet' stays readable but cannot be
+      // written again), and disliked_ingredients is free text like allergies, where '' means none.
       function okHealth(data, keys) {
         return (!keys.hasAny(['diabetes_type']) || data.diabetes_type in ['Type 1', 'Type 2', 'Prediabetes'])
           && (!keys.hasAny(['allergies']) || (data.allergies is string && data.allergies.size() >= 1 && data.allergies.size() <= 500))
           && (!keys.hasAny(['birthdate']) || data.birthdate is timestamp)
           && (!keys.hasAny(['activity_level']) || data.activity_level in ['Sedentary', 'Light', 'Active', 'Very Active'])
-          && (!keys.hasAny(['dietary_preference']) || data.dietary_preference in ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet']);
+          && (!keys.hasAny(['dietary_preference']) || data.dietary_preference in ['Everything', 'Vegetarian'])
+          && (!keys.hasAny(['disliked_ingredients']) || (data.disliked_ingredients is string && data.disliked_ingredients.size() <= 300));
       }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.

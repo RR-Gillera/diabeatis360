@@ -84,7 +84,7 @@ const deny = (name, promise) => check(name, promise, false);
     await setDoc(doc(db, 'Guardian_Verifications/pMinorRejected'), { user_id: 'pMinorRejected', guardian_full_name: 'Old Name', relationship_to_minor: 'parent', guardian_id_photo_url: 'https://x/old.jpg', verification_status: 'rejected', rejection_reason: 'Blurry photo' });
     await setDoc(doc(db, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 110, context: 'before_meal' });
     // D25: a profile saved by an older app version, with the old condition label and no allergies.
-    await setDoc(doc(db, 'Users/pLegacy'), { full_name: 'Legacy', role: 'patient', is_active: true, diabetes_type: 'Pre-Diabetic', allergies: '' });
+    await setDoc(doc(db, 'Users/pLegacy'), { full_name: 'Legacy', role: 'patient', is_active: true, diabetes_type: 'Pre-Diabetic', allergies: '', dietary_preference: 'No Pork' });
     await setDoc(doc(db, 'Glucose_Logs/g9'), { patient_id: 'p9', reading_mgdl: 99, context: 'before_meal' });
     // Each booking holds its own time slot and, while live, the patient's share with the doctor (D22).
     await seedBooking(db, 'bPending', { patient_id: 'p1', provider_id: 'd1', status: 'pending', payment_status: 'unpaid', fee: 500 }, 1);
@@ -626,6 +626,16 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('D25: dietary preference outside the list is refused', updateDoc(doc(p1, 'Users/p1'), { dietary_preference: 'Keto' }));
   await allow('D25: an old profile can still change other fields', updateDoc(doc(pLegacy, 'Users/pLegacy'), { full_name: 'Legacy Renamed' }));
   await allow('D25: an old profile can move to Prediabetes', updateDoc(doc(pLegacy, 'Users/pLegacy'), { diabetes_type: 'Prediabetes' }));
+  // ---- D40: two diets, and the ingredients someone does not eat
+  await allow('D40: a diet of Vegetarian', updateDoc(doc(p1, 'Users/p1'), { dietary_preference: 'Vegetarian' }));
+  await allow('D40: a diet of Everything', updateDoc(doc(p1, 'Users/p1'), { dietary_preference: 'Everything' }));
+  await deny('D40: Diabetic Diet can no longer be written', updateDoc(doc(p1, 'Users/p1'), { dietary_preference: 'Diabetic Diet' }));
+  await deny('D40: No Pork can no longer be written (pork is an ingredient not eaten now)', updateDoc(doc(p1, 'Users/p1'), { dietary_preference: 'No Pork' }));
+  await allow('D40: an old profile that still says No Pork can change its other fields', updateDoc(doc(pLegacy, 'Users/pLegacy'), { full_name: 'Legacy Again' }));
+  await allow('D40: ingredients not eaten, as text', updateDoc(doc(p1, 'Users/p1'), { disliked_ingredients: 'Pork, Bitter gourd' }));
+  await allow('D40: no ingredients not eaten (an empty text is an answer)', updateDoc(doc(p1, 'Users/p1'), { disliked_ingredients: '' }));
+  await deny('D40: ingredients not eaten over 300 characters are refused', updateDoc(doc(p1, 'Users/p1'), { disliked_ingredients: 'a'.repeat(301) }));
+  await deny('D40: ingredients not eaten that are not text are refused', updateDoc(doc(p1, 'Users/p1'), { disliked_ingredients: ['Pork'] }));
   await deny('D25: a new profile cannot be created with an empty allergy list', setDoc(doc(signedIn('pNew').firestore(), 'Users/pNew'), { full_name: 'New', role: 'patient', allergies: '' }));
   for (const [value, ok] of [[20, true], [600, true], [19, false], [601, false], [9999, false], [1.5, false], [120.5, false]]) {
     await check(`D25: a reading of ${value} mg/dL is ${ok ? 'saved' : 'refused'}`, addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: value, context: 'before_meal' }), ok);
