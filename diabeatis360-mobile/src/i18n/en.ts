@@ -47,10 +47,8 @@ export const en = {
   'setup.birth.subtitle': 'Your age helps us tailor your health targets and suggestions.',
   'setup.birth.hint': 'Your age remains private to your health profile.',
   'setup.birth.placeholder': 'Select your date of birth',
-  'setup.birth.adultForChild': "This looks like an adult's birthdate. Guardian accounts are for children under 18.",
-  'setup.birth.childForSelf': "You must be 18 or older to use your own account. If this is for a child, set it up as a child's account instead.",
-  'setup.birth.goBackForMe': "Go back and choose 'For me'",
-  'setup.birth.setUpChild': "Set up as a child's account",
+  'setup.birth.adultForChild': "This looks like an adult's birthdate, but this account is for a child under 18. Please check the year you picked.",
+  'setup.birth.childForSelf': 'You need to be 18 or older to use an account for yourself. Please check the year you picked.',
   'setup.condition.title': 'Which best describes\nyour condition?',
   'setup.condition.subtitle': 'This helps us personalize your health monitoring and recommendations.',
   'setup.allergies.title': 'Any food\nallergies?',
@@ -186,6 +184,8 @@ export const en = {
   'reminders.howToStop': 'To stop reminders, turn off notifications for Diabeatis360 in your phone’s settings.',
 
   // ---- sign in, sign up, start page
+  'intro.headline': 'Your Daily Companion for Smarter Diabetes Care.',
+  'intro.skip': 'Skip intro',
   'auth.landing.eyebrow': 'YOUR HEALTH, IN FOCUS',
   'auth.landing.title': 'A smarter way to manage diabetes care.',
   'auth.landing.subtitle': 'Track your health, connect with trusted doctors, and make every day feel more manageable.',

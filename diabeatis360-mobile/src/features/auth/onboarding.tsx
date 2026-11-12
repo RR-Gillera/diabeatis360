@@ -116,6 +116,19 @@ export async function saveOnboardingValue(email: string, key: string, value: str
   await setDoc(doc(db, 'Users', uid), { [field]: stored }, { merge: true });
 }
 
+/**
+ * "For me" or "For my child" (D16): the Users document first, this phone's copy second, 'self' when neither says.
+ * A new phone has no copy of its own, so reading only the phone made a child's account look like "For me" (D41).
+ */
+export async function accountTypeOf(email: string, uid?: string | null): Promise<'self' | 'minor'> {
+  let stored: unknown = null;
+  if (uid) {
+    try { stored = (await getDoc(doc(db, 'Users', uid))).data()?.account_type; } catch { /* offline: this phone's answer below */ }
+  }
+  const value = String(stored ?? '') || (await getOnboardingValue(email, 'accountType')) || '';
+  return value === 'minor' ? 'minor' : 'self';
+}
+
 export async function getOnboardingValue(email: string, key: string) {
   return AsyncStorage.getItem(`diabeatis360:onboarding:${email.trim().toLowerCase()}:${key}`);
 }

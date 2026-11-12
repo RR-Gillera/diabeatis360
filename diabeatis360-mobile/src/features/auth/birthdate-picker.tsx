@@ -98,7 +98,10 @@ function Column<T>({ label, items, selectedIndex, onSelect, render }: { label: s
   return (
     <View style={styles.column}>
       <Text style={styles.columnLabel}>{label}</Text>
-      <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
+      {/* nestedScrollEnabled: these columns sit inside a scrolling screen. Without it, Android gives every drag to the
+          screen as soon as the screen itself can scroll (for example once the age message below makes it taller), and
+          the column seems stuck (D41). iOS and the web build already let an inner list keep its own drags. */}
+      <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
         {items.map((item, index) => (
           <Text key={index} onPress={() => onSelect(index)} style={[styles.wheelText, selectedIndex === index && styles.active]}>
             {render(item)}

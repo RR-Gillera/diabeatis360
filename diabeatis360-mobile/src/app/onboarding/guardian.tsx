@@ -65,8 +65,8 @@ export default function GuardianScreen() {
     setSubmitting(true);
     setError('');
     try {
-      // Reachable directly from the birthdate age check as well as from "For my child", so this is where
-      // account_type is guaranteed to end up 'minor' (DECISIONS.md D16) no matter which path led here.
+      // Reached from "For my child" (or from Profile to resubmit); this is where account_type is guaranteed to end up
+      // 'minor' (DECISIONS.md D16). The birthdate step no longer links here (D41).
       if (email) await saveOnboardingValue(email, 'accountType', 'minor', uid);
       await submitGuardianVerification(uid, name, relationship, photoPreview);
       if (isResubmit) {

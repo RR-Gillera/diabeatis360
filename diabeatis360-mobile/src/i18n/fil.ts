@@ -47,10 +47,8 @@ export const fil: Record<MessageKey, string> = {
   'setup.birth.subtitle': 'Tinutulungan kami ng edad mo na iangkop ang iyong mga target at mungkahi sa kalusugan.',
   'setup.birth.hint': 'Mananatiling pribado sa health profile mo ang iyong edad.',
   'setup.birth.placeholder': 'Piliin ang petsa ng kapanganakan mo',
-  'setup.birth.adultForChild': 'Mukhang kaarawan ito ng isang adult. Para lang sa mga batang wala pang 18 ang guardian account.',
-  'setup.birth.childForSelf': 'Kailangang 18 taong gulang ka o higit pa para sa sariling account. Kung para sa bata ito, i-set up ito bilang account ng bata.',
-  'setup.birth.goBackForMe': "Bumalik at piliin ang 'Para sa akin'",
-  'setup.birth.setUpChild': 'I-set up bilang account ng bata',
+  'setup.birth.adultForChild': 'Mukhang kaarawan ito ng isang adult, pero para sa batang wala pang 18 ang account na ito. Pakitingnan ulit ang taong pinili mo.',
+  'setup.birth.childForSelf': 'Kailangang 18 taong gulang ka o higit pa para magamit ang sariling account. Pakitingnan ulit ang taong pinili mo.',
   'setup.condition.title': 'Alin ang pinakaangkop\nsa kondisyon mo?',
   'setup.condition.subtitle': 'Tutulong ito na iangkop ang pagsubaybay at mga mungkahi para sa kalusugan mo.',
   'setup.allergies.title': 'May allergy ka ba\nsa pagkain?',
@@ -186,6 +184,8 @@ export const fil: Record<MessageKey, string> = {
   'reminders.howToStop': 'Para itigil ang mga paalala, i-off ang abiso ng Diabeatis360 sa settings ng telepono mo.',
 
   // ---- sign in, sign up, start page
+  'intro.headline': 'Ang Araw-araw Mong Kasama para sa Mas Matalinong Pangangalaga sa Diabetes.',
+  'intro.skip': 'Laktawan ang intro',
   'auth.landing.eyebrow': 'ANG KALUSUGAN MO, NAKATUON',
   'auth.landing.title': 'Mas matalinong paraan ng pangangalaga sa diabetes.',
   'auth.landing.subtitle': 'Subaybayan ang kalusugan mo, kumonekta sa mga pinagkakatiwalaang doktor, at gawing mas magaan ang bawat araw.',

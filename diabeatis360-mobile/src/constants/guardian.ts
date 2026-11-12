@@ -18,3 +18,15 @@ export function ageOn(birthdate: Date, now: Date = new Date()): number {
 export function isUnderAdultAge(birthdate: Date, now: Date = new Date()): boolean {
   return ageOn(birthdate, now) < ADULT_MIN_AGE;
 }
+
+/**
+ * The birth years the setup birthdate step offers, most recent first (DECISIONS.md D41): an account "for me" lists 18
+ * years ago and earlier, a child's account the last 18 years (this year included). In the boundary year a person can
+ * be either age, depending on their birthday, so isUnderAdultAge still decides.
+ */
+export function birthYearsFor(accountType: 'self' | 'minor', now: Date = new Date()): number[] {
+  const thisYear = now.getFullYear();
+  const newest = accountType === 'minor' ? thisYear : thisYear - ADULT_MIN_AGE;
+  const oldest = accountType === 'minor' ? thisYear - ADULT_MIN_AGE : thisYear - 119;
+  return Array.from({ length: newest - oldest + 1 }, (_, index) => newest - index);
+}
