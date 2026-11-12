@@ -6,7 +6,7 @@ intent. Names below are lowercase for readability. If this file and seed.cjs dis
 ## Existing collections (16, from the manuscript data dictionary, already seeded)
 | Collection | Doc ID | Key fields |
 |---|---|---|
-| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), created_at, is_active |
+| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, disliked_ingredients (D40), diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), created_at, is_active |
 | guardian_verifications | **the child's own Auth UID** (D16: one per pediatric account, not auto — matches the manuscript's "Minor's Own User ID") | user_id, guardian_full_name, guardian_id_photo_url (Firebase Storage download URL), relationship_to_minor (`parent`/`legal_guardian`/`other`), verification_status (`pending`/`approved`/`rejected`), reviewed_by, reviewed_at, rejection_reason, submitted_at |
 | providers | Auth UID | email, full_name, specialty, prc_license_number, city, consultation_fee (number), is_verified, verified_by, created_at, is_active |
 | admins | Auth UID | email, full_name, role (`super_admin`/`admin`), last_login, created_at |
@@ -32,7 +32,7 @@ Firestore stores a lowercase **code**; the UI shows a **label** looked up in one
 `subscriptions.status` = `trial | active | expired | cancelled`; `bookings.consultation_status` =
 `not_started | active | ended`; `users.role` = `patient | doctor`. Exception: the four onboarding profile
 fields store the Figma display string itself: `activity_level` Sedentary/Light/Active/Very Active,
-`dietary_preference` Everything/Vegetarian/No Pork/Diabetic Diet, `diabetes_type` Type 1/Type 2/Prediabetes,
+`dietary_preference` Everything/Vegetarian (D40: an older No Pork or Diabetic Diet is read as Everything and can no longer be written), `disliked_ingredients` text like allergies, "" for none, up to 300 characters (D40), `diabetes_type` Type 1/Type 2/Prediabetes,
 `language_preference` English/Filipino.
 **Glucose_Logs field names (D13, closed 2026-09-26):** the app's `patient_id`, `reading_mgdl`, `context` are final;
 `seed.cjs` matches. The manuscript data dictionary still says `user_id`, `glucose_value`, `meal_context` and must be updated.
@@ -48,7 +48,7 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 | Role routing / onboarding state | `users.onboarding_complete: boolean` (role is implied by which collection has the uid) |
 | Booking time (Appointment, D26) | `bookings.scheduled_at` is the exact moment of a Philippine-time slot (UTC+8); a new booking must be later than the server's time (`request.time`), so the past cannot be booked. |
 | Reading range (Blood Sugar, D25) | `glucose_logs.reading_mgdl` is a whole number from **20 to 600** (refused otherwise by the app and the rules; 20–39 and 401–600 ask for a check first). `users.diabetes_type` is one of `Type 1`, `Type 2`, `Prediabetes` (the old 'Pre-Diabetic' is refused; `functions/scripts/migrate-diabetes-type.js` fixes old documents). `users.birthdate` is always a timestamp. |
-| Interpretation result (Blood Sugar) | `glucose_logs.interpretation: "low" \| "normal" \| "high" \| "critical"` (the app derives it on read today; `critical` is added with the D4 work) |
+| Interpretation result (Blood Sugar) | `glucose_logs.interpretation: "low" \| "normal" \| "high" \| "critical"` (D40: worked out once, when the reading is saved, for the person's diabetes type, and shown from that saved value; prediabetes uses the normal ranges for people without diabetes) |
 | Doctor schedule (Manage Schedule) | **As built:** `providers.available_days` (numbers, **0 = Monday … 6 = Sunday**, unlike JavaScript's `getDay()` where 0 = Sunday; the app converts with `(getDay() + 6) % 7`) and `providers.available_ranges` (`[{ start: "09:00 AM", end: "12:00 PM" }]`, Philippine time, D26). One set of hours for every working day; slots are 30 minutes (`SLOT_INTERVAL_MINUTES`, not stored). |
 | Doctor profile extras shown in Figma | `providers.years_experience`, `providers.photo_url` (optional) |
 | Decline reason / patient's concern (Appointment, Request Details) | **As built (D24, 2026-10-18):** on bookings, `concern` (string, optional, up to 300 characters, written by the patient when booking; admins can read it too, as with all of Bookings) and `decline_reason` (string, optional, up to 500, written by the doctor only together with `status: 'declined'`). Since D24 a booking create may hold **only** the app's fields: patient_id, provider_id, status, scheduled_at, fee, platform_commission, payment_status, payment_method, queue_number, created_at, concern. |

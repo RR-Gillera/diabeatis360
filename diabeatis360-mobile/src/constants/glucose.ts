@@ -9,6 +9,10 @@
 // | High           | 131 - 249             | 180 - 249  |
 // | Critical high  | 250 and above         | 250+       |
 //
+// Prediabetes (DECISIONS.md D40, team choice "option A"): normal is the range for people WITHOUT diabetes, because the
+// goal is to get back to it: 70 - 99 before a meal, 70 - 139 after. Above that is high. Low and critical are the same
+// for every type. Type 1, Type 2 and a type not stated use the table above. To be confirmed by the adviser or a doctor.
+//
 // Kept free of app imports (type-only imports are erased) so it can be unit-tested with plain Node:
 //   npm test
 import type { Interpretation, MealContext } from './enums';
@@ -20,22 +24,32 @@ export const GLUCOSE_THRESHOLDS = {
   low: 70,
   /** Highest value still "normal", per meal context. */
   normalMax: { before_meal: 130, after_meal: 179 },
+  /** Highest value still "normal" for a person with prediabetes (D40): the range for people without diabetes. */
+  prediabetesNormalMax: { before_meal: 99, after_meal: 139 },
   /** At or above this is critical (dangerously high), in both contexts. */
   criticalHigh: 250,
 } as const;
 
-/** Classifies a reading. `critical` covers both directions; use glucoseDirection() to tell them apart. */
-export function interpretGlucose(readingMgdl: number, context: MealContext): Interpretation {
+/** The highest "normal" reading for this context and diabetes type ('Prediabetes'; anything else uses the D4 targets). */
+export function normalMaxFor(context: MealContext, diabetesType?: string): number {
+  return (diabetesType === 'Prediabetes' ? GLUCOSE_THRESHOLDS.prediabetesNormalMax : GLUCOSE_THRESHOLDS.normalMax)[context];
+}
+
+/**
+ * Classifies a reading for a person's diabetes type (D40; leave it out for the D4 targets). `critical` covers both
+ * directions; use glucoseDirection() to tell them apart.
+ */
+export function interpretGlucose(readingMgdl: number, context: MealContext, diabetesType?: string): Interpretation {
   if (readingMgdl < GLUCOSE_THRESHOLDS.criticalLow || readingMgdl >= GLUCOSE_THRESHOLDS.criticalHigh) return 'critical';
   if (readingMgdl < GLUCOSE_THRESHOLDS.low) return 'low';
-  if (readingMgdl > GLUCOSE_THRESHOLDS.normalMax[context]) return 'high';
+  if (readingMgdl > normalMaxFor(context, diabetesType)) return 'high';
   return 'normal';
 }
 
 /** Which way a non-normal reading is off: used to word critical guidance ("dangerously low" vs "very high"). */
-export function glucoseDirection(readingMgdl: number, context: MealContext): 'low' | 'normal' | 'high' {
+export function glucoseDirection(readingMgdl: number, context: MealContext, diabetesType?: string): 'low' | 'normal' | 'high' {
   if (readingMgdl < GLUCOSE_THRESHOLDS.low) return 'low';
-  if (readingMgdl > GLUCOSE_THRESHOLDS.normalMax[context]) return 'high';
+  if (readingMgdl > normalMaxFor(context, diabetesType)) return 'high';
   return 'normal';
 }
 

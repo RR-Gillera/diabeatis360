@@ -21,3 +21,10 @@ test('rating: missing values count as zero', () => {
   assert.equal(rateNutrients({}).rating, 'suitable')
   assert.equal(rateNutrients(undefined).rating, 'suitable')
 })
+
+test('rating: the insight names the person\'s diabetes type; the limits are the same for every type (D40)', () => {
+  assert.match(rateNutrients({ sugar_g: 20 }, 'Type 1').insight, /someone with Type 1 diabetes/)
+  assert.match(rateNutrients({ sugar_g: 20 }, 'Prediabetes').insight, /someone with prediabetes/)
+  assert.match(rateNutrients({ sugar_g: 20 }).insight, /someone managing diabetes/)
+  for (const type of ['Type 1', 'Type 2', 'Prediabetes', undefined]) assert.equal(rateNutrients({ sugar_g: 9 }, type).rating, 'caution')
+})

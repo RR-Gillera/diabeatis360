@@ -6,24 +6,24 @@ import { AuthButton, authColors } from '@/features/auth/auth-ui';
 import { saveOnboardingValue } from '@/features/auth/onboarding';
 import { isGuardianPhotoStorageAvailable } from '@/features/auth/guardian-service';
 import { useAuth } from '@/features/auth/auth-context';
-import { SETUP_PROGRESS, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
+import { SETUP_PROGRESS, SetupNeedAnswer, SetupOption, SetupScreen } from '@/features/auth/setup-kit';
 import { Brand } from '@/constants/theme';
 import type { AccountType } from '@/constants/enums';
 import { useT } from '@/i18n/language-context';
 
 // "For me" / "For my child" (DECISIONS.md D16, UT-005): shown only on the patient path, right after
 // Choose Your Profile Type. There is no Figma frame for this screen (see docs/FIGMA_MAP.md), so it is built
-// with the same setup kit as the screens around it.
+// with the same setup kit as the screens around it. Nothing is chosen in advance (D40).
 export default function AccountForScreen() {
   const router = useRouter();
   const { email, uid } = useAuth();
   const { t } = useT();
-  const [accountType, setAccountType] = useState<AccountType>('self');
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [notice, setNotice] = useState('');
   const [checking, setChecking] = useState(false);
 
   const finish = async () => {
-    if (!email || checking) return;
+    if (!email || checking || !accountType) return;
     setNotice('');
     // "For my child" is saved for good (firestore.rules: account_type is set once) and the child's account cannot be
     // verified without the guardian's ID photo. So first make sure photos can be stored: until the Firebase project
@@ -47,7 +47,10 @@ export default function AccountForScreen() {
       title={t('setup.accountFor.title')}
       subtitle={t('setup.accountFor.subtitle')}
       onBack={router.canGoBack() ? () => router.back() : undefined}
-      footer={<AuthButton title={checking ? t('setup.accountFor.checking') : t('common.next')} icon={checking ? undefined : 'arrow'} onPress={finish} disabled={checking} />}
+      footer={<>
+        {!accountType ? <SetupNeedAnswer>{t('setup.chooseOne')}</SetupNeedAnswer> : null}
+        <AuthButton title={checking ? t('setup.accountFor.checking') : t('common.next')} icon={checking ? undefined : 'arrow'} onPress={finish} disabled={checking || !accountType} />
+      </>}
     >
       <SetupOption
         icon={{ ios: 'person.fill', android: 'person' }}

@@ -2,6 +2,7 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query,
 
 import { db } from '@/firebase';
 import { checkReading, interpretGlucose } from '@/constants/glucose';
+import { INTERPRETATIONS, type Interpretation } from '@/constants/enums';
 import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
 
 import { doctorCriticalAlert } from './doctor-alert';
@@ -37,8 +38,11 @@ async function notifyDoctorsOfCriticalReading(patientId: string, readingMgdl: nu
   }
 }
 
-/** Saves a new reading. `doctorsNotified` is how many doctors were sent a critical-reading alert (0 unless critical). */
-export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date, language: Language = 'English') {
+/**
+ * Saves a new reading, classified for the person's diabetes type (D40: prediabetes uses the ranges for people without
+ * diabetes). `doctorsNotified` is how many doctors were sent a critical-reading alert (0 unless critical).
+ */
+export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date, language: Language = 'English', diabetesType = '') {
   assertPossibleReading(readingMgdl);
   const record: GlucoseLogRecord = {
     patient_id: patientId,
@@ -46,7 +50,7 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
     context,
     notes: notes.trim(),
     logged_at: Timestamp.fromDate(loggedAt),
-    interpretation: interpretGlucose(readingMgdl, context),
+    interpretation: interpretGlucose(readingMgdl, context, diabetesType),
     created_at: serverTimestamp(),
   };
   const reference = await addDoc(collection(db, 'Glucose_Logs'), record);
@@ -55,7 +59,7 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
   // patient still gets told to see a doctor even if they leave the result
   // screen immediately. Failing to notify must never fail the log itself.
   // The patient's own alert is written in their language (D33); the doctor's alert stays English (doctor-alert.ts).
-  const alert = glucoseAlert(readingMgdl, context, language);
+  const alert = glucoseAlert(readingMgdl, context, language, record.interpretation);
   if (alert) {
     try {
       await createNotification(patientId, 'glucose_alert', alert.message, alert.severity);
@@ -73,13 +77,13 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
 // Editing a reading deliberately does NOT re-fire a glucose alert: the patient
 // is correcting a typo they are already looking at, and re-notifying them about
 // their own edit would be noise.
-export async function updateGlucoseLog(logId: string, readingMgdl: number, context: MealContext, notes: string) {
+export async function updateGlucoseLog(logId: string, readingMgdl: number, context: MealContext, notes: string, diabetesType = '') {
   assertPossibleReading(readingMgdl);
   await updateDoc(doc(db, 'Glucose_Logs', logId), {
     reading_mgdl: readingMgdl,
     context,
     notes: notes.trim(),
-    interpretation: interpretGlucose(readingMgdl, context),
+    interpretation: interpretGlucose(readingMgdl, context, diabetesType),
   });
 }
 
@@ -111,6 +115,9 @@ export function bucketCurrentWeek(entries: GlucoseLogEntry[]) {
 
 // Single equality filter only, sorted client-side — matches the no-composite-index
 // convention already used by subscribeToBookingHistory in the booking feature.
+// Each reading shows the class saved with it, which was worked out for the person's diabetes type when it was saved
+// (D40), so a doctor sees the same class as the patient. An old reading saved without one is classified now (D4 targets).
+const savedClass = (value: unknown): Interpretation | null => ((INTERPRETATIONS as readonly string[]).includes(String(value)) ? (value as Interpretation) : null);
 export function subscribeToGlucoseHistory(
   patientId: string,
   onChange: (entries: GlucoseLogEntry[]) => void,
@@ -131,7 +138,7 @@ export function subscribeToGlucoseHistory(
             context,
             notes: String(data.notes ?? ''),
             loggedAt: (data.logged_at as Timestamp | undefined)?.toDate() ?? null,
-            interpretation: interpretGlucose(readingMgdl, context),
+            interpretation: savedClass(data.interpretation) ?? interpretGlucose(readingMgdl, context),
           };
         })
         .sort((a, b) => (b.loggedAt?.getTime() ?? 0) - (a.loggedAt?.getTime() ?? 0));

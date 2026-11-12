@@ -8,11 +8,13 @@ const { test } = require('node:test')
 
 const { interpretGlucose } = require('../lib/glucose')
 
-test('server thresholds equal the mobile constants/glucose.ts for every reading', async () => {
+test('server thresholds equal the mobile constants/glucose.ts for every reading and every diabetes type (D4, D40)', async () => {
   const mobile = await import(pathToFileURL(path.join(__dirname, '../../diabeatis360-mobile/src/constants/glucose.ts')).href)
-  for (const context of ['before_meal', 'after_meal']) {
-    for (let value = 0; value <= 500; value += 1) {
-      assert.equal(interpretGlucose(value, context), mobile.interpretGlucose(value, context), `${value} mg/dL ${context}`)
+  for (const type of [undefined, '', 'Type 1', 'Type 2', 'Prediabetes']) {
+    for (const context of ['before_meal', 'after_meal']) {
+      for (let value = 0; value <= 500; value += 1) {
+        assert.equal(interpretGlucose(value, context, type), mobile.interpretGlucose(value, context, type), `${value} mg/dL ${context} ${type}`)
+      }
     }
   }
 })

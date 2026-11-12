@@ -34,6 +34,8 @@ export type PatientProfile = {
   activityLevel: string;
   dietaryPreference: string;
   allergies: string;
+  /** The ingredients the patient does not eat, as stored ('' for none, D40). */
+  dislikedIngredients: string;
   location: string;
   languagePreference: string;
 };

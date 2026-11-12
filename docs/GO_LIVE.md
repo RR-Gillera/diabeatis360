@@ -283,6 +283,14 @@ Remove-Item Env:GOOGLE_APPLICATION_CREDENTIALS
 
 > Since D19 only **B2 step 1 (Storage)** and its rules are needed for Spark's last gap, the guardian ID photo. Deploying the functions to Firebase is optional: the Vercel server already does the same job.
 
+## A14. Setup choices, allergy and ingredient search, advice by diabetes type (DECISIONS D40)
+Three parts go live separately, in this order:
+1. **The app (over-the-air) [PERSON or Claude after your "go"]:** from `diabeatis360-mobile`: `npx.cmd eas-cli update --channel preview --environment preview --message "Setup, allergy search, diabetes type"`. No new APK.
+2. **The server [PERSON]:** from `functions` (not the repo root): `npx vercel --prod`. It reads old and new profiles alike, so it can go any time after step 1.
+3. **The rules, last [PERSON]:** once the phones have the update (open the app twice), from the repo root: `npx firebase deploy --only firestore:rules --project diabeatis360-b2ab8`. Before the update reaches a phone, its older setup still saves "Diabetic Diet", which the new rules refuse.
+4. **Before respondents [ADVISER]:** confirm the prediabetes ranges (DECISIONS D4 amendment). Have a Filipino speaker, and ideally a dietitian, read the food lists in `functions/lib/food-words.js`.
+5. **Phone test [PERSON, fake test account]:** sign up a new patient; every setup choice starts blank; on allergies type "hip" and add Shrimp; on diet choose Everything and add Pork; Home > Log Blood Sugar 115 before a meal shows High for a prediabetes account and Normal for Type 2. Record the lines in `docs/TEST_LOG.md`.
+
 ## B1. Upgrade **[PERSON]**
 Upgrade `diabeatis360-b2ab8` to **Blaze** and set a budget alert (Google Cloud console > Billing > Budgets & alerts, for example PHP 50). Capstone usage stays inside the free quota.
 

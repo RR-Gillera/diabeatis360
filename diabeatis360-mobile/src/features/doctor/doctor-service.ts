@@ -91,6 +91,7 @@ export function subscribeToPatientProfile(
         activityLevel: String(data.activity_level ?? ''),
         dietaryPreference: String(data.dietary_preference ?? ''),
         allergies: String(data.allergies ?? ''),
+        dislikedIngredients: String(data.disliked_ingredients ?? ''),
         location: String(data.location ?? ''),
         languagePreference: String(data.language_preference ?? ''),
       });

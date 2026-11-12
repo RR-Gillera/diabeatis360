@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { COMMON_ALLERGIES, ACTIVITY_LEVELS, allergyList, DIETS, NO_ALLERGIES } from '@/features/auth/health-profile';
+import { foodLabel } from '@/constants/food-words';
+import { ACTIVITY_LEVELS, allergyList, DIETS, foodList, NO_ALLERGIES } from '@/features/auth/health-profile';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { BottomNav } from '@/features/home/home-ui';
 import { Chip, ChipRow, EditPill, InfoCard, InfoLine, ProfileTop, profileColors } from '@/features/profile/profile-ui';
@@ -18,12 +19,13 @@ export default function HealthProfileScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/profile');
   const { uid, email, displayName } = useAuth();
-  const { t, date } = useT();
+  const { t, date, language } = useT();
   const profile = useHealthProfile(uid, email);
 
   const allergies = allergyList(profile?.form.allergy ?? '');
   const activity = ACTIVITY_LEVELS.find((option) => option.value === profile?.form.activity);
   const diet = DIETS.find((option) => option.value === profile?.form.diet);
+  const disliked = foodList(profile?.form.disliked ?? '');
   const condition = profile?.form.condition ?? '';
   const conditionText = condition ? t('condition.withDiabetes', { type: t(`condition.${condition}` as MessageKey) }) : '';
 
@@ -48,7 +50,7 @@ export default function HealthProfileScreen() {
             <InfoCard title={t('health.allergies')}>
               {!allergies.length ? <Text style={styles.missing}>{t('health.allergiesMissing')}</Text>
                 : allergies[0] === NO_ALLERGIES ? <ChipRow><Chip label={t('health.noAllergies')} /></ChipRow>
-                  : <ChipRow>{allergies.map((item) => <Chip key={item} label={allergyLabel(item, t)} />)}</ChipRow>}
+                  : <ChipRow>{allergies.map((item) => <Chip key={item} label={foodLabel(item, language)} />)}</ChipRow>}
             </InfoCard>
 
             <InfoCard title={t('health.activity')}>
@@ -58,17 +60,18 @@ export default function HealthProfileScreen() {
             <InfoCard title={t('health.diet')}>
               <Text style={[styles.value, !diet && styles.missing]}>{diet ? `${t(diet.labelKey)} · ${t(diet.detailKey)}` : profile.form.diet || t('common.notSet')}</Text>
             </InfoCard>
+
+            <InfoCard title={t('health.disliked')}>
+              {disliked.length
+                ? <ChipRow>{disliked.map((item) => <Chip key={item} label={foodLabel(item, language)} />)}</ChipRow>
+                : <Text style={styles.value}>{t('allergy.None')}</Text>}
+            </InfoCard>
           </View>
         )}
       </ScrollView>
       <BottomNav active="profile" />
     </View>
   );
-}
-
-/** A common allergy chip in the person's language ("Nuts" -> "Mani"); a typed one is shown as it was typed. */
-function allergyLabel(item: string, t: ReturnType<typeof useT>['t']) {
-  return COMMON_ALLERGIES.includes(item) ? t(`allergy.${item}` as MessageKey) : item;
 }
 
 const styles = StyleSheet.create({

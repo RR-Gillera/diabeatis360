@@ -74,6 +74,8 @@ export function SetupOption({ title, detail, icon, emoji, selected, onPress }: {
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      // The web build reads only aria-checked (accessibilityState is not passed on there), so both are set.
+      aria-checked={selected}
       accessibilityLabel={detail ? `${title}, ${detail}` : title}
       onPress={onPress}
       style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}
@@ -106,6 +108,11 @@ export function SetupNote({ children }: { children: string }) {
   );
 }
 
+/** The line above Next while nothing is chosen yet: setup never picks an answer for the person (D40). */
+export function SetupNeedAnswer({ children }: { children: string }) {
+  return <Text style={styles.needAnswer}>{children}</Text>;
+}
+
 /** The small grey line under the main button, with its icon (globe, shield...). */
 export function SetupHint({ icon, children }: { icon: SetupIcon; children: string }) {
   return (
@@ -133,6 +140,7 @@ const styles = StyleSheet.create({
   title: { color: authColors.navy, fontFamily: Brand.font.extraBold, fontSize: 30, letterSpacing: -0.6, lineHeight: 37, marginTop: 22 },
   subtitle: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 24, marginTop: 12 },
   footer: { gap: 18, marginTop: 'auto', paddingTop: 28 },
+  needAnswer: { color: authColors.muted, fontFamily: Brand.font.medium, fontSize: 13, textAlign: 'center' },
   option: {
     alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#FFFFFF', borderRadius: 24, borderWidth: 2, flexDirection: 'row',
     gap: 16, marginTop: 16, minHeight: 84, paddingHorizontal: 18, paddingVertical: 16,

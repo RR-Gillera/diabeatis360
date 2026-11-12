@@ -3,7 +3,7 @@
 // Rule: the database stores a lowercase CODE (e.g. 'before_meal'); the UI shows a LABEL looked up
 // here. Never compare against, or display, a hardcoded English string in a screen.
 // Exception: the four onboarding profile fields (activity, diet, diabetes type, language) store the
-// Figma display string itself ('Type 2', 'Diabetic Diet'), so their value and label are the same.
+// Figma display string itself ('Type 2', 'Vegetarian'), so their value and label are the same.
 //
 // Filipino ('fil') labels are a first draft; have a Filipino speaker review them before the defense.
 
@@ -54,7 +54,8 @@ export type GuardianRelationship = (typeof GUARDIAN_RELATIONSHIPS)[number];
 
 // Onboarding profile fields: the stored value IS the display string (matches Figma).
 export const ACTIVITY_LEVELS = ['Sedentary', 'Light', 'Active', 'Very Active'] as const;
-export const DIETARY_PREFERENCES = ['Everything', 'Vegetarian', 'No Pork', 'Diabetic Diet'] as const;
+// D40: 'No Pork' and 'Diabetic Diet' are no longer offered; health-profile.ts reads an old answer as Everything.
+export const DIETARY_PREFERENCES = ['Everything', 'Vegetarian'] as const;
 export const DIABETES_TYPES = ['Type 1', 'Type 2', 'Prediabetes'] as const;
 export type DiabetesType = (typeof DIABETES_TYPES)[number];
 

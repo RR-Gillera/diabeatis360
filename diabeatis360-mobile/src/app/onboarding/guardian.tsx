@@ -25,7 +25,8 @@ export default function GuardianScreen() {
   const isResubmit = mode === 'resubmit';
 
   const [name, setName] = useState('');
-  const [relationship, setRelationship] = useState<GuardianRelationship>('parent');
+  // Nothing is chosen in advance (D40); a resubmission starts from the relationship sent before.
+  const [relationship, setRelationship] = useState<GuardianRelationship | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +61,7 @@ export default function GuardianScreen() {
   };
 
   const submit = async () => {
-    if (!uid || !name.trim() || !photoPreview || submitting) return;
+    if (!uid || !name.trim() || !photoPreview || !relationship || submitting) return;
     setSubmitting(true);
     setError('');
     try {
@@ -138,7 +139,7 @@ export default function GuardianScreen() {
 
       <View style={styles.bottom}>
         {submitting ? <ActivityIndicator color={authColors.green} /> : (
-          <AuthButton title={isResubmit ? t('setup.guardian.resubmit') : t('common.continue')} onPress={submit} disabled={!name.trim() || !photoPreview} />
+          <AuthButton title={isResubmit ? t('setup.guardian.resubmit') : t('common.continue')} onPress={submit} disabled={!name.trim() || !photoPreview || !relationship} />
         )}
       </View>
     </View>

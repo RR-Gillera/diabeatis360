@@ -62,7 +62,9 @@ For the emulator, put `GEMINI_API_KEY=your-key` in `functions/.secret.local` (gi
 
 ## Keep in sync
 `lib/glucose.js` is a copy of `diabeatis360-mobile/src/constants/glucose.ts` (the server cannot import from the app);
-`test/glucose-parity.test.js` fails if they ever disagree. The free limits in `lib/limits.js` mirror `src/constants/plans.ts`.
+`test/glucose-parity.test.js` fails if they ever disagree (for every diabetes type, D40). The free limits in `lib/limits.js` mirror
+`src/constants/plans.ts`. `lib/food-words.js` (the allergy and ingredient lists with their other names, D40) is copied in
+`diabeatis360-mobile/src/constants/food-words.ts`; `test/food-words-parity.test.js` fails if the two differ.
 
 ## Only confirmed emails (DECISIONS.md D21)
 Every endpoint refuses a sign-in whose email address is not confirmed: HTTP 403 `PERMISSION_DENIED`, "Please verify your email

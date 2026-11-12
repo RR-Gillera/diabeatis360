@@ -12,7 +12,7 @@ const { rateNutrients } = require('./rating')
 const { allowanceFor, hasPremium } = require('./limits')
 const { reserveSlot, usedToday } = require('./usage')
 const {
-  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals,
+  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, diabetesTypeOf, dislikedIngredients,
   exerciseSchema, labelSchema, mealSchema, parseAllergens, containsAllergen,
 } = require('./prompts')
 
@@ -22,7 +22,7 @@ const CRITICAL_MESSAGE =
 
 // DECISIONS.md D25: suggestions, label scans and barcode ratings all avoid the person's allergens, so they need an
 // answer to the allergy question first ("None" is an answer). Without one: no Gemini call and nothing counted.
-const ALLERGIES_MESSAGE = 'Add your allergies first (or choose None if you have none) in Profile > Health Profile, so suggestions and scans can avoid them.'
+const ALLERGIES_MESSAGE = 'Add your allergies first (or tap "I don\'t have food allergies") in Profile > Health Profile, so suggestions and scans can avoid them.'
 const allergiesDeclared = (value) => (Array.isArray(value) ? value.some((item) => String(item).trim()) : String(value ?? '').trim().length > 0)
 function requireAllergies(profile) {
   if (!allergiesDeclared(profile.allergies)) throw new HttpsError('failed-precondition', ALLERGIES_MESSAGE)
@@ -36,11 +36,13 @@ async function loadContext(db, uid) {
   ])
   const millis = (log) => (log.logged_at && log.logged_at.toMillis ? log.logged_at.toMillis() : 0)
   const latest = logs.docs.map((doc) => doc.data()).sort((a, b) => millis(b) - millis(a))[0] ?? null
+  const profile = userSnap.data() ?? {}
+  // Classified for this person's diabetes type (D40): a prediabetes reading of 115 before a meal is high, not normal.
   const reading = latest
-    ? { ...latest, interpretation: interpretGlucose(Number(latest.reading_mgdl), latest.context === 'after_meal' ? 'after_meal' : 'before_meal') }
+    ? { ...latest, interpretation: interpretGlucose(Number(latest.reading_mgdl), latest.context === 'after_meal' ? 'after_meal' : 'before_meal', diabetesTypeOf(profile.diabetes_type)) }
     : null
   return {
-    profile: userSnap.data() ?? {},
+    profile,
     reading,
     premium: hasPremium(subs.docs.map((doc) => doc.data())),
   }
@@ -73,7 +75,8 @@ async function generateRecommendations({ db, uid, kind, callAi, now = new Date()
       foods = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
     }
 
-    const allergens = parseAllergens(profile.allergies)
+    // A meal is dropped if it has an allergen or an ingredient the person does not eat (D40).
+    const avoid = [...parseAllergens(profile.allergies), ...dislikedIngredients(profile)]
     const prompt = buildRecommendationPrompt({ kind, profile, reading, foods })
     let raw
     try {
@@ -82,7 +85,7 @@ async function generateRecommendations({ db, uid, kind, callAi, now = new Date()
       throw new HttpsError('unavailable', 'The suggestion service is busy right now. Please try again in a moment.')
     }
 
-    const items = kind === 'meal' ? cleanMeals(raw?.items, allergens) : cleanExercises(raw?.items)
+    const items = kind === 'meal' ? cleanMeals(raw?.items, avoid) : cleanExercises(raw?.items)
     if (!items.length) throw new HttpsError('unavailable', 'We could not prepare safe suggestions right now. Please try again.')
 
     const saved = await db.collection('AI_Suggestions').add({
@@ -132,7 +135,7 @@ async function analyzeLabel({ db, uid, image, barcode, callAi, now = new Date() 
       throw new HttpsError('unavailable', 'The scanner is busy right now. Please try again in a moment.')
     }
 
-    const result = cleanLabel(raw, allergens)
+    const result = cleanLabel(raw, allergens, dislikedIngredients(profile))
     if (!result.readable) {
       // Not saved, so a blurry photo does not use up one of the day's scans (the slot is given back below).
       return {
@@ -180,10 +183,11 @@ async function lookupProduct({ db, uid, barcode, now = new Date() }) {
   const nutrients = product.nutrients ?? {}
   const allergens = parseAllergens(profile.allergies)
   const matched = containsAllergen(`${product.product_name ?? ''} ${product.ingredients_text ?? ''}`, allergens)
-  const rated = rateNutrients(nutrients)
+  const rated = rateNutrients(nutrients, diabetesTypeOf(profile.diabetes_type))
   const rating = matched.length ? 'unsuitable' : rated.rating
+  const avoid = [...allergens, ...dislikedIngredients(profile)]
   const alternatives = (Array.isArray(product.alternatives) ? product.alternatives : [])
-    .filter((entry) => entry && entry.instead_of && entry.try && !containsAllergen(entry.try, allergens).length)
+    .filter((entry) => entry && entry.instead_of && entry.try && !containsAllergen(entry.try, avoid).length)
     .slice(0, 4)
   const analysis = {
     brand: product.brand ?? '',

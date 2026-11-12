@@ -16,9 +16,11 @@ export type HealthForm = {
   allergy: string;
   activity: string;
   diet: string;
+  /** The ingredients the person does not eat, one text like allergies ("Pork, Bitter gourd"); '' for none (D40). */
+  disliked: string;
 };
 
-export const EMPTY_HEALTH_FORM: HealthForm = { dateOfBirth: '', condition: '', allergy: '', activity: '', diet: '' };
+export const EMPTY_HEALTH_FORM: HealthForm = { dateOfBirth: '', condition: '', allergy: '', activity: '', diet: '', disliked: '' };
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -35,7 +37,11 @@ export function birthdateText(value: unknown): string {
   return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
-/** Fills the form from a Users document. The old 'Pre-Diabetic' label is shown as 'Prediabetes'. */
+/**
+ * Fills the form from a Users document. The old 'Pre-Diabetic' label is shown as 'Prediabetes', and an old diet answer
+ * as one of today's two (D40): 'Diabetic Diet' is Everything, 'No Pork' is Everything with Pork among the ingredients
+ * not eaten.
+ */
 export function profileToForm(data: Record<string, unknown> | undefined | null): HealthForm {
   if (!data) return { ...EMPTY_HEALTH_FORM };
   return {
@@ -43,27 +49,48 @@ export function profileToForm(data: Record<string, unknown> | undefined | null):
     condition: normalizeDiabetesType(data.diabetes_type),
     allergy: String(data.allergies ?? '').trim(),
     activity: String(data.activity_level ?? '').trim(),
-    diet: String(data.dietary_preference ?? '').trim(),
+    diet: normalizeDiet(data.dietary_preference),
+    disliked: dislikedText(data.disliked_ingredients, data.dietary_preference),
   };
 }
 
-/** Only the fields that changed and are not empty: a blank never overwrites what is stored. */
+/** Today's diet choices are Everything and Vegetarian (D40); an older 'Diabetic Diet' or 'No Pork' reads as Everything. */
+export function normalizeDiet(value: unknown): string {
+  const diet = String(value ?? '').trim();
+  if (!diet) return '';
+  return diet === 'Vegetarian' ? 'Vegetarian' : 'Everything';
+}
+
+/** The stored ingredients not eaten, plus Pork for an older 'No Pork' answer, as one text. */
+export function dislikedText(value: unknown, diet: unknown): string {
+  const list = foodList(String(value ?? ''));
+  if (String(diet ?? '').trim() === 'No Pork' && !list.some((item) => item.toLowerCase() === 'pork')) list.push('Pork');
+  return allergyText(list);
+}
+
+/**
+ * Only the fields that changed. A blank never overwrites what is stored, with one exception: the ingredients not eaten
+ * may be cleared, because "none" is a real answer there (D40).
+ */
 export function changedHealthFields(before: HealthForm, after: HealthForm): Partial<HealthForm> {
   const changes: Partial<HealthForm> = {};
   for (const key of Object.keys(after) as (keyof HealthForm)[]) {
     const value = after[key].trim();
-    if (value && value !== before[key].trim()) changes[key] = value;
+    if (value === before[key].trim()) continue;
+    if (value || key === 'disliked') changes[key] = value;
   }
   return changes;
 }
 
-/** What stops a save, or null. Allergies may not be left empty: "None" is how someone says they have none. */
+/** What stops a save, or null. Allergies may not be left empty: "I don't have food allergies" (stored as None) is an answer. */
 export function healthFormProblem(form: HealthForm): string | null {
-  if (!form.allergy.trim()) return 'Choose your allergies, or None if you have none. Meal suggestions use them to keep you safe.';
+  if (!form.allergy.trim()) return 'Add your allergies, or tap "I don\'t have food allergies". Meal suggestions use them to keep you safe.';
   return null;
 }
 
 // ---- The answer lists shared by setup and Profile (Figma Step 8 and 9, P-12), so both always offer the same words.
+// D40 (team choice): the diets are Everything and Vegetarian. "Diabetic Diet" went because every suggestion is already for
+// a person with diabetes (and now for their type), and "No Pork" became an ingredient someone can say they do not eat.
 
 type OptionIcon = { ios: SFSymbol; android: AndroidSymbol };
 /** `value` is the stored code (always English); `labelKey` / `detailKey` are what the screens show (D33). */
@@ -79,8 +106,6 @@ export const ACTIVITY_LEVELS: ProfileOption[] = [
 export const DIETS: ProfileOption[] = [
   { value: 'Everything', detail: 'No specific restrictions', icon: { ios: 'fork.knife', android: 'restaurant' }, labelKey: 'diet.Everything', detailKey: 'diet.Everything.detail' },
   { value: 'Vegetarian', detail: 'Plant-based diet, no meat', icon: { ios: 'leaf.fill', android: 'eco' }, labelKey: 'diet.Vegetarian', detailKey: 'diet.Vegetarian.detail' },
-  { value: 'No Pork', detail: 'All meats except pork products', icon: { ios: 'nosign', android: 'block' }, labelKey: 'diet.No Pork', detailKey: 'diet.No Pork.detail' },
-  { value: 'Diabetic Diet', detail: 'Low sugar & glycemic index focus', icon: { ios: 'drop.fill', android: 'water_drop' }, labelKey: 'diet.Diabetic Diet', detailKey: 'diet.Diabetic Diet.detail' },
 ];
 
 /** The detail line for a stored activity level or diet ("Light" -> "1-2 days of light activity/week"), or ''. */
@@ -88,11 +113,16 @@ export function optionDetail(options: ProfileOption[], value: string): string {
   return options.find((option) => option.value === value)?.detail ?? '';
 }
 
-// ---- Allergies are stored as one text ("Peanuts, Shellfish" or "None"); the screens show them as chips.
+// ---- Allergies are stored as one text ("Peanuts, Shellfish" or "None"); the screens show them as chips. What the search
+// offers, and each food's Filipino name, are in constants/food-words.ts (D40).
 
-/** The allergy chips everyone is offered (Figma Step 7). */
-export const COMMON_ALLERGIES = ['Nuts', 'Dairy', 'Eggs', 'Seafood'];
 export const NO_ALLERGIES = 'None';
+
+/** "Pork, Bitter gourd" -> ['Pork', 'Bitter gourd'], without blanks or repeats (any case). Used for the ingredients not eaten. */
+export function foodList(text: string): string[] {
+  const items = text.split(',').map((item) => item.trim()).filter(Boolean);
+  return items.filter((item, index) => items.findIndex((other) => other.toLowerCase() === item.toLowerCase()) === index);
+}
 
 /** "Peanuts, Shellfish" -> ['Peanuts', 'Shellfish']; empty -> []; any spelling of "none" -> ['None']. */
 export function allergyList(text: string): string[] {

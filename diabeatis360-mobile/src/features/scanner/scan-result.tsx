@@ -11,8 +11,8 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { DAILY_CALORIE_REFERENCE, HIGH_SUGAR_PER_SERVING_G } from '@/constants/nutrition';
 import { Brand } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
-import type { Language, MessageKey } from '@/i18n/translate';
-import { COMMON_ALLERGIES } from '@/features/auth/health-profile';
+import type { Language } from '@/i18n/translate';
+import { foodLabel } from '@/constants/food-words';
 
 import type { LabelAnalysis } from '@/features/ai/types';
 
@@ -119,14 +119,12 @@ function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barco
 
 /**
  * The server writes each allergy warning in English ("Contains nuts", functions/lib/prompts.js). The card says the
- * whole sentence in the person's language, so only the allergen is taken from it: a common allergy is translated as
- * on the Health Profile ("nuts" -> "mani"), and one the person typed is shown as typed.
+ * whole sentence in the person's language, so only the allergen is taken from it: a listed food is translated as on
+ * the Health Profile ("shrimp" -> "hipon", constants/food-words.ts), and one the person typed is shown as typed.
  */
-function allergenName(warning: string, language: Language, t: (key: MessageKey) => string) {
+function allergenName(warning: string, language: Language) {
   const allergen = warning.replace(/^Contains\s+/i, '');
-  if (language === 'English') return allergen;
-  const common = COMMON_ALLERGIES.find((item) => item.toLowerCase() === allergen.toLowerCase());
-  return common ? t(`allergy.${common}` as MessageKey).toLowerCase() : allergen;
+  return language === 'English' ? allergen : foodLabel(allergen, language).toLowerCase();
 }
 
 /** The analysis of one scanned label (Figma 195:2908). onShare is set only for a new product that has a barcode. */
@@ -159,7 +157,7 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, bar
           <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={18} tintColor={Brand.colors.danger} />
           <View style={styles.allergenCopy}>
             <AppText weight="bold" style={styles.allergenTitle}>{t('scan.allergyTitle')}</AppText>
-            {analysis.allergen_warnings.map((warning) => <AppText key={warning} style={styles.allergenText}>{t('scan.allergyLine', { allergen: allergenName(warning, language, t) })}</AppText>)}
+            {analysis.allergen_warnings.map((warning) => <AppText key={warning} style={styles.allergenText}>{t('scan.allergyLine', { allergen: allergenName(warning, language) })}</AppText>)}
           </View>
         </View>
       ) : null}
