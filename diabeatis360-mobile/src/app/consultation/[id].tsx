@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -53,7 +53,8 @@ export default function ConsultationScreen() {
   const [notesForm, setNotesForm] = useState<'end' | 'later' | null>(null);
   const [ending, setEnding] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  // React Native 0.88 (SDK 58): a ref holds the ScrollView instance type, not the component type.
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const goBack = useSafeBack(isDoctor ? '/doctor/appointments' : '/profile');
 
   useEffect(() => {

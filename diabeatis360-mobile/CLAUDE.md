@@ -22,7 +22,7 @@ out with a message. A provider with `is_verified == false` sees a "pending verif
 `hasCompletedOnboarding`); `is_active` / `is_verified` are not checked at login yet.
 
 ## Stack (from package.json)
-- Expo SDK 57 · React Native 0.86 · React 19 · TypeScript · expo-router (file-based, `src/app`) ·
+- Expo SDK 58 · React Native 0.88 · React 19.3 · TypeScript (upgraded from SDK 57 on 2026-11-12, app version 1.1.0) · expo-router (file-based, `src/app`) ·
   Firebase JS SDK 12 (modular) · react-native-svg.
 - **Styling:** `nativewind` + `tailwindcss` are in package.json, but NativeWind is **not configured**
   (no `tailwind.config.js`, babel or metro setup), and screens use `StyleSheet.create`. The manuscript

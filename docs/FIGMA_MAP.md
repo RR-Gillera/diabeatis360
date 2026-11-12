@@ -20,7 +20,7 @@ primary `#629C2C` in the frames; **in the build text and buttons use `#4D7C22`**
 ## Current (green) frames — patient app
 | Screen | Node ID | Module |
 |---|---|---|
-| Splash | 3:754 | Account |
+| Splash | 3:754 | Account — the intro that plays when the app opens, before the landing page (`features/intro/intro-splash.tsx`, in the root layout; replaced the Expo template overlay, 2026-11-12). Logo, then headline, then the photo rising, then a fade; a tap skips it; Remove animations shows it still. **The photo is a temporary crop of a 1x screenshot** (`assets/images/intro-hero.png`): export the frame's photo from Figma at 3x to replace it. |
 | Login Screen | 25:2528 | Account — **the frame's Apple button is a Facebook button in the build** (team decision 2026-10-17, DECISIONS.md D7); same on Sign Up. Both the Google and Facebook buttons sign people in (D23); the look is unchanged except for a spinner in the button that is working. Tell the adviser. |
 | Sign Up Screen | 25:99 | Account |
 | Doctor Account Verification (code entry) | 230:3825 | Account — **built as "Check your email" (an emailed LINK, not a 6-digit code), DECISIONS.md D21.** Header, "Step 2 of 3" bar, title, resend line with a timer, big green button and footer follow the frame; the six code boxes are replaced by the address the link was sent to. Used by patients and doctors alike. |

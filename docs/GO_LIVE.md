@@ -353,3 +353,10 @@ Table 24 has 23 module-points and 57 function-by-role ticks.
 - **Spark daily limits for Firestore** (about 50,000 reads and 20,000 writes a day; check the pricing page). The admin dashboard reads whole collections (DECISIONS D17), so a few dozen page loads over a large data set add up. When the limit is reached every read fails until the next day, for patients too. Keep the demo data small and do not leave admin pages open.
 - **API key restriction:** the mobile app uses the Firebase JS SDK, which sends neither an Android package nor a website referrer. Restrict the key **by API** only (Identity Toolkit, Token Service, Cloud Firestore, and Cloud Storage for Firebase once Part B is done), not by Android app or website, then test sign-in at once. If it fails, add the API named in the error.
 - **Expo patch versions:** `npx expo-doctor` reports 14 packages a few patch releases behind SDK 57. They were deliberately not updated, because every test so far ran against the current set.
+
+## A15. Expo SDK 58 (2026-11-12): a new APK is required
+The app moved from SDK 57 to SDK 58 (React Native 0.88). Native code changed, so an SDK 58 update cannot run inside the SDK 57 APK. The app version went from 1.0.0 to 1.1.0, and updates are matched to the app version (runtimeVersion: appVersion), so phones with the old APK simply stop receiving new updates instead of crashing.
+1. Build the new APK (A12): from `diabeatis360-mobile`, `npx.cmd eas-cli build --platform android --profile preview`.
+2. Install it on every test phone, replacing the old one.
+3. After that, over-the-air updates work again for 1.1.0.
+Expo Go from the Play Store now opens only SDK 58 projects.

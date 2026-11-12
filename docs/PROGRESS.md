@@ -182,3 +182,20 @@ Append newest at the bottom. Format:
 - **Files:** functions `lib/{food-words,prompts,handlers,rating,glucose}.js` + tests; mobile `constants/{food-words,glucose,enums}.ts`, `features/auth/{food-search.tsx,health-profile.ts,setup-kit.tsx,onboarding.tsx,use-health-profile.ts}`, the setup screens, Health Profile, Dietary Preference, the doctor's patient view, glucose service and sheet, i18n; `firestore.rules` + tests; docs.
 - **Verified:** unit 141 (135 pass, 6 skipped); tsc and lint; functions 93; rules 407; browser 27/27 on the emulators.
 - **Known gaps:** not tried on a phone or with real Gemini answers; the prediabetes ranges and the food lists need the adviser's (and a Filipino speaker's) review; deploy in the GO_LIVE A14 order.
+
+## 2026-11-08 (later) — Claude Code — birthdate step fixes from the team's video (D41)
+- **Fixed:** the birthdate wheels kept scrolling the whole screen on Android after the age message appeared (`nestedScrollEnabled`); the message no longer offers "Set up as a child's account" (or "Go back to For me"), which could never work because the account type is fixed once chosen and child accounts need Storage.
+- **Also:** the year wheel offers only years that fit the account ("For me": 18 years back and earlier; a child's account: the last 18 years), and the step reads the account type from the Users document first, so a new phone gets it right.
+- **Files:** `features/auth/birthdate-picker.tsx`, `app/onboarding/date-of-birth.tsx`, `app/onboarding/guardian.tsx` (comment), `constants/guardian.ts` (+ test), `features/auth/onboarding.tsx`, i18n; docs.
+- **Verified:** tsc, lint, unit 142 (136 pass, 6 skipped); browser 11/11 in Filipino on the emulators. **Still to do on a phone:** confirm the wheels scroll after the message (needs the next over-the-air update).
+
+## 2026-11-12 — Claude Code — intro screen when the app opens (Figma Splash 3:754)
+- **Built:** an animated intro (logo, headline, the photo rising from the bottom, then a fade into the landing page or Home); a tap skips it and Remove animations shows it without movement. It replaces the Expo template overlay, which showed the Expo logo on blue at launch on phones. The phone's own splash background is now #F5F5F5 to match (takes effect with the next APK).
+- **Files:** `features/intro/intro-splash.tsx` (new), `app/_layout.tsx`, `app.json`, i18n (`intro.headline`, `intro.skip`), `assets/images/intro-hero.png` (new); removed `components/animated-icon*`, `expo-logo.png`, `logo-glow.png`.
+- **Verified:** tsc, lint, unit tests. Not yet seen on a phone (the team is testing it).
+- **Known gap:** the photo is a temporary crop of a low-resolution screenshot; replace it with a 3x export from Figma.
+
+## 2026-11-12 (later) — Claude Code — Expo SDK 57 to 58
+- **Done:** `npx expo install expo@^58.0.0 --fix` (Expo 58.0.24, React Native 0.88.1, expo-router 58.0.31, Reanimated 4.7.1); the lockfile was rebuilt because npm would not resolve SDK 58 around the old one; eslint-config-expo 58 and @types/react 19.3. Two code changes: expo-router 58 reads the first screen from `unstable_settings = { anchor: 'index' }` (no `initialRouteName` prop), and the chat's ScrollView ref uses `ComponentRef<typeof ScrollView>` (React Native 0.88 types). App version 1.0.0 to 1.1.0 so updates never reach the SDK 57 APK.
+- **Verified:** expo-doctor 20/20; tsc and lint clean; unit 142 (136 pass, 6 skipped); Android and web bundles build (`expo export`).
+- **Still to do:** a new APK (GO_LIVE A15) and a full phone re-test, since some library changes only show on a device.
