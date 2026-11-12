@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
@@ -88,7 +89,7 @@ export default function ConsultationDetailsScreen() {
   return (
     <View style={doctorStyles.screen}>
       <DoctorHeader title={t('doctor.consult.title')} onBack={() => goBack()} />
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <KeyboardSafeScroll contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {booking === undefined ? <ActivityIndicator color={homeColors.green} /> : null}
         {booking === null ? <Text style={doctorStyles.error}>{loadFailed ? t('appt.loadFailed') : t('doctor.consult.gone')}</Text> : null}
         {booking ? (
@@ -146,7 +147,7 @@ export default function ConsultationDetailsScreen() {
             </View>
           </>
         ) : null}
-      </ScrollView>
+      </KeyboardSafeScroll>
       {booking ? (
         <DoctorNotesForm
           visible={editing}

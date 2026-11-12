@@ -10,6 +10,7 @@ import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/booking-ui';
 import { manilaDayKey } from '@/features/booking/manila-time';
+import { bookableSchedule, daysText, hoursText, WEEKDAY_KEYS } from '@/features/doctor/availability';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { dashboardStats } from '@/features/doctor/doctor-stats';
 import { isProfileComplete } from '@/features/doctor/profile-complete';
@@ -27,11 +28,11 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 // The doctor's dashboard (Figma "Dashboard Earnings and Notifications", DECISIONS D24): today's numbers, the next
 // confirmed appointment and recent activity. Earnings are recorded amounts (payments are a demo), after the 15%
-// platform commission (D3). The frame's "Available 24/7" card is not built (D24).
+// platform commission (D3). The frame's "Available 24/7 · Manage" card shows how the doctor is available now (D43).
 export default function DoctorHomeScreen() {
   const router = useRouter();
   const { uid, displayName } = useAuth();
-  const { t, language } = useT();
+  const { t, label, language } = useT();
   // null until the first answer arrives, so the cards show "—" instead of a misleading 0 while loading.
   const [appointments, setAppointments] = useState<ProviderBookingEntry[] | null>(null);
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
@@ -67,6 +68,10 @@ export default function DoctorHomeScreen() {
   const profileIncomplete = profile && !isProfileComplete(profile);
   // "Today" is the clinic's day in the Philippines (D26), matching how the slot was booked.
   const nextIsToday = next?.scheduledAt ? manilaDayKey(next.scheduledAt) === manilaDayKey(openedAt) : false;
+  // The availability card (D43): the same days and hours the patient's time picker offers (bookableSchedule). It is
+  // left out while the profile is incomplete, because that doctor is not listed and so is not accepting requests yet.
+  const schedule = profile && !profileIncomplete ? bookableSchedule(profile) : null;
+  const scheduleDays = schedule ? daysText(schedule.days, WEEKDAY_KEYS.map((key) => t(`weekday.${key}`)), t('doctor.schedule.everyDay')) : '';
 
   return (
     <View style={doctorStyles.screen}>
@@ -93,6 +98,21 @@ export default function DoctorHomeScreen() {
               <Text style={styles.alertText}>{t('doctor.finishText')}</Text>
             </View>
           </Pressable>
+        ) : null}
+
+        {profile && schedule ? (
+          <View style={styles.availability}>
+            <View style={styles.availabilityDot} />
+            <View style={styles.availabilityCopy}>
+              <Text style={styles.availabilityTitle}>{profile.availabilityMode === 'always' ? t('doctor.schedule.always') : label('availabilityMode', 'custom')}</Text>
+              <Text style={styles.availabilityText}>
+                {profile.availabilityMode === 'always' ? t('doctor.schedule.accepting') : `${scheduleDays} · ${hoursText(schedule.hours)}`}
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${t('doctor.schedule.manage')}: ${t('doctor.manageSchedule')}`} style={styles.manage} onPress={() => router.push('/doctor/schedule')} hitSlop={8}>
+              <Text style={styles.manageText}>{t('doctor.schedule.manage')}</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         <View style={styles.grid}>
@@ -177,6 +197,13 @@ const styles = StyleSheet.create({
   alertCopy: { flex: 1 },
   alertTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   alertText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18, marginTop: 2 },
+  availability: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 20, padding: 16 },
+  availabilityDot: { backgroundColor: homeColors.green, borderRadius: 6, height: 12, width: 12 },
+  availabilityCopy: { flex: 1, gap: 2 },
+  availabilityTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  availabilityText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 18 },
+  manage: { backgroundColor: 'rgba(98, 156, 44, 0.12)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 },
+  manageText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '800' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginHorizontal: 24, marginTop: 20 },
   stat: { backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flexBasis: '46%', flexGrow: 1, gap: 8, padding: 16 },
   statLabel: { color: '#64748B', fontFamily: Fonts.sans, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },

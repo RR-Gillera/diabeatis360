@@ -114,13 +114,9 @@ export function TrashIcon(props) {
   return <Icon {...props}><path d="M4 7h16" /><path d="M9 7V4.5h6V7" /><path d="M6.5 7l.8 12a1 1 0 0 0 1 .9h7.4a1 1 0 0 0 1-.9l.8-12" /><path d="M10 11v5M14 11v5" /></Icon>
 }
 
-/** Brand mark from FIGMA/ADMIN: a heart with a drop inside a dashed ring. Fixed brand colours, not currentColor. */
+/** Diabeatis360 logo mark (green D, shield and blood drop), served from public/logo-mark.png. */
 export function LogoMark(props) {
   return (
-    <svg viewBox="0 0 48 48" {...props}>
-      <circle cx="24" cy="24" r="21" fill="none" stroke="#8ec63f" strokeWidth="2" strokeDasharray="6 4" strokeLinecap="round" />
-      <path d="M24 35C11 27 12 15.5 18.5 15.5c3 0 5.5 2 5.5 4.5 0-2.5 2.5-4.5 5.5-4.5C36 15.5 37 27 24 35z" fill="#629c2c" />
-      <path d="M24 21c-2.2 3-3.2 4.5-3.2 6.2a3.2 3.2 0 0 0 6.4 0c0-1.7-1-3.2-3.2-6.2z" fill="#fff" />
-    </svg>
+    <img src="/logo-mark.png" alt="Diabeatis360 logo" {...props} />
   )
 }

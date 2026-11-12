@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
 import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
@@ -103,7 +105,7 @@ export default function ProfessionalInfoScreen() {
       </View>
       <View style={styles.track}><View style={styles.fill} /></View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <KeyboardSafeScroll contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text accessibilityRole="button" style={styles.back} onPress={() => router.back()}>{`‹  ${t('common.back')}`}</Text>
 
         <View style={styles.titleRow}>
@@ -163,10 +165,11 @@ export default function ProfessionalInfoScreen() {
           <AuthButton title={saving ? t('setup.pro.submitting') : t('setup.pro.submit')} onPress={submit} disabled={!complete || saving} />
           <Text style={styles.hint}>{t('setup.pro.hint')}</Text>
         </View>
-      </ScrollView>
+      </KeyboardSafeScroll>
 
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
         <View style={styles.overlay}>
+          <ModalBackdrop onClose={() => setPickerOpen(false)} />
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>{t('setup.pro.specialization')}</Text>

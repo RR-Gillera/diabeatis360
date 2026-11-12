@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -159,7 +160,7 @@ export default function ScannerScreen() {
           </Pressable>
           <AppText accessibilityRole="header" weight="extraBold" style={styles.resultTitle}>{t('scan.resultTitle')}</AppText>
         </View>
-        <ScrollView contentContainerStyle={styles.resultScroll}>
+        <KeyboardSafeScroll contentContainerStyle={styles.resultScroll}>
           <ScanResult
             analysis={analysis}
             barcode={barcode ?? undefined}
@@ -168,7 +169,7 @@ export default function ScannerScreen() {
             onShare={barcode && uid && !analysis.from_memory ? (name, brand) => saveProduct(uid, barcode, analysis, name, brand) : undefined}
           />
           <AppText style={styles.usageLight}>{usageText}</AppText>
-        </ScrollView>
+        </KeyboardSafeScroll>
       </View>
     );
   }

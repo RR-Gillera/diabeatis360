@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
 import { Brand } from '@/constants/theme';
 import { INGREDIENT_CHOICES } from '@/constants/food-words';
@@ -22,10 +23,10 @@ export default function DietaryPreferenceScreen() {
   const { t } = useT();
   const profile = useHealthProfile(uid, email);
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScroll style={styles.screen} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
       <ProfileTop title={t('profile.menu.diet')} subtitle={t('setup.dietary.subtitle')} onBack={goBack} />
       {profile ? <DietPicker start={profile.form} onDone={goBack} /> : <ActivityIndicator color={Brand.colors.primary} style={styles.loading} />}
-    </ScrollView>
+    </KeyboardSafeScroll>
   );
 }
 

@@ -32,7 +32,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Out-of-range → in-app notification ✔ (`glucoseAlert`)
 
 ## Tier 3 — Appointments & consultation (P, D, A)
-- [~] Doctor: Manage Schedule (availability + fee) ✔ (`doctor/schedule.tsx`, `updateDoctorAvailability`)
+- [~] Doctor: Manage Schedule (availability + fee) ✔ (`doctor/schedule.tsx`, `updateDoctorAvailability`). **2026-11-12 (D43):** rebuilt to the "Set Your Availability" frame: Available 24/7 or Set Custom Hours, Current Configuration card, saved pop-ups; the patient's time picker and Find a Doctor follow it. Browser-tested on the emulators (31/31); needs a phone test and a new APK.
 - [~] Patient: directory (verified + active doctors only, `subscribeToBookableProviders`) → slots → mock payment → booking ✔; double-booking guard built 2026-09-26: booking id `<providerId>_<slot UTC>` written in a transaction and enforced by the rules; 15% `platform_commission` stored per booking (D3) [item 4]; verified in the browser build against the emulators (not yet on a phone)
 - [~] Doctor: queue → accept / decline ✔; both see appointment history ✔ (`booking/appointment.tsx`, `doctor/appointments.tsx`)
 - [~] Chat (realtime, top-level `Messages` collection, not the D8 subcollection) ✔; doctor sees patient profile + glucose history ✔

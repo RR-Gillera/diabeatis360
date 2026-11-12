@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -7,8 +8,8 @@ import { BookingHeader, BookingHeaderActions, bookingColors, combineDateAndTime,
 import { BookingError, CONCERN_LIMIT, createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { isPastSlot, manilaToday } from '@/features/booking/manila-time';
-import { bookableSlots, subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
-import { DEFAULT_BOOKING_WINDOW, isMorning, slotsFromRanges } from '@/features/doctor/time-slots';
+import { bookableSchedule, DAY_PERIODS, periodOf } from '@/features/doctor/availability';
+import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { auth } from '@/firebase';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -55,14 +56,14 @@ export default function SelectDateTimeScreen() {
     return subscribeToDoctorProfile(provider.id, setDoctorProfile, () => {});
   }, [provider]);
 
-  // Slots come from the doctor's availability windows. A doctor who has not
-  // set any hours yet falls back to the full day, so nobody becomes unbookable.
-  const doctorSlots = bookableSlots(doctorProfile);
-  const times = doctorSlots.length ? doctorSlots : slotsFromRanges([DEFAULT_BOOKING_WINDOW]);
-  const morningTimes = times.filter(isMorning);
-  const afternoonTimes = times.filter((time) => !isMorning(time));
-  const workingDays = doctorProfile?.availableDays ?? [];
-  const isWorkingDay = (day: Date) => workingDays.length === 0 || workingDays.includes((day.getDay() + 6) % 7);
+  // The days and slots come from the doctor's availability (DECISIONS.md D43): every day and every half hour for a
+  // doctor who is Available 24/7, otherwise the doctor's own days and hours. A doctor who has not set any falls back to
+  // the default hours, so nobody becomes unbookable. One function decides it (features/doctor/availability.ts), the
+  // same one the doctor's own screen reads.
+  const schedule = bookableSchedule(doctorProfile);
+  const times = schedule.slots;
+  // The calendar starts its weeks on Monday (0), like Providers.available_days; getDay() starts on Sunday.
+  const isWorkingDay = (day: Date) => schedule.days.includes((day.getDay() + 6) % 7);
 
   // If the previously picked time turns out to already be taken (someone else
   // booked it, or the day changed), don't let a stale selection through.
@@ -97,7 +98,7 @@ export default function SelectDateTimeScreen() {
   return (
     <View style={ui.screen}>
       <BookingHeader title={t('booking.pickTitle')} subtitle={t('booking.pickSubtitle')} onBack={() => goBack()} actions={<BookingHeaderActions />} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <KeyboardSafeScroll contentContainerStyle={styles.scroll}>
         <View style={ui.card}>
           <View style={styles.monthHeader}><Text style={styles.monthTitle}>{`${monthNames(language)[month.getMonth()]} ${month.getFullYear()}`}</Text><View style={styles.monthActions}><Pressable accessibilityRole="button" accessibilityLabel={t('booking.prevMonth')} hitSlop={8} onPress={() => setMonthOffset(-1)}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={20} tintColor={bookingColors.muted} /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={t('booking.nextMonth')} hitSlop={8} onPress={() => setMonthOffset(1)}><SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={20} tintColor={bookingColors.muted} /></Pressable></View></View>
           <View style={styles.weekRow}>{WEEKDAY_KEYS.map((day) => <Text key={day} style={styles.weekDay}>{t(`weekday.${day}`).slice(0, 2).toUpperCase()}</Text>)}</View>
@@ -112,12 +113,17 @@ export default function SelectDateTimeScreen() {
         </View>
         <Text style={ui.sectionTitle}>{t('booking.slots')}</Text>
         {noneLeftToday ? <Text style={styles.noSlots}>{t('booking.noneToday')}</Text> : null}
-        <Text style={styles.period}>{t('booking.morning')}</Text>
-        <View style={styles.timeGrid}>{morningTimes.map((time) => <TimeButton key={time} time={time} selected={selectedTime === time} taken={bookedTimes.has(time)} past={isPast(time)} onPress={() => selectTime(time)} />)}</View>
-        {morningTimes.length === 0 ? <Text style={styles.noSlots}>{t('booking.noMorning')}</Text> : null}
-        <Text style={styles.period}>{t('booking.afternoon')}</Text>
-        <View style={styles.timeGrid}>{afternoonTimes.map((time) => <TimeButton key={time} time={time} selected={selectedTime === time} taken={bookedTimes.has(time)} past={isPast(time)} onPress={() => selectTime(time)} />)}</View>
-        {afternoonTimes.length === 0 ? <Text style={styles.noSlots}>{t('booking.noAfternoon')}</Text> : null}
+        {/* Slots grouped by part of the day (early morning, morning, afternoon, evening); a part with no slots is left out. */}
+        {DAY_PERIODS.map((period) => {
+          const periodTimes = times.filter((time) => periodOf(time) === period);
+          if (periodTimes.length === 0) return null;
+          return (
+            <View key={period} style={styles.periodBlock}>
+              <Text style={styles.period}>{t(`booking.${period}`)}</Text>
+              <View style={styles.timeGrid}>{periodTimes.map((time) => <TimeButton key={time} time={time} selected={selectedTime === time} taken={bookedTimes.has(time)} past={isPast(time)} onPress={() => selectTime(time)} />)}</View>
+            </View>
+          );
+        })}
         <View style={styles.summary}><View><Text style={styles.summaryLabel}>{t('booking.selectedSlot')}</Text><Text style={styles.summaryValue}>{selectedDate && selectedTime ? `${formatDate(selectedDate, language)} • ${selectedTime}` : t('booking.selectSlot')}</Text></View><View><Text style={styles.summaryLabel}>{t('booking.totalFee')}</Text><Text style={styles.summaryValue}>{formatFee(fee)}</Text></View></View>
         <Text style={ui.sectionTitle}>{t('booking.concernTitle')}</Text>
         <TextInput
@@ -134,7 +140,7 @@ export default function SelectDateTimeScreen() {
         {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
         <PrimaryButton title={t('booking.request')} onPress={requestAppointment} disabled={!selectedDate || !selectedTime} loading={requesting} />
         <Text style={styles.requestHint}>{t('booking.requestHint')}</Text>
-      </ScrollView>
+      </KeyboardSafeScroll>
     </View>
   );
 }
@@ -151,5 +157,5 @@ function TimeButton({ time, selected, taken, past, onPress }: { time: string; se
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: 'center' }, summary: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -24, padding: 24 }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
+  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, periodBlock: { gap: 16 }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: 'center' }, summary: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -24, padding: 24 }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
 });

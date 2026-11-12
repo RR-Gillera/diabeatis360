@@ -1,10 +1,11 @@
 import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
-import { normalizeDiabetesType } from '@/constants/enums';
+import { normalizeDiabetesType, toAvailabilityMode } from '@/constants/enums';
 import { parseBirthdate } from '@/features/auth/birthdate';
 
-import { slotsFromRanges, type TimeRange } from './time-slots';
+import type { Availability } from './availability';
+import type { TimeRange } from './time-slots';
 import type { DoctorProfile, PatientProfile, PatientSummary } from './types';
 
 export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -30,6 +31,7 @@ export function subscribeToDoctorProfile(
         isVerified: Boolean(data.is_verified),
         isActive: data.is_active !== false,
         rejectionReason: String(data.rejection_reason ?? ''),
+        availabilityMode: toAvailabilityMode(data.availability_mode),
         availableDays: Array.isArray(data.available_days) ? data.available_days.map(Number) : [],
         availableRanges: Array.isArray(data.available_ranges)
           ? (data.available_ranges as TimeRange[]).filter((range) => range?.start && range?.end).map((range) => ({ start: String(range.start), end: String(range.end) }))
@@ -56,18 +58,19 @@ export async function updateDoctorProfile(
   await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
 }
 
-export async function updateDoctorAvailability(providerId: string, availableDays: number[], availableRanges: TimeRange[]) {
-  await setDoc(doc(db, 'Providers', providerId), {
-    available_days: [...availableDays].sort((a, b) => a - b),
+// Saves how the doctor is available (Manage Schedule, DECISIONS.md D43): Available 24/7, or their own days and hours.
+// Which days and times patients are then offered is worked out in availability.ts (bookableSchedule).
+export async function updateDoctorAvailability(providerId: string, availability: Availability) {
+  const record: Record<string, unknown> = { availability_mode: availability.availabilityMode };
+  // The days and hours are written only with 'custom'. Switching to 24/7 leaves them exactly as they were stored, so
+  // switching back later brings the doctor's own hours back.
+  if (availability.availabilityMode === 'custom') {
+    record.available_days = [...availability.availableDays].sort((a, b) => a - b);
     // Stored as the windows the doctor actually picked; the individual bookable
     // slots are derived from them at read time so the two can never disagree.
-    available_ranges: availableRanges.filter((range) => range.start && range.end).map((range) => ({ start: range.start, end: range.end })),
-  }, { merge: true });
-}
-
-/** Bookable slot labels for a doctor, derived from their availability windows. */
-export function bookableSlots(profile: DoctorProfile | null): string[] {
-  return profile ? slotsFromRanges(profile.availableRanges) : [];
+    record.available_ranges = availability.availableRanges.filter((range) => range.start && range.end).map((range) => ({ start: range.start, end: range.end }));
+  }
+  await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
 }
 
 export function subscribeToPatientProfile(

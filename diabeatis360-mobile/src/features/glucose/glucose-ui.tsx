@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
@@ -119,7 +121,8 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <View style={styles.overlay}>
+      <KeyboardSafeView style={styles.overlay}>
+        <ModalBackdrop onClose={close} />
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>{editing ? t('glucose.form.edit') : t('glucose.form.add')}</Text>
@@ -165,7 +168,7 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
             </Pressable>
           ) : null}
         </View>
-      </View>
+      </KeyboardSafeView>
     </Modal>
   );
 }

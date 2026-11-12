@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
 import { AuthButton, AuthField, authColors, authStyles, BrandMark, SocialButtons } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
@@ -15,6 +16,8 @@ export default function SignUpScreen() {
   const { t } = useT();
   const { signUp } = useAuth();
   const [fullName, setFullName] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [terms, setTerms] = useState(false); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);
+  // Both password boxes start hidden; the eye on the right of each box shows or hides what was typed in that box only.
+  const [hidePassword, setHidePassword] = useState(true); const [hideConfirm, setHideConfirm] = useState(true);
   const submit = async () => { if (!fullName.trim() || !email.trim() || !password || !confirm) { setError(t('auth.error.required')); return; } if (password !== confirm) { setError(t('auth.error.passwordsDiffer')); return; } if (password.length < PASSWORD_MIN_LENGTH) { setError(t('auth.error.passwordShort', { min: PASSWORD_MIN_LENGTH })); return; } if (!terms) { setError(t('auth.error.acceptTerms')); return; } setError(''); setLoading(true); try { const emailSent = await signUp(fullName, email, password); router.replace({ pathname: '/verify-email', params: { sent: emailSent ? '1' : '0' } } as never); } catch (value) { setError(t(registrationErrorKey(value))); } finally { setLoading(false); } };
   // The Google and Facebook buttons (DECISIONS.md D23; Facebook replaced Apple on 2026-10-17). A first-time Google/Facebook
   // sign-in creates the account, so this is "sign up" too; it needs the same agreement to the terms as the form above.
@@ -23,7 +26,7 @@ export default function SignUpScreen() {
     if (!terms) { setError(t('auth.error.acceptTerms')); return; }
     void social.start(provider);
   };
-  return <ScrollView style={authStyles.screen} contentContainerStyle={styles.scroll}>
+  return <KeyboardSafeScroll style={authStyles.screen} contentContainerStyle={styles.scroll}>
     <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={styles.back}>‹ {t('common.back')}</Text></Pressable>
     <View style={styles.heading}>
       <BrandMark />
@@ -33,8 +36,8 @@ export default function SignUpScreen() {
     <View style={styles.form}>
       <AuthField label={t('auth.signup.fullName')} value={fullName} onChangeText={setFullName} placeholder={t('health.edit.namePlaceholder')} autoCapitalize="words" />
       <AuthField label={t('auth.signup.email')} value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" />
-      <AuthField label={t('auth.signup.password')} value={password} onChangeText={setPassword} placeholder="••••••••" secure />
-      <AuthField label={t('auth.signup.confirm')} value={confirm} onChangeText={setConfirm} placeholder="••••••••" secure />
+      <AuthField label={t('auth.signup.password')} value={password} onChangeText={setPassword} placeholder="••••••••" secure={hidePassword} onToggleSecure={() => setHidePassword((value) => !value)} />
+      <AuthField label={t('auth.signup.confirm')} value={confirm} onChangeText={setConfirm} placeholder="••••••••" secure={hideConfirm} onToggleSecure={() => setHideConfirm((value) => !value)} />
       <View style={styles.terms}>
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: terms }} accessibilityLabel={`${t('auth.signup.agreeStart')}${t('profile.terms')}${t('auth.signup.and')}${t('profile.privacy')}`} onPress={() => setTerms((value) => !value)} style={[styles.checkbox, terms && styles.checked]}>
           {terms ? <Text style={styles.check}>✓</Text> : null}
@@ -51,7 +54,7 @@ export default function SignUpScreen() {
         <Text style={styles.login}>{t('auth.signup.haveAccount')} <Text style={styles.green}>{t('auth.signup.logIn')}</Text></Text>
       </Pressable>
     </View>
-  </ScrollView>;
+  </KeyboardSafeScroll>;
 }
 
 /** Which message explains a failed sign-up (the text itself is in en.ts / fil.ts). */

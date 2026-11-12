@@ -27,7 +27,7 @@ export default function HealthProfileScreen() {
   const diet = DIETS.find((option) => option.value === profile?.form.diet);
   const disliked = foodList(profile?.form.disliked ?? '');
   const condition = profile?.form.condition ?? '';
-  const conditionText = condition ? t('condition.withDiabetes', { type: t(`condition.${condition}` as MessageKey) }) : '';
+  const conditionText = condition ? t(`condition.${condition}` as MessageKey) : '';
 
   return (
     <View style={styles.screen}>

@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, onSnapshot, query, runTransaction, se
 import type { DocumentReference, DocumentSnapshot } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { toAvailabilityMode } from '@/constants/enums';
 import { isProfileComplete } from '@/features/doctor/profile-complete';
 import { platformCommission } from '@/constants/commission';
 import { createNotification } from '@/features/notifications/notification-service';
@@ -31,6 +32,7 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
       city: String(data.city ?? ''),
       consultationFee: Number(data.consultation_fee ?? 0),
     }),
+    availabilityMode: toAvailabilityMode(data.availability_mode),
   };
 }
 

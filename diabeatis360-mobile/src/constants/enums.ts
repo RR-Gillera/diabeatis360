@@ -37,6 +37,18 @@ export type ConsultationStatus = (typeof CONSULTATION_STATUSES)[number];
 export const USER_ROLES = ['patient', 'doctor'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+/** `Providers.availability_mode` (DECISIONS.md D43): open every day at any time, or the doctor's own days and hours. */
+export const AVAILABILITY_MODES = ['always', 'custom'] as const;
+export type AvailabilityMode = (typeof AVAILABILITY_MODES)[number];
+
+/**
+ * Reads a stored availability mode. Nothing stored (every doctor saved before D43) or an unknown value counts as
+ * 'custom', so those doctors keep the weekly schedule they already had.
+ */
+export function toAvailabilityMode(value: unknown): AvailabilityMode {
+  return value === 'always' ? 'always' : 'custom';
+}
+
 // Enums for collections the app does not write yet, so seed.cjs and the admin panel agree with the app.
 export const HEALTH_RATINGS = ['suitable', 'caution', 'unsuitable'] as const;
 export const SUGGESTION_TYPES = ['chat', 'meal', 'exercise', 'risk'] as const;
@@ -108,6 +120,10 @@ export const ENUM_LABELS = {
     patient: { en: 'Patient', fil: 'Pasyente' },
     doctor: { en: 'Doctor', fil: 'Doktor' },
   } satisfies Labels<UserRole>,
+  availabilityMode: {
+    always: { en: 'Round the clock', fil: 'Buong araw at gabi' },
+    custom: { en: 'Custom hours', fil: 'Sariling oras' },
+  } satisfies Labels<AvailabilityMode>,
   healthRating: {
     suitable: { en: 'Suitable', fil: 'Angkop' },
     caution: { en: 'Caution', fil: 'Mag-ingat' },

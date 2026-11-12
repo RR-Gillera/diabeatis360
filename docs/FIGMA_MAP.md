@@ -67,14 +67,14 @@ name. Built in batch 1 (patient):
 | [P-25] Consultation Summary (and None Yet) | `app/consultation/summary/[id].tsx` (Doctor's notes, Advice and Follow-up, batch 3) |
 | [P-26] to [P-29] Video call | `app/video-call/[id].tsx`; the full-screen incoming call on top of any screen (`features/calls/incoming-call-host.tsx`) follows P-26 / D-08 since 2026-10-29: initials in a rounded square inside two rings, "<name> is calling", "Video consultation · <role>", wide Decline / Accept |
 | [P-30] to [P-32] Subscription | `app/subscription.tsx` ("Premium until", never "renews": payments are a demo) |
-Already matching in earlier work: P-04 to P-06, P-08 to P-12 (P-10 Interpretation - Critical got its Call 911 button in D25; P-11/P-12 Health Profile rebuilt as the read-only cards + Edit of the frames in D31: `app/health-profile/index.tsx`, `app/health-profile/edit.tsx`). Built in batch 2 (doctor and admin):
+Already matching in earlier work: P-04 to P-06, P-08 to P-12 (P-10 Interpretation - Critical got its Call 911 button in D25; P-11/P-12 Health Profile rebuilt as the read-only cards + Edit of the frames in D31: `app/health-profile/index.tsx`, `app/health-profile/edit.tsx`). Built in batch 2 (doctor and admin):
 
 D26 (2026-10-18): "Payment Success" now reads "Demo payment recorded" with a Demo payment note, and Consultation Fee says "DEMO CHECKOUT" / "Pay ₱… (demo)" instead of "SECURE CHECKOUT" / "Pay Now": a deliberate difference from the frames, so respondents are not misled.
 | Frame | Screen in the app |
 |---|---|
-| Dashboard Earnings and Notifications | `app/doctor/index.tsx` (no 24/7 card) |
+| Dashboard Earnings and Notifications | `app/doctor/index.tsx` (the "Available 24/7 · Manage" card since D43; with custom hours it shows the days and hours instead) |
 | [D-03] Pending Verification, [D-04] Verification Not Approved | `features/doctor/pending-verification.tsx` (+ resubmit via `app/onboarding/professional-info.tsx`) |
-| [D-05] Manage Schedule | `app/doctor/schedule.tsx` (one set of hours for all working days; no 24/7 switch) |
+| "Set Your Availability" (new frame, 2026-11-12; replaces [D-05] Manage Schedule) and Background "24/7 Availability Enabled" | `app/doctor/schedule.tsx` (D43). **Deliberate differences:** the card's "Auto-accept: Enabled" and "Response time: < 5 mins" rows are replaced by "Days" and "Requests: You accept each one", and the 24/7 text says "Patients can request consultations at any time" instead of "Instant consultations anytime you are online", because the doctor still accepts each request; the slot length and fee card of D-05 stays (MODULES lists the fee under Manage Schedule); buttons use the darker AA green (D37). **States with no frame yet (built by Claude, the designer should add them):** Set Custom Hours selected (the D-05 day switches and time windows), "Unsaved changes / NOT SAVED", "Custom Hours Saved" pop-up, the patient's all-day time picker, and the "AVAILABLE 24/7" chip on Find a Doctor. |
 | Background+HorizontalBorder (Set Consultation Fee) | `app/doctor/fee.tsx` |
 | [D-06] Patient Health Profile | `app/doctor/patient/[id].tsx` (age only, no gender or city) |
 | [D-07] End Consultation (Confirm, Notes) | `app/consultation/[id].tsx`; the Notes step is `features/consultation/doctor-notes-form.tsx` (Diagnosis notes, Advice, Follow-up; batch 3) |
@@ -83,7 +83,7 @@ D26 (2026-10-18): "Payment Success" now reads "Demo payment recorded" with a Dem
 | Request Details, if declined (modal) | `app/doctor/request/[id].tsx` (patient's concern card and the decline reason, batch 3; no medical-record files) |
 | After Consultation / End Chat (Consultation Details) | `app/doctor/consultation/[id].tsx`, listed by `app/doctor/history.tsx` |
 | [A-01] Login errors, [A-02] Forgot password | admin `src/pages/LoginPage.jsx` (brand panel instead of the photo) |
-Not built: the 24/7 frames (Background "24/7 Availability Enabled", the dashboard and schedule 24/7 parts), D24.
+The 24/7 frames (Background "24/7 Availability Enabled", the dashboard and schedule 24/7 parts) were left out in D24 and built on 2026-11-12 (D43), without instant consultations or auto-accept.
 
 ## Legacy (teal) frames still needed
 | Screen | Node ID | Module |

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
@@ -39,7 +40,7 @@ export function SetupScreen({ section, percent, title, subtitle, onBack, childre
   const { t } = useT();
   return (
     // A ScrollView, so a small phone or large system text never pushes the Next button off the screen.
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScroll style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View accessible accessibilityLabel={`${section.toLowerCase()}, ${t('common.percentComplete', { percent })}`} style={styles.progressRow}>
         <Text style={styles.section}>{section}</Text>
         <Text style={[styles.percent, percent === 100 && styles.percentDone]}>{t('common.percentComplete', { percent })}</Text>
@@ -57,7 +58,7 @@ export function SetupScreen({ section, percent, title, subtitle, onBack, childre
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {children}
       <View style={styles.footer}>{footer}</View>
-    </ScrollView>
+    </KeyboardSafeScroll>
   );
 }
 

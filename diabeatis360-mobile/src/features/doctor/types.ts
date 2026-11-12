@@ -1,3 +1,5 @@
+import type { AvailabilityMode } from '@/constants/enums';
+
 import type { TimeRange } from './time-slots';
 
 // The doctor's own bookable profile (Providers doc, ID == Auth UID), plus the
@@ -17,6 +19,8 @@ export type DoctorProfile = {
   /** Set by an admin's Reject action (admin panel); shown on the pending-verification screen so the doctor
    * knows what to fix before resubmitting. Cleared back to '' once the admin verifies. */
   rejectionReason: string;
+  /** 'always' = open every day at any time (D43). 'custom' (also when nothing is stored) = the days and hours below. */
+  availabilityMode: AvailabilityMode;
   /** Weekday indexes the doctor works, Mon=0 … Sun=6. Empty means "not set yet". */
   availableDays: number[];
   /** Free-form availability windows, e.g. 7:00 PM - 9:00 PM. Empty means "not set yet". */

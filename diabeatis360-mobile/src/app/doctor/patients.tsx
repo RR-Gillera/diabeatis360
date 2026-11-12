@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
@@ -33,7 +34,7 @@ export default function DoctorPatientsScreen() {
   return (
     <View style={doctorStyles.screen}>
       <DoctorHeader title={t('doctor.myPatients')} subtitle={t('doctor.patients.subtitle')} />
-      <ScrollView contentContainerStyle={doctorStyles.scroll}>
+      <KeyboardSafeScroll contentContainerStyle={doctorStyles.scroll}>
         <View style={styles.searchBox}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor="#0F172A" />
           <TextInput accessibilityLabel={t('doctor.patients.search')} value={search} onChangeText={setSearch} placeholder={t('doctor.patients.search')} placeholderTextColor="#8796AD" style={styles.searchInput} />
@@ -62,7 +63,7 @@ export default function DoctorPatientsScreen() {
               <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={homeColors.textFaint} />
           </Pressable>
         ))}
-      </ScrollView>
+      </KeyboardSafeScroll>
       <DoctorBottomNav active="home" />
     </View>
   );
