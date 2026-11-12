@@ -194,3 +194,8 @@ Append newest at the bottom. Format:
 - **Files:** `features/intro/intro-splash.tsx` (new), `app/_layout.tsx`, `app.json`, i18n (`intro.headline`, `intro.skip`), `assets/images/intro-hero.png` (new); removed `components/animated-icon*`, `expo-logo.png`, `logo-glow.png`.
 - **Verified:** tsc, lint, unit tests. Not yet seen on a phone (the team is testing it).
 - **Known gap:** the photo is a temporary crop of a low-resolution screenshot; replace it with a 3x export from Figma.
+
+## 2026-11-12 (later) — Claude Code — Expo SDK 57 to 58
+- **Done:** `npx expo install expo@^58.0.0 --fix` (Expo 58.0.24, React Native 0.88.1, expo-router 58.0.31, Reanimated 4.7.1); the lockfile was rebuilt because npm would not resolve SDK 58 around the old one; eslint-config-expo 58 and @types/react 19.3. Two code changes: expo-router 58 reads the first screen from `unstable_settings = { anchor: 'index' }` (no `initialRouteName` prop), and the chat's ScrollView ref uses `ComponentRef<typeof ScrollView>` (React Native 0.88 types). App version 1.0.0 to 1.1.0 so updates never reach the SDK 57 APK.
+- **Verified:** expo-doctor 20/20; tsc and lint clean; unit 142 (136 pass, 6 skipped); Android and web bundles build (`expo export`).
+- **Still to do:** a new APK (GO_LIVE A15) and a full phone re-test, since some library changes only show on a device.

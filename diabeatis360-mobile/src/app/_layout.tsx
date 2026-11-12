@@ -16,6 +16,9 @@ import { ReminderHost } from '@/features/reminders/reminder-host';
 
 SplashScreen.preventAutoHideAsync();
 
+// The first screen of the app (the landing page). Expo Router 58 (SDK 58) reads it here instead of from a Stack prop.
+export const unstable_settings = { anchor: 'index' };
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   // The status bar's real height on this phone; every screen starts below it (constants/screen-top.ts).
@@ -33,7 +36,6 @@ export default function TabLayout() {
         <LanguageProvider>
         <BookingProvider>
           <Stack
-            initialRouteName="index"
             screenOptions={({ route }) => ({
               headerShown: false,
               contentStyle: screenTopStyle(route.name, statusBarHeight, 'root'),
