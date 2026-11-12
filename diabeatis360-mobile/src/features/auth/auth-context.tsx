@@ -13,6 +13,7 @@ import {
 import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 import { auth, db } from '@/firebase';
+import { clearPin } from '@/features/pin/pin-service';
 import { hasCompletedOnboarding, onboardingStartPath } from './onboarding';
 import { clearSocialSessions, getSocialToken } from './social-login';
 import { signInWithSocialToken } from './social-service';
@@ -287,6 +288,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // Also forget the Google/Facebook login the phone kept (read before Firebase signs out), so the next person is not
       // offered the previous one's account.
       void clearSocialSessions(auth.currentUser?.providerData.map((info) => info.providerId) ?? []);
+      // The app PIN belongs to this phone's session: the next login creates a new one (DECISIONS.md D42).
+      void clearPin(auth.currentUser?.uid);
       void firebaseSignOut(auth);
       setSession(SIGNED_OUT);
     },

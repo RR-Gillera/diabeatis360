@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
@@ -130,6 +131,7 @@ export default function SubscriptionScreen() {
 
         <Modal visible={confirmCancel} transparent animationType="fade" onRequestClose={() => setConfirmCancel(false)}>
           <View style={styles.overlay}>
+            <ModalBackdrop onClose={() => setConfirmCancel(false)} />
             <View style={styles.dialog}>
               <View style={styles.dialogIcon}><SymbolView name={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }} size={26} tintColor="#F59E0B" /></View>
               <Text style={styles.dialogTitle}>{t('premium.cancelTitle')}</Text>

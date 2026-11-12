@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
@@ -82,7 +83,7 @@ export default function DoctorProfileScreen() {
   return (
     <View style={doctorStyles.screen}>
       <DoctorHeader title={t('doctor.profile.title')} subtitle={t('doctor.profile.subtitle')} />
-      <ScrollView contentContainerStyle={doctorStyles.scroll}>
+      <KeyboardSafeScroll contentContainerStyle={doctorStyles.scroll}>
         <View style={[doctorStyles.card, styles.identityCard]}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{(form.fullName || 'D').trim().charAt(0).toUpperCase()}</Text></View>
           <View style={styles.identityCopy}>
@@ -143,9 +144,14 @@ export default function DoctorProfileScreen() {
           <Text style={styles.linkText}>{t('profile.menu.language')}</Text>
           <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />
         </Pressable>
+        <Pressable accessibilityRole="button" style={[doctorStyles.card, styles.linkRow, styles.linkGap]} onPress={() => router.push('/change-pin')}>
+          <View style={styles.linkIcon}><SymbolView name={{ ios: 'lock.fill', android: 'lock', web: 'lock' }} size={16} tintColor={homeColors.green} /></View>
+          <Text style={styles.linkText}>{t('pin.menu.change')}</Text>
+          <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={15} tintColor={homeColors.textFaint} />
+        </Pressable>
 
         <Pressable accessibilityRole="button" onPress={() => { signOut(); resetTo(router, '/'); }}><Text style={styles.logout}>{t('profile.logout.confirm')}</Text></Pressable>
-      </ScrollView>
+      </KeyboardSafeScroll>
       <DoctorBottomNav active="profile" />
     </View>
   );

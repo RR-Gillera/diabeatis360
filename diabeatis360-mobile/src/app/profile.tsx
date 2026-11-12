@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
@@ -113,6 +114,7 @@ export default function ProfileScreen() {
           <MenuRow icon={{ ios: 'fork.knife', android: 'restaurant' }} title={t('profile.menu.diet')} subtitle={diet ? dietLine : undefined} onPress={() => router.push('/dietary-preference')} />
           <MenuRow icon={{ ios: 'character.bubble', android: 'translate' }} title={t('profile.menu.language')} subtitle={language} onPress={() => router.push('/language-settings')} />
           <MenuRow icon={{ ios: 'bell.fill', android: 'notifications' }} title={t('profile.menu.notifications')} subtitle={reminderStatus} onPress={() => router.push('/notification-settings')} />
+          <MenuRow icon={{ ios: 'lock.fill', android: 'lock' }} title={t('pin.menu.change')} onPress={() => router.push('/change-pin')} />
           <MenuRow icon={{ ios: 'gift.fill', android: 'redeem' }} tint="green" title={t('profile.menu.rewards')} subtitle={t('profile.rewardsLine', { tier: tier.toUpperCase(), points: compactNumber(stats.points) })} onPress={() => router.push('/rewards')} />
           {premium
             ? <PremiumCard title={t('profile.premium.member')} subtitle={t('profile.premium.manage')} onPress={() => router.push('/subscription')} />
@@ -130,6 +132,7 @@ export default function ProfileScreen() {
 
       <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => setConfirmLogout(false)}>
         <View style={styles.dim}>
+          <ModalBackdrop onClose={() => setConfirmLogout(false)} />
           <View style={styles.dialog}>
             <Text accessibilityRole="header" style={styles.dialogTitle}>{t('profile.logout.title')}</Text>
             <Text style={styles.dialogText}>{t('profile.logout.text')}</Text>

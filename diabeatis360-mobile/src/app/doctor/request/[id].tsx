@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
@@ -120,7 +122,8 @@ export default function RequestDetailsScreen() {
       </ScrollView>
 
       <Modal visible={confirmDecline} transparent animationType="fade" onRequestClose={() => setConfirmDecline(false)}>
-        <View style={styles.overlay}>
+        <KeyboardSafeView style={styles.overlay}>
+          <ModalBackdrop onClose={() => setConfirmDecline(false)} />
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>{t('doctor.request.decline')}</Text>
             <Text style={styles.dialogText}>{t('doctor.request.declineConfirm')}</Text>
@@ -142,7 +145,7 @@ export default function RequestDetailsScreen() {
               <Text style={styles.dialogCancelText}>{t('doctor.request.keep')}</Text>
             </Pressable>
           </View>
-        </View>
+        </KeyboardSafeView>
       </Modal>
     </View>
   );

@@ -12,11 +12,12 @@ import { AddReadingModal, AiRecommendations } from '@/features/glucose/glucose-u
 import { POINTS_PER_LOG, wellnessStats } from '@/features/gamification/gamification-service';
 import { subscribeToNotifications } from '@/features/notifications/notification-service';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
+import { activityWhen } from '@/features/home/activity-feed';
 import { BottomNav, homeColors, Sparkline } from '@/features/home/home-ui';
 import { weekSummary } from '@/features/home/week-summary';
 import { DAILY_REMINDERS } from '@/features/reminders/reminder-plan';
 import { useT } from '@/i18n/language-context';
-import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
+import { clockTime } from '@/i18n/translate';
 
 // EXERCISE and HYDRATION: the app does not track minutes or water (activity tracking is future work, DECISIONS.md D10),
 // so these two cards used to show made-up numbers (45 mins, 1.5 L) to everyone. Now they show what is real: the day's
@@ -26,18 +27,8 @@ const reminderTimes = (times: [number, number][]) => times.map(([hour, minute]) 
 // Recent Activity is now driven by real Glucose_Logs: each of the last two
 // readings is one activity row, worth the same points the rewards screen
 // counts it for. The old hardcoded "10k Steps Milestone" row is gone because
-// there is no step data anywhere in the app to back it up.
-function activityWhen(date: Date | null, language: Language, t: (key: MessageKey, vars?: Record<string, string | number>) => string) {
-  if (!date) return '—';
-  const startOfDay = (value: Date) => { const copy = new Date(value); copy.setHours(0, 0, 0, 0); return copy; };
-  const today = startOfDay(new Date());
-  const target = startOfDay(date);
-  const time = clockTime(date);
-  const DAY = 24 * 60 * 60 * 1000;
-  if (target.getTime() === today.getTime()) return t('home.when.today', { time });
-  if (target.getTime() === today.getTime() - DAY) return t('home.when.yesterday', { time });
-  return `${shortDay(date, language)}, ${time}`;
-}
+// there is no step data anywhere in the app to back it up. "View Activity"
+// opens the full timeline (app/activity.tsx).
 
 const badgeStyle: Record<Interpretation, { color: string; background: string }> = {
   normal: { color: homeColors.green, background: homeColors.greenTint },
@@ -202,11 +193,12 @@ export default function UserHomeScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t('home.activity.title')}</Text>
-          <Pressable onPress={() => router.navigate('/rewards')} hitSlop={8}>
-            <Text style={styles.sectionLink}>{t('home.activity.rewards')}</Text>
+          {/* Rewards already has its own link in Profile, so this opens the full activity timeline instead. */}
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/activity')} hitSlop={8}>
+            <Text style={styles.sectionLink}>{t('home.activity.viewAll')}</Text>
           </Pressable>
         </View>
-        <Pressable style={styles.activityCard} onPress={() => router.navigate('/rewards')}>
+        <Pressable style={styles.activityCard} onPress={() => router.navigate('/activity')}>
           <View style={styles.streakRow}>
             <View style={styles.streakLeft}>
               <View style={styles.streakIconWrap}>

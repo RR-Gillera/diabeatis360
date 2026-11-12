@@ -18,7 +18,7 @@ const WHITE_TOP_DOCTOR = new Set([
 
 /** Screens that place their own content around the status bar: camera, video call, the landing page, and the doctor
  * group (its own navigator pads each doctor screen). */
-const OWN_TOP_ROOT = new Set(['landing', 'scanner', 'video-call/[id]', 'doctor']);
+const OWN_TOP_ROOT = new Set(['landing', 'scanner', 'video-call/[id]', 'doctor', 'change-pin']);
 
 export function screenTopStyle(routeName: string, statusBarHeight: number, navigator: 'root' | 'doctor') {
   if (navigator === 'root' && OWN_TOP_ROOT.has(routeName)) return { backgroundColor: Brand.colors.background };

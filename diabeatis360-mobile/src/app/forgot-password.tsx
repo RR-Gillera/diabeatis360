@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
 import { RoundBackButton } from '@/components/ui/round-back-button';
 import { AuthButton, AuthField, authColors, authStyles } from '@/features/auth/auth-ui';
@@ -12,7 +13,7 @@ import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
 
 // "Reset your password" (Figma P-01, doctors D-01) and, once the email has gone out, "Check your email" (P-02, D-02).
-// Login's "Forgot?" opens this screen with whatever was typed in its email field.
+// Login's "Forgot password?" opens this screen with whatever was typed in its email field.
 export default function ForgotPasswordScreen() {
   const { t } = useT();
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function ForgotPasswordScreen() {
     </View>;
   }
 
-  return <ScrollView style={authStyles.screen} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+  return <KeyboardSafeScroll style={authStyles.screen} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
     <RoundBackButton onPress={goBack} />
     <Text style={styles.title}>{t('reset.title')}</Text>
     <Text style={styles.subtitle}>{t('reset.subtitle')}</Text>
@@ -76,7 +77,7 @@ export default function ForgotPasswordScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <AuthButton title={sending ? t('verify.sending') : t('reset.send')} onPress={send} disabled={sending} />
     </View>
-  </ScrollView>;
+  </KeyboardSafeScroll>;
 }
 
 /** Which message explains a failed reset email (the text itself is in en.ts / fil.ts). */

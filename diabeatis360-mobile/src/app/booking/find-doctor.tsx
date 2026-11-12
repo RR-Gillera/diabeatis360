@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -53,7 +54,7 @@ export default function FindDoctorScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <KeyboardSafeScroll contentContainerStyle={styles.scrollContent}>
         <View style={styles.searchBox}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={19} tintColor={bookingColors.navy} />
           <TextInput value={search} onChangeText={setSearch} accessibilityLabel={t('doctors.search')} placeholder={t('doctors.search')} placeholderTextColor="#8796AD" style={styles.searchInput} />
@@ -79,6 +80,8 @@ export default function FindDoctorScreen() {
                 <Text style={styles.doctorName}>{provider.fullName}</Text>
                 <Text style={styles.specialty}>{provider.specialty}</Text>
                 {provider.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>{t('doctors.verified')}</Text></View> : null}
+                {/* A doctor who chose Available 24/7 (D43): any day and any time can be requested. */}
+                {provider.availabilityMode === 'always' ? <View style={styles.always}><Text style={styles.alwaysText}>{t('doctors.always')}</Text></View> : null}
               </View>
             </View>
             <View style={styles.detailsRow}>
@@ -91,7 +94,7 @@ export default function FindDoctorScreen() {
             </View>
           </View>
         ))}
-      </ScrollView>
+      </KeyboardSafeScroll>
       <BottomNav active="doctors" />
     </View>
   );
@@ -124,6 +127,8 @@ const styles = StyleSheet.create({
   specialty: { color: bookingColors.green, fontSize: 13, fontWeight: '700' },
   verified: { alignSelf: 'flex-start', backgroundColor: '#E6F6EF', borderRadius: 4, marginTop: 3, paddingHorizontal: 7, paddingVertical: 4 },
   verifiedText: { color: bookingColors.green, fontSize: 10, fontWeight: '800' },
+  always: { alignSelf: 'flex-start', backgroundColor: homeColors.blueTint, borderRadius: 4, paddingHorizontal: 7, paddingVertical: 4 },
+  alwaysText: { color: '#1D4ED8', fontSize: 10, fontWeight: '800' },
   detailsRow: { borderBottomColor: bookingColors.border, borderBottomWidth: 1, borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, paddingVertical: 14 },
   label: { color: '#8C9DB6', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   value: { color: bookingColors.navy, fontSize: 14, fontWeight: '700', marginTop: 5 },

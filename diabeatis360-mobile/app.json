@@ -7,9 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "diabeatis360mobile",
     "userInterfaceStyle": "automatic",
-    "ios": {
-      "icon": "./assets/expo.icon"
-    },
     "android": {
       "package": "com.diabeatis360.app",
       "adaptiveIcon": {

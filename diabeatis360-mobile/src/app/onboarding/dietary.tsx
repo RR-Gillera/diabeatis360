@@ -44,7 +44,7 @@ export default function DietaryScreen() {
 
   return (
     <SetupScreen
-      section={t('setup.section.dietary')}
+      section={t('setup.section.personal')}
       percent={SETUP_PROGRESS.dietary}
       title={t('setup.dietary.title')}
       subtitle={t('setup.dietary.subtitle')}

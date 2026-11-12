@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore';
 
-import type { BookingStatus, PaymentStatus } from '@/constants/enums';
+import type { AvailabilityMode, BookingStatus, PaymentStatus } from '@/constants/enums';
 
 // The status enums live in one place (constants/enums.ts, DECISIONS.md D6);
 // re-exported here so existing imports keep working.
@@ -17,6 +17,8 @@ export type Provider = {
   isActive: boolean;
   /** Specialty, PRC number, city and a fee are really filled in (profile-complete.ts), read before any display default. */
   profileComplete: boolean;
+  /** 'always' when the doctor is open every day at any time (D43); shown as a chip on the Find a Doctor card. */
+  availabilityMode: AvailabilityMode;
 };
 
 export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';

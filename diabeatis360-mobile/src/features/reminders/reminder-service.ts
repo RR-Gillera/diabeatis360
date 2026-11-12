@@ -1,3 +1,4 @@
+import { requireOptionalNativeModule } from 'expo';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { collection, getDocs, query, Timestamp, where } from 'firebase/firestore';
 import { Platform } from 'react-native';
@@ -27,6 +28,10 @@ function loadNotifications(): NotificationsModule | null {
   cached = null;
   const inExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
   if (Platform.OS === 'web' || (Platform.OS === 'android' && inExpoGo)) return cached;
+  // Expo Go can still pass the check above (its environment name varies by version). expo-notifications needs the
+  // ExpoApplication native module, so if the phone's app does not contain it, skip reminders instead of loading the
+  // module, because the failed require would show a red error screen even though we catch it below.
+  if (!requireOptionalNativeModule('ExpoApplication')) return cached;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const module = require('expo-notifications') as NotificationsModule;

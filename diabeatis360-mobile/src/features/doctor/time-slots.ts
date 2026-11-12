@@ -51,11 +51,6 @@ export function slotsFromRanges(ranges: TimeRange[]): string[] {
   return [...slots].sort((a, b) => a - b).map(labelFromMinutes);
 }
 
-export function isMorning(label: string) {
-  const minutes = minutesFromLabel(label);
-  return minutes !== null && minutes < 12 * 60;
-}
-
 export function formatRange(range: TimeRange) {
   return `${range.start} – ${range.end}`;
 }

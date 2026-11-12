@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -101,7 +102,7 @@ export default function GuardianScreen() {
   }
 
   return (
-    <View style={[authStyles.screen, styles.screen]}>
+    <KeyboardSafeScroll style={authStyles.screen} contentContainerStyle={styles.screen}>
       {isResubmit ? null : <>
         <View style={styles.progress}><Text style={styles.progressLabel}>{t('setup.guardian.progress')}</Text><Text style={styles.step}>{t('common.percentComplete', { percent: 35 })}</Text></View>
         <View style={styles.track}><View style={styles.fill} /></View>
@@ -142,7 +143,7 @@ export default function GuardianScreen() {
           <AuthButton title={isResubmit ? t('setup.guardian.resubmit') : t('common.continue')} onPress={submit} disabled={!name.trim() || !photoPreview || !relationship} />
         )}
       </View>
-    </View>
+    </KeyboardSafeScroll>
   );
 }
 

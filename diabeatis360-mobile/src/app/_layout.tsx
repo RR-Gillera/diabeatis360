@@ -12,6 +12,7 @@ import { RouteGuard } from '@/features/auth/route-guard';
 import { LanguageProvider } from '@/i18n/language-context';
 import { IncomingCallHost } from '@/features/calls/incoming-call-host';
 import { IntroSplash } from '@/features/intro/intro-splash';
+import { PinGate } from '@/features/pin/pin-gate';
 import { ReminderHost } from '@/features/reminders/reminder-host';
 
 SplashScreen.preventAutoHideAsync();
@@ -52,6 +53,8 @@ export default function TabLayout() {
           <IncomingCallHost />
           {/* Keeps the phone's local health reminders scheduled (all categories are on, D29) and in step with appointments. */}
           <ReminderHost />
+          {/* The 6-digit app PIN (D42): asks for it when the app opens or returns after 30 seconds. Below the intro, above every screen. */}
+          <PinGate />
           {/* The intro (Figma "Splash"), on top of everything while the first screen loads underneath. Last, so it is on top. */}
           <IntroSplash />
         </BookingProvider>

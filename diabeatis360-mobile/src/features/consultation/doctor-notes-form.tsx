@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { RoundBackButton } from '@/components/ui/round-back-button';
@@ -87,7 +88,7 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.screen}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <KeyboardSafeScroll contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <RoundBackButton onPress={onClose} />
           <Text accessibilityRole="header" style={styles.title}>{title ?? t('chat.endTitle')}</Text>
           <Text style={styles.subtitle}>{t('doctor.notes.for', { name: patientName })}</Text>
@@ -111,7 +112,7 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
           ) : null}
           <Text style={styles.hint}>{t('doctor.notes.hint')}</Text>
           {problem || error ? <Text style={styles.error}>{problem || error}</Text> : null}
-        </ScrollView>
+        </KeyboardSafeScroll>
         <Pressable accessibilityRole="button" style={[styles.submit, busy && styles.disabled]} disabled={busy} onPress={submit}>
           <Text style={styles.submitText}>{busy ? t('common.saving') : submitLabel}</Text>
         </Pressable>

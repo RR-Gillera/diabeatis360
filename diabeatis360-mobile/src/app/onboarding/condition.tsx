@@ -23,7 +23,7 @@ export default function ConditionScreen() {
   };
   return (
     <SetupScreen
-      section={t('setup.section.dietary')}
+      section={t('setup.section.personal')}
       percent={SETUP_PROGRESS.condition}
       title={t('setup.condition.title')}
       subtitle={t('setup.condition.subtitle')}

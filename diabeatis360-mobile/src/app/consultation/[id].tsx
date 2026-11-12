@@ -1,6 +1,7 @@
 import { type ComponentRef, useEffect, useRef, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
 import { MoreMenu } from '@/components/ui/more-menu';
@@ -314,6 +315,7 @@ export default function ConsultationScreen() {
 
       <Modal visible={confirmEnd} animationType="fade" transparent onRequestClose={() => setConfirmEnd(false)}>
         <View style={styles.confirmOverlay}>
+          <ModalBackdrop onClose={() => setConfirmEnd(false)} />
           <View style={styles.confirmCard}>
             <View style={styles.confirmIcon}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={26} tintColor="#EF4444" /></View>
             <Text style={styles.confirmTitle}>{t('chat.confirmTitle')}</Text>
