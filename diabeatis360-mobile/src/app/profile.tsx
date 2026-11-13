@@ -12,6 +12,7 @@ import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { wellnessStats } from '@/features/gamification/gamification-service';
 import { compactNumber, memberTier } from '@/features/gamification/member-tier';
+import { subscribeToFamilyContacts } from '@/features/family/family-service';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav } from '@/features/home/home-ui';
@@ -50,6 +51,13 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!uid) return;
     return subscribeToGuardianVerification(uid, setGuardian, () => {});
+  }, [uid]);
+
+  // How many family members are texted on a critical reading (D45), for the Family alerts row.
+  const [familyCount, setFamilyCount] = useState(0);
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToFamilyContacts(uid, (contacts) => setFamilyCount(contacts.length), () => {});
   }, [uid]);
 
   // Checked each time Profile comes back into view: the person may have just changed it in the phone's settings.
@@ -114,6 +122,7 @@ export default function ProfileScreen() {
           <MenuRow icon={{ ios: 'fork.knife', android: 'restaurant' }} title={t('profile.menu.diet')} subtitle={diet ? dietLine : undefined} onPress={() => router.push('/dietary-preference')} />
           <MenuRow icon={{ ios: 'character.bubble', android: 'translate' }} title={t('profile.menu.language')} subtitle={language} onPress={() => router.push('/language-settings')} />
           <MenuRow icon={{ ios: 'bell.fill', android: 'notifications' }} title={t('profile.menu.notifications')} subtitle={reminderStatus} onPress={() => router.push('/notification-settings')} />
+          <MenuRow icon={{ ios: 'person.2.fill', android: 'family_restroom' }} title={t('family.title')} subtitle={familyCount === 0 ? t('family.menuNone') : familyCount === 1 ? t('family.menuOne') : t('family.menuTwo')} onPress={() => router.push('/family-contacts')} />
           <MenuRow icon={{ ios: 'lock.fill', android: 'lock' }} title={t('pin.menu.change')} onPress={() => router.push('/change-pin')} />
           <MenuRow icon={{ ios: 'gift.fill', android: 'redeem' }} tint="green" title={t('profile.menu.rewards')} subtitle={t('profile.rewardsLine', { tier: tier.toUpperCase(), points: compactNumber(stats.points) })} onPress={() => router.push('/rewards')} />
           {premium

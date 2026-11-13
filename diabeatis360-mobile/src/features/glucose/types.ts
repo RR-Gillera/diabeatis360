@@ -22,4 +22,18 @@ export type GlucoseLogEntry = {
   notes: string;
   loggedAt: Date | null;
   interpretation: Interpretation;
+  /** How many times the reading was changed after it was logged (Glucose_Logs.edit_count, D44); 0 if never. */
+  editCount: number;
+};
+
+/** One change to a reading: what it said before and after, and when (Glucose_Logs/{id}/Edits/{number}, D44). */
+export type GlucoseEdit = {
+  number: number;
+  previousReadingMgdl: number;
+  previousContext: MealContext;
+  previousNotes: string;
+  readingMgdl: number;
+  context: MealContext;
+  notes: string;
+  editedAt: Date | null;
 };

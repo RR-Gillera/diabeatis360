@@ -20,6 +20,21 @@ async function check(name, promise, expectOk) {
 const allow = (name, promise) => check(name, promise, true);
 const deny = (name, promise) => check(name, promise, false);
 
+// A change to a reading together with its edit record, in one write (D44), the way the app does it. A test can make one
+// part dishonest: `record` / `log` change fields of the record or the reading, `recordId` files the record under another
+// number, and skipLog / skipRecord leave a part out.
+const editReading = (db, logId, number, before, after, { record = {}, log = {}, recordId, skipLog = false, skipRecord = false } = {}) => {
+  const batch = writeBatch(db);
+  if (!skipLog) batch.update(doc(db, `Glucose_Logs/${logId}`), { ...after, edit_count: number, ...log });
+  if (!skipRecord) {
+    batch.set(doc(db, `Glucose_Logs/${logId}/Edits/${recordId ?? number}`), {
+      previous_reading_mgdl: before.reading_mgdl, previous_context: before.context, previous_notes: before.notes,
+      ...after, edited_at: serverTimestamp(), ...record,
+    });
+  }
+  return batch.commit();
+};
+
 (async () => {
   const env = await initializeTestEnvironment({
     projectId: 'demo-diabeatis360',
@@ -231,7 +246,10 @@ const deny = (name, promise) => check(name, promise, false);
   await deny('p2 queries p1 logs', getDocs(query(collection(p2, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
   await allow('verified doctor queries patient logs', getDocs(query(collection(d1, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
   await deny('unverified doctor queries patient logs', getDocs(query(collection(d5, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
-  await allow('p1 edits own log', updateDoc(doc(p1, 'Glucose_Logs/g1'), { reading_mgdl: 115 }));
+  // g1 was seeded like an older app's reading: no notes field and no edit count.
+  await deny('D44: p1 changes a reading without leaving an edit record', updateDoc(doc(p1, 'Glucose_Logs/g1'), { reading_mgdl: 115 }));
+  await allow('p1 edits own log (with its edit record, D44)', editReading(p1, 'g1', 1,
+    { reading_mgdl: 110, context: 'before_meal', notes: '' }, { reading_mgdl: 115, context: 'before_meal', notes: '' }));
   await deny('p1 reassigns log to p2', updateDoc(doc(p1, 'Glucose_Logs/g1'), { patient_id: 'p2' }));
   await deny('p2 edits p1 log', updateDoc(doc(p2, 'Glucose_Logs/g1'), { reading_mgdl: 1 }));
   await deny('p2 deletes p1 log', require('firebase/firestore').deleteDoc(doc(p2, 'Glucose_Logs/g1')));
@@ -640,14 +658,91 @@ const deny = (name, promise) => check(name, promise, false);
   for (const [value, ok] of [[20, true], [600, true], [19, false], [601, false], [9999, false], [1.5, false], [120.5, false]]) {
     await check(`D25: a reading of ${value} mg/dL is ${ok ? 'saved' : 'refused'}`, addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: value, context: 'before_meal' }), ok);
   }
-  await deny('D25: editing a reading to an impossible value is refused', updateDoc(doc(p1, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 0 }));
-  await allow('D25: editing a reading to a possible value', updateDoc(doc(p1, 'Glucose_Logs/g1'), { patient_id: 'p1', reading_mgdl: 145 }));
+  // Honest edit records (D44), so only the value decides these two.
+  const g1Now = { reading_mgdl: 115, context: 'before_meal', notes: '' };
+  await deny('D25: editing a reading to an impossible value is refused', editReading(p1, 'g1', 2, g1Now, { ...g1Now, reading_mgdl: 0 }));
+  await allow('D25: editing a reading to a possible value', editReading(p1, 'g1', 2, g1Now, { ...g1Now, reading_mgdl: 145 }));
 
   // ---- D26: a booking must be in the future by the server's clock. SLOT_START is 30 days ahead (on the hour), so
   // slot -1442 is about an hour ago, -1438 about an hour from now.
   await deny('D26: a booking for a time that has already passed is refused', book(p1, 'bk-d26-past', { n: -1442 }));
   await deny('D26: a booking 30 days in the past is refused', book(p1, 'bk-d26-old', { n: -2880 }));
   await allow('D26: a booking an hour from now is allowed', book(p1, 'bk-d26-soon', { n: -1438 }));
+
+  // ---- D44: a reading's edit history cannot be skipped, faked, rewritten or erased
+  await allow('D44: p1 logs a reading of 280 (with notes)', setDoc(doc(p1, 'Glucose_Logs/gEdit'), { patient_id: 'p1', reading_mgdl: 280, context: 'after_meal', notes: 'after lunch' }));
+  const was = { reading_mgdl: 280, context: 'after_meal', notes: 'after lunch' };
+  const now = { reading_mgdl: 120, context: 'after_meal', notes: 'after lunch' };
+  await deny('D44: a new reading cannot start with an edit count', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 120, context: 'before_meal', edit_count: 3 }));
+  await deny('D44: the record cannot lie about the value before', editReading(p1, 'gEdit', 1, was, now, { record: { previous_reading_mgdl: 120 } }));
+  await deny('D44: the record cannot lie about the value after', editReading(p1, 'gEdit', 1, was, now, { record: { reading_mgdl: 280 } }));
+  await deny('D44: the record cannot lie about the meal context before', editReading(p1, 'gEdit', 1, was, now, { record: { previous_context: 'before_meal' } }));
+  await deny('D44: the record cannot lie about the notes before', editReading(p1, 'gEdit', 1, was, now, { record: { previous_notes: '' } }));
+  await deny('D44: the record cannot be backdated (the time must be the server\'s)', editReading(p1, 'gEdit', 1, was, now, { record: { edited_at: Timestamp.fromMillis(Date.now() - 86400000) } }));
+  await deny('D44: the record cannot carry extra fields', editReading(p1, 'gEdit', 1, was, now, { record: { reason: 'typo' } }));
+  const recordWithoutOldNotes = () => {
+    const batch = writeBatch(p1);
+    batch.update(doc(p1, 'Glucose_Logs/gEdit'), { ...now, edit_count: 1 });
+    batch.set(doc(p1, 'Glucose_Logs/gEdit/Edits/1'), { previous_reading_mgdl: 280, previous_context: 'after_meal', ...now, edited_at: serverTimestamp() });
+    return batch.commit();
+  };
+  await deny('D44: the record cannot leave a field out', recordWithoutOldNotes());
+  await deny('D44: the count cannot skip a number', editReading(p1, 'gEdit', 2, was, now));
+  await deny('D44: the record must be filed under the edit it records', editReading(p1, 'gEdit', 1, was, now, { recordId: 7 }));
+  await deny('D44: a record cannot be written without changing the reading', editReading(p1, 'gEdit', 1, was, now, { skipLog: true }));
+  await deny('D44: another patient cannot change the reading, even with a record', editReading(p2, 'gEdit', 1, was, now));
+  await allow('D44: p1 changes 280 to 120 and the record keeps both numbers', editReading(p1, 'gEdit', 1, was, now));
+  await allow('D44: p1 reads the edit history', getDocs(collection(p1, 'Glucose_Logs/gEdit/Edits')));
+  await allow('D44: a doctor p1 booked reads the edit history', getDocs(collection(d1, 'Glucose_Logs/gEdit/Edits')));
+  await allow('D44: an admin reads the edit history', getDocs(collection(a1, 'Glucose_Logs/gEdit/Edits')));
+  await deny('D44: a doctor p1 never booked cannot read it', getDocs(collection(d9, 'Glucose_Logs/gEdit/Edits')));
+  await deny('D44: an unverified doctor cannot read it', getDocs(collection(d5, 'Glucose_Logs/gEdit/Edits')));
+  await deny('D44: another patient cannot read it', getDocs(collection(p2, 'Glucose_Logs/gEdit/Edits')));
+  await deny('D44: p1 cannot rewrite a record', updateDoc(doc(p1, 'Glucose_Logs/gEdit/Edits/1'), { previous_reading_mgdl: 120 }));
+  await deny('D44: p1 cannot delete a record and keep the reading', deleteDoc(doc(p1, 'Glucose_Logs/gEdit/Edits/1')));
+  await deny('D44: p1 cannot reset the edit count', updateDoc(doc(p1, 'Glucose_Logs/gEdit'), { edit_count: 0 }));
+  await deny('D44: p1 cannot move the reading to another time', updateDoc(doc(p1, 'Glucose_Logs/gEdit'), { logged_at: Timestamp.now() }));
+  await allow('D44: saving the class alone needs no record (nothing the reading says changed)', updateDoc(doc(p1, 'Glucose_Logs/gEdit'), { interpretation: 'normal' }));
+  const later = { reading_mgdl: 120, context: 'before_meal', notes: 'meter was wrong' };
+  await allow('D44: a second change (meal context and notes) adds record 2', editReading(p1, 'gEdit', 2, now, later));
+  await deny('D44: a third change cannot overwrite record 2', editReading(p1, 'gEdit', 2, later, { ...later, reading_mgdl: 130 }));
+  const deleteWithHistory = () => {
+    const batch = writeBatch(p1);
+    batch.delete(doc(p1, 'Glucose_Logs/gEdit/Edits/1'));
+    batch.delete(doc(p1, 'Glucose_Logs/gEdit/Edits/2'));
+    batch.delete(doc(p1, 'Glucose_Logs/gEdit'));
+    return batch.commit();
+  };
+  await allow('D44: p1 deletes the reading together with its history', deleteWithHistory());
+
+  // ---- D45: family contacts (private to the patient) and family alert outcomes (written only by the server)
+  const contactsDoc = (contacts, extra = {}) => ({ user_id: 'p1', contacts, updated_at: serverTimestamp(), ...extra });
+  const maria = { name: 'Maria', relationship: 'Mother', phone: '+639171234567' };
+  const jose = { name: 'Jose', phone: '+639181234567' };
+  await allow('D45: p1 saves two family contacts', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([maria, jose])));
+  await allow('D45: p1 reads their own contacts', getDoc(doc(p1, 'Emergency_Contacts/p1')));
+  await allow('D45: p1 saves no contacts at all (they are optional)', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([])));
+  await deny('D45: a third contact is refused', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([maria, jose, { name: 'Ana', phone: '+639191234567' }])));
+  await deny('D45: a number that is not a Philippine mobile number is refused', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([{ name: 'X', phone: '+15551234567' }])));
+  await deny('D45: a local-format number must be saved as +639…', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([{ name: 'X', phone: '09171234567' }])));
+  await deny('D45: the same number twice is refused', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([maria, { ...jose, phone: maria.phone }])));
+  await deny('D45: a contact with no name is refused', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([{ name: '', phone: '+639171234567' }])));
+  await deny('D45: a contact with extra fields is refused', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([{ ...maria, email: 'm@x.com' }])));
+  await deny('D45: the document cannot carry extra fields', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([maria], { notes: 'x' })));
+  await deny('D45: the time must be the server\'s', setDoc(doc(p1, 'Emergency_Contacts/p1'), contactsDoc([maria], { updated_at: Timestamp.now() })));
+  await deny('D45: p1 cannot save contacts for p2', setDoc(doc(p1, 'Emergency_Contacts/p2'), { ...contactsDoc([maria]), user_id: 'p2' }));
+  await deny('D45: a doctor p1 booked cannot read p1\'s family contacts', getDoc(doc(d1, 'Emergency_Contacts/p1')));
+  await deny('D45: another patient cannot read them', getDoc(doc(p2, 'Emergency_Contacts/p1')));
+  await deny('D45: an admin cannot read them either', getDoc(doc(a1, 'Emergency_Contacts/p1')));
+
+  await env.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'Family_Alerts/logOfP1'), { patient_id: 'p1', log_id: 'logOfP1', day: '2026-11-13', status: 'sent', contacts_count: 2 });
+  });
+  await allow('D45: p1 reads the outcome of their own family alert', getDoc(doc(p1, 'Family_Alerts/logOfP1')));
+  await allow('D45: p1 can wait for an outcome that does not exist yet', getDoc(doc(p1, 'Family_Alerts/notYet')));
+  await deny('D45: another patient cannot read p1\'s alert outcome', getDoc(doc(p2, 'Family_Alerts/logOfP1')));
+  await deny('D45: a patient cannot write an alert outcome (only the server can)', setDoc(doc(p1, 'Family_Alerts/fake'), { patient_id: 'p1', status: 'sent' }));
+  await deny('D45: a patient cannot change an alert outcome', updateDoc(doc(p1, 'Family_Alerts/logOfP1'), { status: 'failed' }));
 
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));

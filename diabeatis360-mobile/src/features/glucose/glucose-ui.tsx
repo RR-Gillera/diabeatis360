@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
@@ -11,9 +11,10 @@ import { useAuth } from '@/features/auth/auth-context';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { homeColors } from '@/features/home/home-ui';
 import { checkReading, interpretGlucose, READING_LIMITS } from '@/constants/glucose';
-import { addGlucoseLog, deleteGlucoseLog, updateGlucoseLog } from './glucose-service';
+import { addGlucoseLog, deleteGlucoseLog, subscribeToEditHistory, updateGlucoseLog } from './glucose-service';
 import { useT } from '@/i18n/language-context';
-import type { GlucoseLogEntry, Interpretation, MealContext } from './types';
+import { clockTime, shortDay } from '@/i18n/translate';
+import type { GlucoseEdit, GlucoseLogEntry, Interpretation, MealContext } from './types';
 
 const contexts: MealContext[] = ['before_meal', 'after_meal'];
 
@@ -167,9 +168,53 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
               <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : confirmDelete ? t('glucose.form.deleteConfirm') : t('glucose.form.delete')}</Text>
             </Pressable>
           ) : null}
+          {/* Below the buttons, so it never pushes Save out of reach when the keyboard is open. */}
+          {entry ? <EditHistory logId={entry.id} /> : null}
         </View>
       </KeyboardSafeView>
     </Modal>
+  );
+}
+
+/**
+ * What a reading said when it was first logged and every change since, each with its time (D44). Shared by the
+ * patient's edit sheet and the doctor's patient screen, so both see the same record. The times come from the server,
+ * so a phone with a wrong clock cannot misdate an edit.
+ */
+export function EditHistory({ logId }: { logId: string }) {
+  const { t, label, language } = useT();
+  const [edits, setEdits] = useState<GlucoseEdit[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => subscribeToEditHistory(logId, (value) => { setEdits(value); setFailed(false); }, () => setFailed(true)), [logId]);
+
+  if (failed) return <Text style={historyStyles.muted}>{t('glucose.history.loadFailed')}</Text>;
+  if (!edits) return null;
+
+  return (
+    <View style={historyStyles.box}>
+      <Text style={historyStyles.title}>{t('glucose.history.title')}</Text>
+      {edits.length === 0 ? (
+        <Text style={historyStyles.muted}>{t('glucose.history.none')}</Text>
+      ) : (
+        <ScrollView style={historyStyles.list} nestedScrollEnabled>
+          {/* The first record's "before" values are the reading as it was originally logged. */}
+          <Text style={historyStyles.original}>{t('glucose.history.original', { value: edits[0].previousReadingMgdl })}</Text>
+          {edits.map((edit) => {
+            const changes: string[] = [];
+            if (edit.previousReadingMgdl !== edit.readingMgdl) changes.push(`${edit.previousReadingMgdl} → ${edit.readingMgdl} mg/dL`);
+            if (edit.previousContext !== edit.context) changes.push(`${label('mealContext', edit.previousContext)} → ${label('mealContext', edit.context)}`);
+            if (edit.previousNotes !== edit.notes) changes.push(t('glucose.history.notesChanged'));
+            return (
+              <View key={edit.number} style={historyStyles.row}>
+                <Text style={historyStyles.when}>{edit.editedAt ? `${shortDay(edit.editedAt, language)} · ${clockTime(edit.editedAt)}` : '—'}</Text>
+                <Text style={historyStyles.change}>{changes.join('\n')}</Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -244,6 +289,18 @@ const styles = StyleSheet.create({
   offlineButtonText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   deleteButton: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 8, minHeight: 46 },
   deleteButtonText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+});
+
+const historyStyles = StyleSheet.create({
+  box: { borderTopColor: homeColors.borderSoft, borderTopWidth: 1, gap: 8, marginTop: 12, paddingTop: 14 },
+  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  // Capped so a long history scrolls inside the sheet instead of pushing it off the screen.
+  list: { maxHeight: 170 },
+  original: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  row: { borderLeftColor: homeColors.green, borderLeftWidth: 2, gap: 2, marginBottom: 8, paddingLeft: 10 },
+  when: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700' },
+  change: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  muted: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
 });
 
 const recStyles = StyleSheet.create({

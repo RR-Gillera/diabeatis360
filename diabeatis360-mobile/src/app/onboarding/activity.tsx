@@ -20,7 +20,7 @@ export default function ActivityScreen() {
   const next = async () => {
     if (!activity) return;
     if (email) await saveOnboardingValue(email, 'activity', activity, uid);
-    router.push('/onboarding/dietary');
+    router.push('/onboarding/family');
   };
   return (
     <SetupScreen

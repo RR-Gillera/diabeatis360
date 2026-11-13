@@ -19,6 +19,15 @@ export function formatDateTime(value) {
     : '—'
 }
 
+/**
+ * Award points for display: "—" until the patient has earned any. A plain 0 read as a score of zero
+ * (as if they had tried and earned nothing), when it really means nothing has been awarded yet.
+ */
+export function formatPoints(value) {
+  const points = Number(value ?? 0)
+  return points > 0 ? points.toLocaleString('en-PH') : '—'
+}
+
 export function formatPeso(amount) {
   return `₱${Number(amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }

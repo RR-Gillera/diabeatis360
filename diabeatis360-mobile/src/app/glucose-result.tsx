@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { CallEmergencyButton, EMERGENCY_NUMBER } from '@/components/ui/call-emergency-button';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
+import { subscribeToFamilyAlert, type FamilyAlertStatus } from '@/features/family/family-service';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AiRecommendations } from '@/features/glucose/glucose-ui';
 import { glucoseAlert } from '@/features/notifications/notification-service';
@@ -29,11 +30,21 @@ export default function GlucoseResultScreen() {
   const { doctors } = useLocalSearchParams<{ doctors?: string }>();
   const doctorsNotified = Number(doctors) || 0;
   const [latest, setLatest] = useState<GlucoseLogEntry | null>(null);
+  // The family text for this reading (D45). Sent in the background, so it is watched rather than waited for: the screen
+  // and its Call 911 appear at once, and this line appears when the server has an outcome. Nothing shows until then.
+  const [family, setFamily] = useState<{ status: FamilyAlertStatus; count: number } | null>(null);
 
   useEffect(() => {
     if (!uid) return;
     return subscribeToGlucoseHistory(uid, (entries) => setLatest(entries[0] ?? null), () => {});
   }, [uid]);
+
+  const latestId = latest?.id ?? null;
+  const latestCritical = latest?.interpretation === 'critical';
+  useEffect(() => {
+    if (!latestId || !latestCritical) return;
+    return subscribeToFamilyAlert(latestId, setFamily);
+  }, [latestId, latestCritical]);
 
   if (!latest) {
     return (
@@ -64,6 +75,22 @@ export default function GlucoseResultScreen() {
         <Text style={[styles.alertText, styles.doctorNotified]} accessibilityLiveRegion="polite">
           {doctorsNotified === 1 ? t('result.doctorNotified', { number: EMERGENCY_NUMBER }) : t('result.doctorsNotified', { count: doctorsNotified, number: EMERGENCY_NUMBER })}
         </Text>
+      ) : null}
+      {critical && family ? (
+        <View accessibilityLiveRegion="polite">
+          <Text style={[styles.alertText, styles.doctorNotified]}>
+            {family.status === 'sent' ? (family.count === 1 ? t('family.result.sentOne') : t('family.result.sentMany', { count: family.count }))
+              : family.status === 'sending' ? t('family.result.sending')
+                : family.status === 'failed' ? t('family.result.failed')
+                  : family.status === 'limit' ? t('family.result.limit')
+                    : t('family.result.noContacts')}
+          </Text>
+          {family.status === 'no-contacts' ? (
+            <Pressable accessibilityRole="button" onPress={() => router.push('/family-contacts')} hitSlop={8}>
+              <Text style={styles.familyLink}>{t('family.result.addContacts')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
       {critical ? <CallEmergencyButton /> : null}
       <Pressable accessibilityRole="button" style={[styles.alertButton, { backgroundColor: critical ? homeColors.red : homeColors.orange }]} onPress={() => router.push('/booking/find-doctor')}>
@@ -139,6 +166,7 @@ const styles = StyleSheet.create({
   alertTitle: { fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
   alertText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
   doctorNotified: { color: '#111827', fontWeight: '600' },
+  familyLink: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800', marginTop: 4 },
   alertButton: { alignItems: 'center', borderRadius: 12, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46 },
   alertButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   recommendations: { marginTop: 32 },

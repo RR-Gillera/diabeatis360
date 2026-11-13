@@ -25,6 +25,7 @@ export const SETUP_PROGRESS = {
   condition: 50,
   allergies: 60,
   activity: 70,
+  family: 85,
   dietary: 100,
 } as const;
 
