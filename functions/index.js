@@ -5,6 +5,7 @@
 //   analyzeLabel({ imageBase64, mimeType, barcode? })          -> nutrition label reading
 //   lookupProduct({ barcode })                                 -> shared product memory (no Gemini call)
 //   joinCall({ bookingId })                                    -> the LiveKit video room of an accepted call (D39)
+//   notifyFamily({ logId })                                    -> texts the family about a critical reading (D45)
 // The Gemini key is the Functions secret GEMINI_API_KEY:   firebase functions:secrets:set GEMINI_API_KEY
 // (locally, for the emulator, put GEMINI_API_KEY=... in functions/.secret.local, which is gitignored).
 
@@ -16,11 +17,14 @@ const { defineSecret } = require('firebase-functions/params')
 const { callGemini } = require('./lib/gemini')
 const { analyzeLabel, generateRecommendations, lookupProduct } = require('./lib/handlers')
 const { joinCall } = require('./lib/calls')
+const { notifyFamily } = require('./lib/family')
+const { semaphoreSender } = require('./lib/sms')
 const { requireVerifiedEmail } = require('./lib/verified')
 
 initializeApp()
 const geminiKey = defineSecret('GEMINI_API_KEY')
 const livekitSecret = defineSecret('LIVEKIT_API_SECRET')
+const semaphoreKey = defineSecret('SEMAPHORE_API_KEY')
 
 // asia-southeast1 = the same region as Firestore, so calls stay close to the data and to the Philippines.
 const options = { region: 'asia-southeast1', secrets: [geminiKey], timeoutSeconds: 60, memory: '256MiB', maxInstances: 5 }
@@ -65,3 +69,15 @@ exports.joinCall = onCall({ region: options.region, secrets: [livekitSecret], ti
     bookingId: request.data && request.data.bookingId,
     livekit: { url: process.env.LIVEKIT_URL, apiKey: process.env.LIVEKIT_API_KEY, apiSecret: livekitSecret.value() || process.env.LIVEKIT_API_SECRET, pageUrl: process.env.CALL_PAGE_URL },
   }))
+
+// Texts the patient's family about a critical reading (D45). Semaphore's key is the Functions secret SEMAPHORE_API_KEY;
+// SEMAPHORE_SENDER_NAME and FAMILY_SMS_DAILY_CAP are optional and go in functions/.env.
+exports.notifyFamily = onCall({ region: options.region, secrets: [semaphoreKey], timeoutSeconds: 30, memory: '256MiB', maxInstances: 5 }, (request) => {
+  const apiKey = semaphoreKey.value() || process.env.SEMAPHORE_API_KEY
+  return notifyFamily({
+    db: getFirestore(),
+    uid: requireUser(request),
+    logId: request.data && request.data.logId,
+    sendSms: apiKey ? semaphoreSender({ apiKey, senderName: process.env.SEMAPHORE_SENDER_NAME }) : null,
+  })
+})

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 
 import DataTable from '../../components/DataTable'
 import { Button, ConfirmDialog, Drawer, Notice, SearchInput, StatusBadge, StatusToggle } from '../../components/ui'
-import { formatDate, formatDateTime, toDate } from '../../lib/format'
+import { formatDate, formatDateTime, formatPoints, toDate } from '../../lib/format'
 import { effectiveStatus } from '../../lib/subscriptions'
 import { useCollection, useFilteredCollection } from '../../lib/useCollection'
 import { setUserActive } from '../../services/users'
@@ -126,7 +126,7 @@ export default function PatientsTab() {
               <div>
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Wellness</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Award points</p><p className="font-extrabold text-brand">{stats.total_points ?? 0}</p></div>
+                  <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Award points</p><p className="font-extrabold text-brand">{formatPoints(stats.total_points)}</p></div>
                   <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Current streak</p><p className="font-extrabold">{stats.streak_count ?? 0} days</p></div>
                 </div>
               </div>

@@ -32,5 +32,6 @@ export function firstUnansweredStep(answers: OnboardingAnswers): string {
   if (!allergiesDeclared(answers.allergy)) return '/onboarding/allergies';
   if (!answered(answers.activity)) return '/onboarding/activity';
   // Dietary is the last step (D29): every answer given but setup not finished -> back to it, to tap Complete Setup.
+  // The family contacts step (D45) comes before it but is optional, so it is never resumed: Profile > Family alerts.
   return '/onboarding/dietary';
 }

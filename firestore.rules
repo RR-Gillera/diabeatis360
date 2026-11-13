@@ -310,15 +310,68 @@ service cloud.firestore {
       // Readings are private health data: the patient, admins, and a doctor the patient shared them with by booking
       // that doctor (Care_Links, D22) only. A doctor's list query must name the patient (where patient_id ==).
       allow read: if signedIn() && (resource.data.patient_id == request.auth.uid || isAdmin() || canSeePatient(resource.data.patient_id));
-      // You can only log readings for yourself, and only a possible value.
+      // You can only log readings for yourself, and only a possible value. A new reading starts with no edits (D44).
       allow create: if signedIn() && request.resource.data.patient_id == request.auth.uid
-                    && possibleReading(request.resource.data);
-      // You can edit only your own readings, and cannot reassign one to another patient.
+                    && possibleReading(request.resource.data)
+                    && !('edit_count' in request.resource.data);
+      // You can edit only your own readings, and only what the reading says: never whose it is or when it was taken.
+      // Every change to the value, meal context or notes must add the next edit record in the same write (D44), so a
+      // change can never skip the history. A save that changes none of those three must leave the edit count alone.
       allow update: if signedIn() && resource.data.patient_id == request.auth.uid
-                    && request.resource.data.patient_id == request.auth.uid
-                    && possibleReading(request.resource.data);
-      // You can delete only your own readings (the app offers delete-with-confirmation).
+                    && possibleReading(request.resource.data)
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['reading_mgdl', 'context', 'notes', 'interpretation', 'edit_count'])
+                    && (readingChanged()
+                          ? request.resource.data.edit_count == resource.data.get('edit_count', 0) + 1
+                            && existsAfter(editPath(logId, request.resource.data.edit_count))
+                          : request.resource.data.get('edit_count', 0) == resource.data.get('edit_count', 0));
+      // You can delete only your own readings (the app offers delete-with-confirmation, and deletes the edit records
+      // in the same write).
       allow delete: if signedIn() && resource.data.patient_id == request.auth.uid;
+
+      // True when this write changes what the reading says (the three things an edit record keeps).
+      function readingChanged() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasAny(['reading_mgdl', 'context', 'notes']);
+      }
+      function logPath(id) {
+        return /databases/$(database)/documents/Glucose_Logs/$(id);
+      }
+      function editPath(id, number) {
+        return /databases/$(database)/documents/Glucose_Logs/$(id)/Edits/$(string(number));
+      }
+
+      // A reading's edit history (D44): records 1, 2, 3… each holding the values before and after one change and the
+      // server's time of it. Written only together with the change it describes, and never changed afterwards, so a
+      // doctor can trust it: if 280 became 120, both numbers and the time stay on record.
+      match /Edits/{editNumber} {
+        // Exactly the people who can read the reading can read its history.
+        allow read: if signedIn() && (get(logPath(logId)).data.patient_id == request.auth.uid
+                                      || isAdmin()
+                                      || canSeePatient(get(logPath(logId)).data.patient_id));
+        // Only the reading's patient, only inside the edit it records: it is the next number, the reading's count moves
+        // to that number in the same write, "before" is what the reading said until now (get), "after" is what it says
+        // once this write is done (getAfter), and the time is the server's.
+        allow create: if signedIn()
+                      && get(logPath(logId)).data.patient_id == request.auth.uid
+                      && editNumber == string(get(logPath(logId)).data.get('edit_count', 0) + 1)
+                      && getAfter(logPath(logId)).data.get('edit_count', 0) == get(logPath(logId)).data.get('edit_count', 0) + 1
+                      && request.resource.data.keys().hasOnly(['previous_reading_mgdl', 'previous_context', 'previous_notes',
+                                                               'reading_mgdl', 'context', 'notes', 'edited_at'])
+                      && request.resource.data.keys().hasAll(['previous_reading_mgdl', 'previous_context', 'previous_notes',
+                                                              'reading_mgdl', 'context', 'notes', 'edited_at'])
+                      && request.resource.data.previous_reading_mgdl == get(logPath(logId)).data.reading_mgdl
+                      && request.resource.data.previous_context == get(logPath(logId)).data.get('context', 'before_meal')
+                      && request.resource.data.previous_notes == get(logPath(logId)).data.get('notes', '')
+                      && request.resource.data.reading_mgdl == getAfter(logPath(logId)).data.reading_mgdl
+                      && request.resource.data.context == getAfter(logPath(logId)).data.get('context', 'before_meal')
+                      && request.resource.data.notes == getAfter(logPath(logId)).data.get('notes', '')
+                      && request.resource.data.edited_at == request.time;
+        // A record is never changed. It can only be deleted in the same write that deletes its reading.
+        allow update: if false;
+        allow delete: if signedIn()
+                      && get(logPath(logId)).data.patient_id == request.auth.uid
+                      && !existsAfter(logPath(logId));
+      }
     }
 
     // ------------------------------------------------------------------ appointments and chat
@@ -605,6 +658,40 @@ service cloud.firestore {
     // block is only here to say so out loud: anything not matched in this file is denied anyway.)
     match /Usage_Counters/{counterId} {
       allow read, write: if false;
+    }
+
+    // ------------------------------------------------------------------ family alerts (D45)
+
+    // Up to two family members the server texts when the patient logs a critical reading. Private: only the patient.
+    // (The server reads it with its own access.) Kept off Users on purpose, because a booked doctor can read Users.
+    match /Emergency_Contacts/{uid} {
+      // A name, an optional relationship, and a Philippine mobile number in +639XXXXXXXXX form.
+      function validContact(contact) {
+        return contact is map
+          && contact.keys().hasOnly(['name', 'relationship', 'phone'])
+          && contact.keys().hasAll(['name', 'phone'])
+          && contact.name is string && contact.name.size() >= 1 && contact.name.size() <= 60
+          && contact.get('relationship', '') is string && contact.get('relationship', '').size() <= 30
+          && contact.phone is string && contact.phone.matches('[+]639[0-9]{9}');
+      }
+      function validContacts(data) {
+        return data.keys().hasOnly(['user_id', 'contacts', 'updated_at'])
+          && data.user_id == uid
+          && data.contacts is list && data.contacts.size() <= 2
+          && (data.contacts.size() < 1 || validContact(data.contacts[0]))
+          && (data.contacts.size() < 2 || (validContact(data.contacts[1]) && data.contacts[1].phone != data.contacts[0].phone))
+          && data.updated_at == request.time;
+      }
+      allow read, delete: if isUser(uid);
+      allow create, update: if isUser(uid) && validContacts(request.resource.data);
+    }
+
+    // The outcome of each family alert, one per reading (D45). Written only by the server. The patient reads their own
+    // (the result screen shows "We texted your family"); reading one that does not exist yet is allowed so the screen
+    // can wait for it. It holds no phone number and no message.
+    match /Family_Alerts/{logId} {
+      allow read: if signedIn() && (resource == null || resource.data.patient_id == request.auth.uid);
+      allow write: if false;
     }
 
     match /Food_Database/{foodId} {

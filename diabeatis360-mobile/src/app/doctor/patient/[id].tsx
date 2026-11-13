@@ -5,6 +5,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { EditHistory } from '@/features/glucose/glucose-ui';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
@@ -64,6 +65,8 @@ export default function DoctorPatientDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [entries, setEntries] = useState<GlucoseLogEntry[]>([]);
+  // The one reading whose edit history is open (D44); one at a time keeps the list short.
+  const [historyOpen, setHistoryOpen] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<MessageKey | null>(null);
 
@@ -211,7 +214,7 @@ export default function DoctorPatientDetailScreen() {
                         <View style={[styles.entryIcon, { backgroundColor: style.background }]}>
                           <SymbolView name={{ ios: 'drop.fill', android: 'water_drop', web: 'water_drop' }} size={16} tintColor={style.color} />
                         </View>
-                        <View>
+                        <View style={styles.entryText}>
                           <Text style={styles.entryReading}>{entry.readingMgdl} <Text style={styles.entryUnit}>mg/dL</Text></Text>
                           <Text style={styles.entryMeta}>
                             {entry.loggedAt ? shortDay(entry.loggedAt, language) : '—'}
@@ -219,6 +222,17 @@ export default function DoctorPatientDetailScreen() {
                             {' · '}{label('mealContext', entry.context)}
                           </Text>
                           {entry.notes ? <Text style={styles.entryNotes}>&ldquo;{entry.notes}&rdquo;</Text> : null}
+                          {/* A reading the patient changed after logging it is marked, and the doctor can see the original
+                              value and each change with its time (D44), so an edited number is never taken at face value. */}
+                          {entry.editCount > 0 ? (
+                            <Pressable accessibilityRole="button" onPress={() => setHistoryOpen(historyOpen === entry.id ? null : entry.id)} hitSlop={6}>
+                              <Text style={styles.entryEdited}>
+                                {entry.editCount === 1 ? t('glucose.history.edited') : t('glucose.history.editedCount', { count: entry.editCount })}
+                                {' · '}{historyOpen === entry.id ? t('glucose.history.hide') : t('glucose.history.show')}
+                              </Text>
+                            </Pressable>
+                          ) : null}
+                          {historyOpen === entry.id ? <EditHistory logId={entry.id} /> : null}
                         </View>
                       </View>
                       <View style={[styles.entryBadge, { backgroundColor: style.background }]}>
@@ -298,6 +312,8 @@ const styles = StyleSheet.create({
   entryUnit: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600' },
   entryMeta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 2 },
   entryNotes: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, fontStyle: 'italic', marginTop: 4 },
+  entryText: { flex: 1 },
+  entryEdited: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '700', marginTop: 6 },
   entryBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   entryBadgeText: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
 });

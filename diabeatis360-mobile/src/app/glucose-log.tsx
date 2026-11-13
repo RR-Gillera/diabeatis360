@@ -181,6 +181,8 @@ export default function GlucoseLogScreen() {
                             <Text style={[styles.classText, { color: readingColors[entry.interpretation].color }]}>{label('interpretation', entry.interpretation)}</Text>
                           </View>
                         ) : null}
+                        {/* A changed reading says so here; tapping it shows what changed and when (D44). */}
+                        {entry.editCount > 0 ? <Text style={styles.editedText}>{t('glucose.history.edited')}</Text> : null}
                       </View>
                     </View>
                   </View>
@@ -276,6 +278,7 @@ const styles = StyleSheet.create({
   entryMeta: { alignItems: 'center', flexDirection: 'row', gap: 8, marginTop: 4 },
   classPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
   classText: { fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800' },
+  editedText: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontStyle: 'italic', fontWeight: '600' },
   entryBadge: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 4 },
   entryBadgeText: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '800', letterSpacing: -0.5, textTransform: 'uppercase' },
   fab: { alignItems: 'center', backgroundColor: homeColors.greenBright, borderRadius: 16, bottom: 112, elevation: 4, height: 64, justifyContent: 'center', position: 'absolute', right: 24, shadowColor: homeColors.greenBright, shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.2, shadowRadius: 15, width: 64 },
