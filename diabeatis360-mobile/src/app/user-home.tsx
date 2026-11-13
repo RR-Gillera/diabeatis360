@@ -23,6 +23,8 @@ import { clockTime } from '@/i18n/translate';
 // so these two cards used to show made-up numbers (45 mins, 1.5 L) to everyone. Now they show what is real: the day's
 // movement and water reminder times (reminder-plan.ts), and open Exercise Tips / Notifications (D34).
 const reminderTimes = (times: [number, number][]) => times.map(([hour, minute]) => clockTime(new Date(2000, 0, 1, hour, minute))).join(' · ');
+// One time per line on the half-width cards: "10:00 AM · 3:00 PM" did not fit and broke after the dot.
+const stacked = (times: string) => times.split(' · ').join('\n');
 
 // Recent Activity is now driven by real Glucose_Logs: each of the last two
 // readings is one activity row, worth the same points the rewards screen
@@ -156,10 +158,14 @@ export default function UserHomeScreen() {
 
         <View style={styles.card}>
           <Text style={[styles.cardLabel, styles.cardLabelStart]}>{t('home.average')}</Text>
-          <View style={styles.avgRow}>
-            <Text style={styles.avgValue}>{average ?? '—'}</Text>
-            <Text style={styles.avgUnit}>mg/dL</Text>
-          </View>
+          {/* No number yet: the line under it already says "log a few more readings". A dash at this size drew as a
+              thick black bar next to "mg/dL". */}
+          {average !== null ? (
+            <View style={styles.avgRow}>
+              <Text style={styles.avgValue}>{average}</Text>
+              <Text style={styles.avgUnit}>mg/dL</Text>
+            </View>
+          ) : null}
           <Sparkline values={recentReadings} />
         </View>
 
@@ -169,7 +175,7 @@ export default function UserHomeScreen() {
               <Text style={styles.smallCardLabel}>{t('home.exercise')}</Text>
               <SymbolView name={{ ios: 'figure.walk', android: 'directions_walk', web: 'directions_walk' }} size={16} tintColor={homeColors.orange} />
             </View>
-            <Text style={styles.reminderTime}>{reminderTimes(DAILY_REMINDERS.exercise.times)}</Text>
+            <Text style={styles.reminderTime}>{stacked(reminderTimes(DAILY_REMINDERS.exercise.times))}</Text>
             <Text style={styles.reminderLabel}>{t('home.exercise.reminder')}</Text>
             <Text style={styles.cardLink}>{t('home.exercise.tips')} ›</Text>
           </Pressable>
@@ -179,7 +185,7 @@ export default function UserHomeScreen() {
               <Text style={styles.smallCardLabel}>{t('home.hydration')}</Text>
               <SymbolView name={{ ios: 'drop.fill', android: 'water_drop', web: 'water_drop' }} size={16} tintColor={homeColors.blue} />
             </View>
-            <Text style={styles.reminderTime}>{reminderTimes(DAILY_REMINDERS.hydration.times)}</Text>
+            <Text style={styles.reminderTime}>{stacked(reminderTimes(DAILY_REMINDERS.hydration.times))}</Text>
             <Text style={styles.reminderLabel}>{t('home.hydration.reminders')}</Text>
             <Text style={[styles.cardLink, styles.cardLinkBlue]}>{t('home.hydration.settings')} ›</Text>
           </Pressable>

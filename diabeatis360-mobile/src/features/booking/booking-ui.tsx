@@ -31,7 +31,9 @@ export function BookingHeader({ title, subtitle, onBack, actions }: { title: str
           </Pressable>
         ) : null}
         <View style={styles.headerCopy}>
-          <Text accessibilityRole="header" style={styles.title}>{title}</Text>
+          {/* Beside the bell and the menu there is not room for a long title at full size ("Select Date & Time" broke
+              onto two lines), so there it is a little smaller and the phone shrinks it further to stay on one line. */}
+          <Text accessibilityRole="header" style={[styles.title, actions ? styles.titleBesideActions : null]} numberOfLines={actions ? 1 : undefined} adjustsFontSizeToFit={Boolean(actions)} minimumFontScale={0.75}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
         {actions}
@@ -128,9 +130,10 @@ export const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   backButton: { width: 28, height: 28, justifyContent: 'center' },
   headerCopy: { flex: 1 },
-  headerActions: { flexDirection: 'row', gap: 12 },
+  headerActions: { flexDirection: 'row', gap: 8 },
   headerActionButton: { alignItems: 'center', backgroundColor: '#F8FAFC', borderColor: '#F1F5F9', borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
   title: { color: bookingColors.navy, fontFamily: Fonts.sans, fontSize: 24, fontWeight: '800' },
+  titleBesideActions: { fontSize: 20 },
   subtitle: { color: bookingColors.muted, fontFamily: Fonts.sans, fontSize: 14, marginTop: 4 },
   sectionTitle: { color: bookingColors.navy, fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
   card: { backgroundColor: '#FFFFFF', borderColor: bookingColors.border, borderWidth: 1, borderRadius: 20, padding: Spacing.three },

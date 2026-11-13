@@ -19,9 +19,12 @@ export function BrandMark() {
   return <View style={styles.brandMark}><Image source={require('@/assets/images/logo-mark.png')} style={styles.brandLogo} contentFit="contain" accessibilityLabel="Diabeatis360 logo" /></View>;
 }
 
-export function AuthField({ label, secure, onToggleSecure, icon, ...props }: TextInputProps & { label: string; secure?: boolean; onToggleSecure?: () => void; icon?: 'mail' | 'lock' }) {
+/** The SF Symbol for each field icon; Android and web use the icon's own name (Material Symbols). */
+const FIELD_ICONS_IOS = { mail: 'envelope.fill', lock: 'lock.fill', person: 'person.fill' } as const;
+
+export function AuthField({ label, secure, onToggleSecure, icon, ...props }: TextInputProps & { label: string; secure?: boolean; onToggleSecure?: () => void; icon?: 'mail' | 'lock' | 'person' }) {
   const { t } = useT();
-  return <View style={styles.fieldGroup}><Text style={styles.label}>{label}</Text><View style={styles.inputWrap}>{icon ? <SymbolView name={{ ios: icon === 'mail' ? 'envelope.fill' : 'lock.fill', android: icon, web: icon }} size={16} tintColor="#9BACBF" /> : null}<TextInput {...props} secureTextEntry={secure} style={styles.input} placeholderTextColor="#C6D2E2" autoCapitalize="none" />{onToggleSecure ? <Pressable accessibilityRole="button" accessibilityLabel={secure ? t('auth.password.show') : t('auth.password.hide')} onPress={onToggleSecure} hitSlop={10}><SymbolView name={{ ios: secure ? 'eye.slash' : 'eye', android: secure ? 'visibility_off' : 'visibility', web: secure ? 'visibility_off' : 'visibility' }} size={19} tintColor="#C6D2E2" /></Pressable> : null}</View></View>;
+  return <View style={styles.fieldGroup}><Text style={styles.label}>{label}</Text><View style={styles.inputWrap}>{icon ? <SymbolView name={{ ios: FIELD_ICONS_IOS[icon], android: icon, web: icon }} size={16} tintColor="#9BACBF" /> : null}<TextInput {...props} secureTextEntry={secure} style={styles.input} placeholderTextColor="#C6D2E2" autoCapitalize="none" />{onToggleSecure ? <Pressable accessibilityRole="button" accessibilityLabel={secure ? t('auth.password.show') : t('auth.password.hide')} onPress={onToggleSecure} hitSlop={10}><SymbolView name={{ ios: secure ? 'eye.slash' : 'eye', android: secure ? 'visibility_off' : 'visibility', web: secure ? 'visibility_off' : 'visibility' }} size={19} tintColor="#C6D2E2" /></Pressable> : null}</View></View>;
 }
 
 const BUTTON_ICONS = {
@@ -69,7 +72,7 @@ const styles = StyleSheet.create({
   brandLogo: { height: 46, width: 46 },
   fieldGroup: { gap: 8 },
   label: { color: authColors.muted, fontFamily: Brand.font.extraBold, fontSize: 12, letterSpacing: 0.7 },
-  inputWrap: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', minHeight: 56, paddingHorizontal: 16 },
+  inputWrap: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 56, paddingHorizontal: 16 },
   input: { color: authColors.navy, flex: 1, fontFamily: Brand.font.regular, fontSize: 16 },
   button: { alignItems: 'center', backgroundColor: authColors.green, borderRadius: 18, elevation: 3, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 60, shadowColor: authColors.green, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.22, shadowRadius: 16 },
   buttonText: { color: '#FFF', fontFamily: Brand.font.bold, fontSize: 17 },

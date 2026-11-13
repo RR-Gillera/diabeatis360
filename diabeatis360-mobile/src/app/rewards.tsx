@@ -51,6 +51,12 @@ export default function RewardsScreen() {
   }, [uid, badges, earned, stats]);
 
   const earnedIds = new Set(earned.map((item) => item.badgeId));
+  const isUnlocked = (badge: (typeof badges)[number]) => earnedIds.has(badge.id) || hasQualified(badge, stats);
+  // Earned badges first, then the ones still to earn; in each group the logging badges before the streak badges, each
+  // from the smallest goal up. The list used to come in the database's own order, so a locked "14-Day Streak" sat
+  // between earned badges and above the 3-day one.
+  const orderedBadges = [...badges].sort((a, b) =>
+    (Number(!isUnlocked(a)) - Number(!isUnlocked(b))) || a.kind.localeCompare(b.kind) || (a.threshold - b.threshold));
 
   return (
     <View style={styles.screen}>
@@ -94,8 +100,8 @@ export default function RewardsScreen() {
         <Text style={styles.sectionTitle}>{t('rewards.badges')}</Text>
         {badges.length === 0 ? (
           <Text style={styles.empty}>{t('rewards.noBadges')}</Text>
-        ) : badges.map((badge) => {
-          const unlocked = earnedIds.has(badge.id) || hasQualified(badge, stats);
+        ) : orderedBadges.map((badge) => {
+          const unlocked = isUnlocked(badge);
           const words = badgeText(badge, language);
           return (
             <View key={badge.id} style={[styles.badgeCard, !unlocked && styles.badgeLocked]}>

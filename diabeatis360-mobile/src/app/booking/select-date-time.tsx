@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BookingHeader, BookingHeaderActions, bookingColors, combineDateAndTime, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { BookingError, CONCERN_LIMIT, createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
@@ -32,6 +33,7 @@ export default function SelectDateTimeScreen() {
   const goBack = useSafeBack('/booking/find-doctor');
   const { provider, selectedDate, selectedTime, selectDate, selectTime, fee, setBookingId } = useBooking();
   const { t, language } = useT();
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const [month, setMonth] = useState(new Date());
   const days = useMemo(() => monthDays(month), [month]);
   // Philippine time (DECISIONS.md D26). `now` moves every minute so a slot greys out the moment it starts.
@@ -124,7 +126,6 @@ export default function SelectDateTimeScreen() {
             </View>
           );
         })}
-        <View style={styles.summary}><View><Text style={styles.summaryLabel}>{t('booking.selectedSlot')}</Text><Text style={styles.summaryValue}>{selectedDate && selectedTime ? `${formatDate(selectedDate, language)} • ${selectedTime}` : t('booking.selectSlot')}</Text></View><View><Text style={styles.summaryLabel}>{t('booking.totalFee')}</Text><Text style={styles.summaryValue}>{formatFee(fee)}</Text></View></View>
         <Text style={ui.sectionTitle}>{t('booking.concernTitle')}</Text>
         <TextInput
           accessibilityLabel={t('booking.concernLabel')}
@@ -137,10 +138,15 @@ export default function SelectDateTimeScreen() {
           maxLength={CONCERN_LIMIT}
         />
         <Text style={styles.concernCount}>{t('booking.concernCount', { count: concern.length, limit: CONCERN_LIMIT })}</Text>
-        {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
-        <PrimaryButton title={t('booking.request')} onPress={requestAppointment} disabled={!selectedDate || !selectedTime} loading={requesting} />
         <Text style={styles.requestHint}>{t('booking.requestHint')}</Text>
       </KeyboardSafeScroll>
+      {/* Pinned to the bottom, as in the Figma frame. It used to sit at the END of the list, so with a doctor who is
+          open all day the person scrolled past up to 48 time slots to find the button. */}
+      <View style={[styles.footer, { paddingBottom: Math.max(16, bottomInset + 12) }]}>
+        <View style={styles.summary}><View><Text style={styles.summaryLabel}>{t('booking.selectedSlot')}</Text><Text style={styles.summaryValue}>{selectedDate && selectedTime ? `${formatDate(selectedDate, language)} • ${selectedTime}` : t('booking.selectSlot')}</Text></View><View><Text style={styles.summaryLabel}>{t('booking.totalFee')}</Text><Text style={styles.summaryValue}>{formatFee(fee)}</Text></View></View>
+        {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
+        <PrimaryButton title={t('booking.request')} onPress={requestAppointment} disabled={!selectedDate || !selectedTime} loading={requesting} />
+      </View>
     </View>
   );
 }
@@ -157,5 +163,5 @@ function TimeButton({ time, selected, taken, past, onPress }: { time: string; se
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, periodBlock: { gap: 16 }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: 'center' }, summary: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -24, padding: 24 }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
+  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, periodBlock: { gap: 16 }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, textAlign: 'center' }, footer: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, gap: 12, paddingHorizontal: 24, paddingTop: 14 }, summary: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
 });

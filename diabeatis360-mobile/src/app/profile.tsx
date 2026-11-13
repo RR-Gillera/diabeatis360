@@ -122,7 +122,7 @@ export default function ProfileScreen() {
           <MenuRow icon={{ ios: 'fork.knife', android: 'restaurant' }} title={t('profile.menu.diet')} subtitle={diet ? dietLine : undefined} onPress={() => router.push('/dietary-preference')} />
           <MenuRow icon={{ ios: 'character.bubble', android: 'translate' }} title={t('profile.menu.language')} subtitle={language} onPress={() => router.push('/language-settings')} />
           <MenuRow icon={{ ios: 'bell.fill', android: 'notifications' }} title={t('profile.menu.notifications')} subtitle={reminderStatus} onPress={() => router.push('/notification-settings')} />
-          <MenuRow icon={{ ios: 'person.2.fill', android: 'family_restroom' }} title={t('family.title')} subtitle={familyCount === 0 ? t('family.menuNone') : familyCount === 1 ? t('family.menuOne') : t('family.menuTwo')} onPress={() => router.push('/family-contacts')} />
+          <MenuRow icon={{ ios: 'person.2.fill', android: 'family_restroom' }} title={t('family.title')} subtitle={(familyCount === 0 ? t('family.menuNone') : familyCount === 1 ? t('family.menuOne') : t('family.menuTwo')).toUpperCase()} onPress={() => router.push('/family-contacts')} />
           <MenuRow icon={{ ios: 'lock.fill', android: 'lock' }} title={t('pin.menu.change')} onPress={() => router.push('/change-pin')} />
           <MenuRow icon={{ ios: 'gift.fill', android: 'redeem' }} tint="green" title={t('profile.menu.rewards')} subtitle={t('profile.rewardsLine', { tier: tier.toUpperCase(), points: compactNumber(stats.points) })} onPress={() => router.push('/rewards')} />
           {premium

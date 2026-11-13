@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
+import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -28,6 +29,8 @@ export default function FindDoctorScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [loadFailed, setLoadFailed] = useState(false);
+  // The doctor whose details are open ("View Profile"); null when the sheet is closed.
+  const [viewing, setViewing] = useState<Provider | null>(null);
 
   useEffect(() => subscribeToBookableProviders(setProviders, () => setLoadFailed(true)), []);
 
@@ -71,7 +74,8 @@ export default function FindDoctorScreen() {
 
         <Text style={styles.sectionTitle}>{t('doctors.all')}</Text>
         {loadFailed ? <Text style={styles.error}>{t('doctors.loadFailed')}</Text> : null}
-        {!loadFailed && visibleProviders.length === 0 ? <Text style={styles.empty}>{t('doctors.none')}</Text> : null}
+        {/* "No match" only when the person searched or filtered; with no doctors at all it said that to someone who had typed nothing. */}
+        {!loadFailed && visibleProviders.length === 0 ? <Text style={styles.empty}>{t(search.trim() || filter !== 'All' ? 'doctors.none' : 'doctors.noneYet')}</Text> : null}
         {visibleProviders.map((provider) => (
           <View key={provider.id} style={ui.card}>
             <View style={styles.doctorTop}>
@@ -89,14 +93,52 @@ export default function FindDoctorScreen() {
               <View><Text style={styles.label}>{t('doctors.fee')}</Text><Text style={styles.value}>{formatFee(provider.consultationFee)}</Text></View>
             </View>
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => choose(provider)}><Text style={styles.secondaryText}>{t('doctors.viewProfile')}</Text></Pressable>
+              {/* View Profile used to open the same date picker as Consult, so the card had two buttons for one thing. */}
+              <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => setViewing(provider)}><Text style={styles.secondaryText}>{t('doctors.viewProfile')}</Text></Pressable>
               <View style={styles.actionPrimary}><PrimaryButton title={t('doctors.consult')} onPress={() => choose(provider)} /></View>
             </View>
           </View>
         ))}
       </KeyboardSafeScroll>
       <BottomNav active="doctors" />
+      <DoctorProfileSheet doctor={viewing} onClose={() => setViewing(null)} onConsult={(doctor) => { setViewing(null); choose(doctor); }} />
     </View>
+  );
+}
+
+// "View Profile": the doctor's details in one place before booking, including the PRC licence number, which the card
+// does not show. It reads the same Provider the list already loaded, so it needs no extra Firestore read.
+function DoctorProfileSheet({ doctor, onClose, onConsult }: { doctor: Provider | null; onClose: () => void; onConsult: (doctor: Provider) => void }) {
+  const { t } = useT();
+  return (
+    <Modal visible={doctor !== null} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.sheetOverlay}>
+        <ModalBackdrop onClose={onClose} />
+        {doctor ? (
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.doctorTop}>
+              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(doctor.fullName)}</Text></View>
+              <View style={styles.doctorCopy}>
+                <Text accessibilityRole="header" style={styles.doctorName}>{doctor.fullName}</Text>
+                <Text style={styles.specialty}>{doctor.specialty}</Text>
+                {doctor.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>{t('doctors.verified')}</Text></View> : null}
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={onClose} hitSlop={10} style={styles.sheetClose}>
+                <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#64748B" />
+              </Pressable>
+            </View>
+            <View style={styles.sheetRows}>
+              <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctor.profile.prc')}</Text><Text style={styles.sheetValue} selectable>{doctor.prcLicenseNumber}</Text></View>
+              <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctors.profile.location')}</Text><Text style={styles.sheetValue}>{doctor.city}</Text></View>
+              <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctors.profile.fee')}</Text><Text style={styles.sheetValue}>{formatFee(doctor.consultationFee)}</Text></View>
+              <View style={[styles.sheetRow, styles.sheetRowLast]}><Text style={styles.sheetLabel}>{t('doctors.profile.hours')}</Text><Text style={styles.sheetValue}>{t(doctor.availabilityMode === 'always' ? 'doctor.schedule.always' : 'doctors.profile.bySchedule')}</Text></View>
+            </View>
+            <PrimaryButton title={t('doctors.consult')} onPress={() => onConsult(doctor)} />
+          </View>
+        ) : null}
+      </View>
+    </Modal>
   );
 }
 
@@ -138,4 +180,13 @@ const styles = StyleSheet.create({
   secondaryButton: { alignItems: 'center', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 14 },
   secondaryText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' },
   actionPrimary: { flex: 1 },
+  sheetOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, gap: 20, padding: 24, paddingBottom: 32 },
+  sheetHandle: { alignSelf: 'center', backgroundColor: '#E2E8F0', borderRadius: 3, height: 5, marginBottom: -4, width: 44 },
+  sheetClose: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
+  sheetRows: { borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16 },
+  sheetRow: { alignItems: 'center', borderBottomColor: bookingColors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingVertical: 14 },
+  sheetRowLast: { borderBottomWidth: 0 },
+  sheetLabel: { color: bookingColors.muted, fontSize: 13, fontWeight: '600' },
+  sheetValue: { color: bookingColors.navy, flexShrink: 1, fontSize: 14, fontWeight: '700', textAlign: 'right' },
 });

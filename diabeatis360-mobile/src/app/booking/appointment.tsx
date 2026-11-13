@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { bookingReference } from '@/features/booking/booking-reference';
 import { BookingHeader, bookingColors, formatApptDate, formatApptTime, formatFee, paymentMethodLabel, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, BookingStatus, PaymentStatus } from '@/features/booking/types';
@@ -102,7 +103,7 @@ export default function AppointmentScreen() {
               <Text style={styles.waitingNote}>{t('appt.waiting')}</Text>
             ) : null}
 
-            <Text style={styles.reference} selectable>{t('appt.bookingId', { id: entry.id })}</Text>
+            <Text style={styles.reference} selectable>{t('appt.bookingId', { id: bookingReference(entry.id) })}</Text>
           </View>
         ) : (
           <Text style={styles.empty}>{t('appt.unavailable')}</Text>

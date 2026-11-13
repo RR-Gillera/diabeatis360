@@ -76,6 +76,9 @@ export function BottomNav({ active }: { active: NavTarget }) {
   );
 }
 
+/** Room kept on every side of a chart for its dots (radius 4) and the 3-wide line, so none is cut off at the edge. */
+const CHART_DOT_MARGIN = 6;
+
 // Minimal SVG line chart for a week of readings — no smoothing, just straight
 // segments between points, which is all react-native-svg needs here.
 export function Sparkline({ values, width = 262, height = 96 }: { values: number[]; width?: number; height?: number }) {
@@ -84,9 +87,11 @@ export function Sparkline({ values, width = 262, height = 96 }: { values: number
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const stepX = width / (values.length - 1);
+  // The dots are 4 wide each side of their centre: without this margin the first and last ones were cut in half by
+  // the edge of the drawing.
+  const stepX = (width - CHART_DOT_MARGIN * 2) / (values.length - 1);
   const points = values.map((value, index) => {
-    const x = index * stepX;
+    const x = CHART_DOT_MARGIN + index * stepX;
     const y = height - ((value - min) / range) * (height - 12) - 6;
     return { x, y };
   });
@@ -112,11 +117,14 @@ export function WeeklyChart({ days, width = 264, height = 140 }: { days: { label
   const niceMax = Math.max(niceMin + 60, Math.ceil(Math.max(...values) / 20) * 20);
   const gridValues = [niceMax, niceMax - (niceMax - niceMin) / 3, niceMax - ((niceMax - niceMin) * 2) / 3, niceMin];
 
-  const plotX = (index: number) => (index / (days.length - 1)) * width;
-  const plotY = (value: number) => ((niceMax - value) / (niceMax - niceMin)) * height;
+  // Inset on every side by the dot margin: Monday's dot, and a reading exactly on the top or bottom gridline, used to
+  // be cut in half. It also puts each gridline level with the middle of its number on the left.
+  const plotX = (index: number) => CHART_DOT_MARGIN + (index / (days.length - 1)) * (width - CHART_DOT_MARGIN * 2);
+  const plotY = (value: number) => CHART_DOT_MARGIN + ((niceMax - value) / (niceMax - niceMin)) * (height - CHART_DOT_MARGIN * 2);
   const points = present.map((day) => ({ x: plotX(day.index), y: plotY(day.value) }));
   const pointsAttr = points.map((point) => `${point.x},${point.y}`).join(' ');
-  const areaAttr = `${pointsAttr} ${points[points.length - 1].x},${height} ${points[0].x},${height}`;
+  const floorY = plotY(niceMin);
+  const areaAttr = `${pointsAttr} ${points[points.length - 1].x},${floorY} ${points[0].x},${floorY}`;
 
   return (
     <View>
