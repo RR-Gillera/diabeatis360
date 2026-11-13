@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { screenAnimation } from '@/constants/screen-animation';
 import { screenTopStyle } from '@/constants/screen-top';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
@@ -51,7 +52,8 @@ export default function DoctorLayout() {
     <Stack
       screenOptions={({ route }) => ({
         headerShown: false,
-        animation: reduceMotion ? 'none' : 'slide_from_right',
+        // Pages slide in from the right; the five tab screens change in place (constants/screen-animation.ts).
+        animation: screenAnimation(route.name, reduceMotion, 'doctor'),
         contentStyle: screenTopStyle(route.name, statusBarHeight, 'doctor'),
       })}
     />

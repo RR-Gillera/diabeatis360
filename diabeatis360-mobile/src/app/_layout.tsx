@@ -5,6 +5,7 @@ import { useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 
+import { screenAnimation } from '@/constants/screen-animation';
 import { screenTopStyle } from '@/constants/screen-top';
 import { BookingProvider } from '@/features/booking/booking-context';
 import { AuthProvider } from '@/features/auth/auth-context';
@@ -40,11 +41,9 @@ export default function TabLayout() {
             screenOptions={({ route }) => ({
               headerShown: false,
               contentStyle: screenTopStyle(route.name, statusBarHeight, 'root'),
-              // Without this the platform default is used, which reads as a
-              // screen appearing on top rather than a horizontal push — the
-              // app has no headers, so the slide is the only cue that you have
-              // moved somewhere new.
-              animation: reduceMotion ? 'none' : 'slide_from_right',
+              // Pages slide in from the right; the bottom-tab screens change in place
+              // (constants/screen-animation.ts explains why).
+              animation: screenAnimation(route.name, reduceMotion, 'root'),
             })}
           />
           {/* Sends a patient away from doctor screens and a doctor away from patient-only ones (QA D-15). */}
