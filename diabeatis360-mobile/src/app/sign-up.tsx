@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
+import { RoundBackButton } from '@/components/ui/round-back-button';
 import { AuthButton, AuthField, authColors, authStyles, BrandMark, SocialButtons } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import type { SocialProvider } from '@/features/auth/social-types';
@@ -27,17 +28,17 @@ export default function SignUpScreen() {
     void social.start(provider);
   };
   return <KeyboardSafeScroll style={authStyles.screen} contentContainerStyle={styles.scroll}>
-    <Pressable accessibilityRole="button" onPress={() => router.back()}><Text style={styles.back}>‹ {t('common.back')}</Text></Pressable>
+    <View style={styles.back}><RoundBackButton onPress={() => router.back()} /></View>
     <View style={styles.heading}>
       <BrandMark />
       <Text style={styles.title}>{t('auth.signup.title')}</Text>
       <Text style={styles.subtitle}>{t('auth.signup.subtitle')}</Text>
     </View>
     <View style={styles.form}>
-      <AuthField label={t('auth.signup.fullName')} value={fullName} onChangeText={setFullName} placeholder={t('health.edit.namePlaceholder')} autoCapitalize="words" />
-      <AuthField label={t('auth.signup.email')} value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" />
-      <AuthField label={t('auth.signup.password')} value={password} onChangeText={setPassword} placeholder="••••••••" secure={hidePassword} onToggleSecure={() => setHidePassword((value) => !value)} />
-      <AuthField label={t('auth.signup.confirm')} value={confirm} onChangeText={setConfirm} placeholder="••••••••" secure={hideConfirm} onToggleSecure={() => setHideConfirm((value) => !value)} />
+      <AuthField label={t('auth.signup.fullName')} value={fullName} onChangeText={setFullName} placeholder={t('health.edit.namePlaceholder')} autoCapitalize="words" icon="person" />
+      <AuthField label={t('auth.signup.email')} value={email} onChangeText={setEmail} placeholder="name@example.com" keyboardType="email-address" icon="mail" />
+      <AuthField label={t('auth.signup.password')} value={password} onChangeText={setPassword} placeholder="••••••••" icon="lock" secure={hidePassword} onToggleSecure={() => setHidePassword((value) => !value)} />
+      <AuthField label={t('auth.signup.confirm')} value={confirm} onChangeText={setConfirm} placeholder="••••••••" icon="lock" secure={hideConfirm} onToggleSecure={() => setHideConfirm((value) => !value)} />
       <View style={styles.terms}>
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: terms }} accessibilityLabel={`${t('auth.signup.agreeStart')}${t('profile.terms')}${t('auth.signup.and')}${t('profile.privacy')}`} onPress={() => setTerms((value) => !value)} style={[styles.checkbox, terms && styles.checked]}>
           {terms ? <Text style={styles.check}>✓</Text> : null}
@@ -68,4 +69,4 @@ function registrationErrorKey(value: unknown): MessageKey {
   return 'auth.error.register';
 }
 
-const styles = StyleSheet.create({ scroll: { flexGrow: 1, padding: 24 }, back: { color: authColors.muted, fontSize: 15, marginBottom: 28 }, heading: { alignItems: 'center' }, title: { color: authColors.navy, fontSize: 28, fontWeight: '900', marginTop: 14, textAlign: 'center' }, subtitle: { color: authColors.muted, fontSize: 15, lineHeight: 23, marginTop: 8, textAlign: 'center' }, form: { gap: 17, marginTop: 34, maxWidth: 430, width: '100%', alignSelf: 'center' }, terms: { alignItems: 'center', flexDirection: 'row', gap: 10 }, checkbox: { borderColor: authColors.muted, borderRadius: 4, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 }, checked: { backgroundColor: authColors.green, borderColor: authColors.green }, check: { color: '#FFF', fontWeight: '900', textAlign: 'center' }, termsText: { color: authColors.muted, flex: 1, fontSize: 12, lineHeight: 18 }, green: { color: authColors.green, fontWeight: '700' }, error: { color: '#D9364F', fontSize: 13 }, divider: { alignItems: 'center', flexDirection: 'row', gap: 10, marginVertical: 8 }, line: { backgroundColor: '#E1E7EF', flex: 1, height: 1 }, dividerText: { color: '#8CA0BB', fontSize: 11, letterSpacing: 1 }, login: { color: authColors.muted, fontSize: 14, marginTop: 14, textAlign: 'center' } });
+const styles = StyleSheet.create({ scroll: { flexGrow: 1, padding: 24 }, back: { alignSelf: 'flex-start', marginBottom: 20 }, heading: { alignItems: 'center' }, title: { color: authColors.navy, fontSize: 28, fontWeight: '900', marginTop: 14, textAlign: 'center' }, subtitle: { color: authColors.muted, fontSize: 15, lineHeight: 23, marginTop: 8, textAlign: 'center' }, form: { gap: 17, marginTop: 34, maxWidth: 430, width: '100%', alignSelf: 'center' }, terms: { alignItems: 'center', flexDirection: 'row', gap: 10 }, checkbox: { borderColor: authColors.muted, borderRadius: 4, borderWidth: 1, height: 20, justifyContent: 'center', width: 20 }, checked: { backgroundColor: authColors.green, borderColor: authColors.green }, check: { color: '#FFF', fontWeight: '900', textAlign: 'center' }, termsText: { color: authColors.muted, flex: 1, fontSize: 12, lineHeight: 18 }, green: { color: authColors.green, fontWeight: '700' }, error: { color: '#D9364F', fontSize: 13 }, divider: { alignItems: 'center', flexDirection: 'row', gap: 10, marginVertical: 8 }, line: { backgroundColor: '#E1E7EF', flex: 1, height: 1 }, dividerText: { color: '#8CA0BB', fontSize: 11, letterSpacing: 1 }, login: { color: authColors.muted, fontSize: 14, marginTop: 14, textAlign: 'center' } });

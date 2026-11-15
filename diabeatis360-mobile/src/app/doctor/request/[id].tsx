@@ -7,6 +7,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
+import { bookingReference } from '@/features/booking/booking-reference';
 import { DECLINE_REASON_LIMIT, subscribeToBooking, updateBookingStatus } from '@/features/booking/booking-service';
 import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
@@ -82,7 +83,11 @@ export default function RequestDetailsScreen() {
                 <View style={styles.cell}><Text style={styles.label}>{t('doctor.request.type')}</Text><Text style={[styles.value, styles.green]}>{t('doctor.request.online')}</Text></View>
                 <View style={styles.cell}><Text style={styles.label}>{t('doctors.fee')}</Text><Text style={styles.value}>{formatFee(booking.fee)}</Text></View>
               </View>
-              <View style={styles.statusRow}><StatusPill status={booking.status as never} /></View>
+              {/* The same short Booking ID the patient's receipt shows, so the two can be matched (features/booking/booking-reference.ts). */}
+              <View style={styles.statusRow}>
+                <StatusPill status={booking.status as never} />
+                {id ? <Text style={styles.reference} selectable>{t('appt.bookingId', { id: bookingReference(id) })}</Text> : null}
+              </View>
             </View>
 
             <View style={[doctorStyles.card, styles.concernCard]}>
@@ -164,7 +169,8 @@ const styles = StyleSheet.create({
   label: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
   value: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
   green: { color: homeColors.green },
-  statusRow: { alignSelf: 'stretch', marginTop: 12 },
+  statusRow: { alignItems: 'center', alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  reference: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600' },
   concernCard: { gap: 12 },
   concernTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13, fontWeight: '800', letterSpacing: 0.6 },
   concernBox: { backgroundColor: '#F5F7F9', borderRadius: 14, padding: 14 },

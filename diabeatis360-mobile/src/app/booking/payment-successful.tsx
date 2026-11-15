@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
+import { bookingReference } from '@/features/booking/booking-reference';
 import { bookingColors, formatApptDate, formatApptTime, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
@@ -51,7 +52,7 @@ export default function PaymentSuccessfulScreen() {
             {bookingId ? (
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>{t('booking.id')}</Text>
-                <Text style={styles.bookingIdValue} selectable>{bookingId}</Text>
+                <Text style={styles.bookingIdValue} selectable>{bookingReference(bookingId)}</Text>
               </View>
             ) : null}
             <View style={styles.receiptRow}>

@@ -133,6 +133,13 @@ export default function GlucoseResultScreen() {
       <View style={styles.recommendations}>
         <AiRecommendations interpretation={latest.interpretation} />
       </View>
+
+      {/* The way out. The Figma frame has none, so the screen was a dead end without the phone's own Back button.
+          dismissTo, like the tab bar: it goes back to the Home already open instead of stacking a second one. */}
+      <Pressable accessibilityRole="button" style={({ pressed }) => [styles.homeButton, pressed && styles.homeButtonPressed]} onPress={() => router.dismissTo('/user-home')}>
+        <SymbolView name={{ ios: 'house.fill', android: 'home', web: 'home' }} size={18} tintColor={homeColors.green} />
+        <Text style={styles.homeButtonText}>{t('result.backHome')}</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -140,6 +147,9 @@ export default function GlucoseResultScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { padding: 24, paddingBottom: 60 },
+  homeButton: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.green, borderRadius: 16, borderWidth: 1.5, flexDirection: 'row', gap: 8, height: 56, justifyContent: 'center', marginTop: 24 },
+  homeButtonPressed: { opacity: 0.7 },
+  homeButtonText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 16, fontWeight: '700' },
   emptyScreen: { alignItems: 'center', gap: 12, justifyContent: 'center' },
   emptyText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 15 },
   emptyLink: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700' },

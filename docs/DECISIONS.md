@@ -459,6 +459,8 @@ Figma sidebar (Overview, Users, Providers, Content, Analytics, Revenue, Settings
 **Deploy together:** these rules refuse writes an older APK makes ("Pre-Diabetic", a blank birthdate or allergies), so deploy them with the new APK.
 **Known side effect:** accounts created before `onboarding_completed` existed go through onboarding once more; the live database is wiped before respondents (hardening item 13).
 
+**Correction 2026-11-13 (found in a UI test run):** "resumes at the first unanswered question" did not hold for the role question. `Users.role` is `'patient'` from the moment the account is created, and the resume check read it as the answer to "Choose Your Profile Type", so a doctor who closed the app at Professional Information came back into the patient's questions with no way back, and nobody who left before that screen was asked it again. Now the phone's own answer comes first, and the document counts only when it shows which way the person went (`role == 'doctor'`, or `account_type` is filled in) (`features/auth/onboarding.tsx` `onboardingStartPath`). No rules or data change.
+
 ### D26 — QA fixes, batch 2: no past bookings, demo payments labelled, stay signed in — CLOSED 2026-10-18 (team request after the QA run)
 **Context:** QA found that a patient could book a time that had already passed (D-05), that the consultation checkout said "SECURE CHECKOUT" and "Payment Successful!" for a simulated payment (D-06), and that the installed app asked for the password on every open even though the session was kept (D-04).
 **Decided:**

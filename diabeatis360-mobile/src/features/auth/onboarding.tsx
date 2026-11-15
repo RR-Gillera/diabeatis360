@@ -70,7 +70,11 @@ export async function onboardingStartPath(email: string, uid?: string | null) {
   }
   return firstUnansweredStep({
     language: String(data.language_preference ?? '') || await local('language'),
-    profileType: String(data.role ?? '') || await local('profileType'),
+    // Users.role is 'patient' from the moment the account exists (auth-context.tsx), so by itself it is not an answer
+    // to "Choose Your Profile Type". Counting it sent a doctor who closed the app at the credentials step down the
+    // patient's questions, with no way back. This phone's answer comes first; the document only counts once it shows
+    // which way the person went: a doctor, or a patient who already answered "Who is this account for?".
+    profileType: await local('profileType') || (data.role === 'doctor' ? 'doctor' : data.account_type ? 'patient' : ''),
     accountType: String(data.account_type ?? '') || await local('accountType'),
     guardianSubmitted,
     dateOfBirth: birthdateText(data.birthdate) || await local('dateOfBirth'),

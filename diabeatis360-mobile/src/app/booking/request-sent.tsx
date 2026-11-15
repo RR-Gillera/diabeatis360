@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { bookingReference } from '@/features/booking/booking-reference';
 import { bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { useBooking } from '@/features/booking/booking-context';
 import { useT } from '@/i18n/language-context';
@@ -39,7 +40,7 @@ export default function RequestSentScreen() {
             {id ? (
               <View style={styles.row}>
                 <Text style={styles.label}>{t('booking.id')}</Text>
-                <Text style={styles.bookingId} selectable>{id}</Text>
+                <Text style={styles.bookingId} selectable>{bookingReference(id)}</Text>
               </View>
             ) : null}
             <View style={styles.row}>

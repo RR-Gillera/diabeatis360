@@ -143,15 +143,15 @@ export default function VerifyEmailScreen() {
 
     <View style={styles.resendBlock}>
       <Pressable accessibilityRole="button" disabled={resending || secondsLeft > 0} onPress={resend}>
-        <Text style={styles.resend}>{t('verify.noEmail')} <Text style={secondsLeft > 0 || resending ? styles.muted : styles.green}>{resending ? t('verify.sending') : t('verify.resend')}</Text></Text>
+        {/* One line. While the wait runs it reads "Resend email in 0:57"; it used to show a greyed "Resend email" and
+            the same words again with the countdown on the line below. */}
+        <Text style={styles.resend}>{t('verify.noEmail')} <Text style={secondsLeft > 0 || resending ? styles.muted : styles.green}>{resending ? t('verify.sending') : secondsLeft > 0 ? t('verify.resendIn', { time: formatCountdown(secondsLeft) }) : t('verify.resend')}</Text></Text>
       </Pressable>
-      {secondsLeft > 0 ? <Text style={styles.timer}>{t('verify.resendIn', { time: formatCountdown(secondsLeft) })}</Text> : null}
     </View>
 
     {error ? <Text style={styles.error}>{error}</Text> : null}
     {message ? <Text style={styles.success}>{message}</Text> : null}
     <AuthButton title={checking ? t('verify.checking') : t('verify.button')} icon={checking ? undefined : 'done'} onPress={() => { void check(true); }} disabled={checking || Boolean(confirmed)} />
-    <Text style={styles.footer}>{t('verify.portal')}</Text>
     <Pressable accessibilityRole="button" onPress={() => leave('/sign-up')}><Text style={styles.back}>{t('verify.wrongEmail')} <Text style={styles.green}>{t('verify.signUpAgain')}</Text></Text></Pressable>
     <Pressable accessibilityRole="button" onPress={() => leave('/login')}><Text style={styles.back}>{t('verify.backToLogin')}</Text></Pressable>
   </ScrollView>;
@@ -177,11 +177,9 @@ const styles = StyleSheet.create({
   waitingText: { color: authColors.muted, fontSize: 13 },
   resendBlock: { marginBottom: 22, marginTop: 22 },
   resend: { color: authColors.muted, fontSize: 14, textAlign: 'center' },
-  timer: { color: '#91A4BF', fontSize: 12, marginTop: 8, textAlign: 'center' },
   green: { color: authColors.green, fontWeight: '800' },
   muted: { color: '#9BACBF', fontWeight: '800' },
   error: { color: '#D9364F', fontSize: 13, lineHeight: 19, marginBottom: 14, textAlign: 'center' },
   success: { color: authColors.green, fontSize: 14, fontWeight: '800', marginBottom: 14, textAlign: 'center' },
-  footer: { color: '#9BACBF', fontSize: 10, letterSpacing: 1.2, marginTop: 24, textAlign: 'center' },
   back: { color: authColors.muted, fontSize: 14, marginTop: 22, textAlign: 'center' },
 });

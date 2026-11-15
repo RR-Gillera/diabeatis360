@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
@@ -16,7 +16,6 @@ import type { MessageKey } from '@/i18n/translate';
 // Login's "Forgot password?" opens this screen with whatever was typed in its email field.
 export default function ForgotPasswordScreen() {
   const { t } = useT();
-  const router = useRouter();
   const goBack = useSafeBack('/login');
   const { email: typed } = useLocalSearchParams<{ email?: string }>();
   const { resetPassword } = useAuth();
@@ -59,7 +58,8 @@ export default function ForgotPasswordScreen() {
         <Text style={styles.hint}>{t('reset.spamHint')}</Text>
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </View>
-      <AuthButton title={t('verify.backToLogin')} onPress={() => router.replace('/login')} />
+      {/* Goes back to the Login this screen was opened from (it slides back out), instead of opening a second Login on top. */}
+      <AuthButton title={t('verify.backToLogin')} onPress={goBack} />
       <Pressable disabled={secondsLeft > 0 || sending} onPress={send}>
         <Text style={[styles.resend, secondsLeft === 0 && styles.resendReady]}>
           {sending ? t('verify.sending') : secondsLeft > 0 ? t('reset.resendIn', { time: formatCountdown(secondsLeft).padStart(5, '0') }) : t('reset.resend')}
