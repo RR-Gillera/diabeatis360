@@ -2,6 +2,7 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { httpsCallable, httpsCallableFromURL } from 'firebase/functions';
 
 import { db, functions } from '@/firebase';
+import { serverBaseUrl } from '@/lib/server-target';
 
 import type { FamilyContact } from './phone';
 
@@ -10,7 +11,7 @@ import type { FamilyContact } from './phone';
 // the app asks our server to text those contacts; the server checks everything again and holds the SMS key, so the
 // app never sends a text itself. The outcome appears in Family_Alerts/{logId}, which the result screen watches.
 
-const SERVER_URL = (process.env.EXPO_PUBLIC_AI_BASE_URL ?? '').replace(/\/+$/, '');
+// The server address comes from src/lib/server-target.ts: in emulator mode it is the local emulator, never the live server (PAT-002).
 
 export function subscribeToFamilyContacts(uid: string, onChange: (contacts: FamilyContact[]) => void, onError: (error: Error) => void) {
   return onSnapshot(
@@ -44,8 +45,9 @@ export async function saveFamilyContacts(uid: string, contacts: FamilyContact[])
  */
 export async function requestFamilyAlert(logId: string) {
   try {
-    const notify = SERVER_URL
-      ? httpsCallableFromURL<{ logId: string }, { status: string; sent: number }>(functions, `${SERVER_URL}/api/notifyFamily`)
+    const baseUrl = serverBaseUrl();
+    const notify = baseUrl
+      ? httpsCallableFromURL<{ logId: string }, { status: string; sent: number }>(functions, `${baseUrl}/api/notifyFamily`)
       : httpsCallable<{ logId: string }, { status: string; sent: number }>(functions, 'notifyFamily');
     await notify({ logId });
   } catch {

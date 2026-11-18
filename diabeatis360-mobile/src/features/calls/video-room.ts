@@ -3,6 +3,8 @@ import { Camera } from 'expo-camera';
 
 import { functions } from '@/firebase';
 import { translate, type Language } from '@/i18n/translate';
+import { isFunctionMissing } from '@/lib/feature-unavailable';
+import { inEmulatorMode, serverBaseUrl, TEST_MODE_UNAVAILABLE_MESSAGE } from '@/lib/server-target';
 
 import { CallError, joinErrorMessage } from './join-error';
 
@@ -10,17 +12,19 @@ import { CallError, joinErrorMessage } from './join-error';
 // (/api/joinCall on Vercel, the same place as the AI functions) and gets back our call page's address with a pass for
 // THIS person only. The server checks that the call is accepted and that this person is on it; the LiveKit secret never
 // exists in the app, and the pass is never stored. The ringing / accept / hang-up part stays in Firestore (call-service.ts).
-const SERVER_URL = (process.env.EXPO_PUBLIC_AI_BASE_URL ?? '').replace(/\/+$/, '');
+// The address comes from src/lib/server-target.ts: in emulator mode it is never the live server (PAT-002).
 
 /** The address to load in the call frame. Throws a CallError whose message can be shown as it is. */
 export async function requestCallUrl(bookingId: string, language: Language = 'English'): Promise<string> {
   let url: unknown;
   try {
-    const join = SERVER_URL
-      ? httpsCallableFromURL<{ bookingId: string }, { url: string }>(functions, `${SERVER_URL}/api/joinCall`)
+    const baseUrl = serverBaseUrl();
+    const join = baseUrl
+      ? httpsCallableFromURL<{ bookingId: string }, { url: string }>(functions, `${baseUrl}/api/joinCall`)
       : httpsCallable<{ bookingId: string }, { url: string }>(functions, 'joinCall');
     url = (await join({ bookingId })).data?.url;
   } catch (error) {
+    if (inEmulatorMode() && isFunctionMissing(error)) throw new CallError(TEST_MODE_UNAVAILABLE_MESSAGE);
     throw new CallError(joinErrorMessage(error, language));
   }
   if (typeof url !== 'string' || !/^https?:\/\//.test(url)) throw new CallError(joinErrorMessage(null, language));
