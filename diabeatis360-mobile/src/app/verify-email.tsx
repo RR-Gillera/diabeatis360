@@ -10,6 +10,7 @@ import { useT } from '@/i18n/language-context';
 import {
   CHECK_INTERVAL_MS, RESEND_COOLDOWN_SECONDS, errorCode, formatCountdown, verificationErrorMessage,
 } from '@/features/auth/verification';
+import { Brand } from '@/constants/theme';
 
 // "Check your email" (Figma 230:3825 "Verify Your Account", DECISIONS.md D21). The frame shows six code boxes; the real
 // verification is Firebase's emailed LINK, so the boxes are replaced by the address the link went to. Everything else
@@ -160,26 +161,26 @@ export default function VerifyEmailScreen() {
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, padding: 38 },
   progress: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressLabel: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  progressStep: { color: '#91A4BF', fontSize: 11, fontWeight: '700' },
+  progressLabel: { color: authColors.green, fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 1 },
+  progressStep: { color: '#91A4BF', fontSize: 11, fontFamily: Brand.font.bold },
   progressTrack: { backgroundColor: '#DDE5EF', borderRadius: 4, height: 6, marginTop: 10, overflow: 'hidden' },
   progressFill: { backgroundColor: authColors.green, borderRadius: 4, height: '100%', width: '66%' },
   heading: { alignItems: 'center', flexDirection: 'row', gap: 14, marginTop: 42 },
-  title: { color: authColors.navy, fontSize: 27, fontWeight: '900' },
-  description: { color: authColors.muted, fontSize: 16, lineHeight: 24, marginTop: 24 },
+  title: { color: authColors.navy, fontSize: 27, fontFamily: Brand.font.extraBold },
+  description: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 16, lineHeight: 24, marginTop: 24 },
   mailCard: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 14, marginTop: 26, padding: 16 },
   mailIcon: { alignItems: 'center', backgroundColor: '#EAF4E1', borderRadius: 12, height: 44, justifyContent: 'center', width: 44 },
   mailText: { flex: 1, gap: 2 },
-  mailLabel: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
-  mailAddress: { color: authColors.navy, fontSize: 16, fontWeight: '800' },
-  hint: { color: authColors.muted, fontSize: 13, lineHeight: 19, marginTop: 12 },
+  mailLabel: { color: authColors.muted, fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 0.7 },
+  mailAddress: { color: authColors.navy, fontSize: 16, fontFamily: Brand.font.extraBold },
+  hint: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19, marginTop: 12 },
   waiting: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'center', marginTop: 22 },
-  waitingText: { color: authColors.muted, fontSize: 13 },
+  waitingText: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 13 },
   resendBlock: { marginBottom: 22, marginTop: 22 },
-  resend: { color: authColors.muted, fontSize: 14, textAlign: 'center' },
-  green: { color: authColors.green, fontWeight: '800' },
-  muted: { color: '#9BACBF', fontWeight: '800' },
-  error: { color: '#D9364F', fontSize: 13, lineHeight: 19, marginBottom: 14, textAlign: 'center' },
-  success: { color: authColors.green, fontSize: 14, fontWeight: '800', marginBottom: 14, textAlign: 'center' },
-  back: { color: authColors.muted, fontSize: 14, marginTop: 22, textAlign: 'center' },
+  resend: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 14, textAlign: 'center' },
+  green: { color: authColors.green, fontFamily: Brand.font.extraBold },
+  muted: { color: '#9BACBF', fontFamily: Brand.font.extraBold },
+  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19, marginBottom: 14, textAlign: 'center' },
+  success: { color: authColors.green, fontSize: 14, fontFamily: Brand.font.extraBold, marginBottom: 14, textAlign: 'center' },
+  back: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 14, marginTop: 22, textAlign: 'center' },
 });

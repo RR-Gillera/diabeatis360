@@ -9,6 +9,7 @@ import { bookingColors, formatApptDate, formatApptTime, formatFee, PrimaryButton
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { useT } from '@/i18n/language-context';
+import { Brand } from '@/constants/theme';
 
 export default function PaymentSuccessfulScreen() {
   const router = useRouter();
@@ -79,21 +80,21 @@ const styles = StyleSheet.create({
   scroll: { alignItems: 'center', gap: 24, padding: 24, paddingBottom: 110 },
   content: { alignItems: 'center', gap: 8, marginTop: 90 },
   icon: { alignItems: 'center', backgroundColor: 'rgba(98, 156, 44, 0.1)', borderRadius: 24, height: 64, justifyContent: 'center', width: 64 },
-  title: { color: '#111827', fontSize: 24, fontWeight: '700', marginTop: 8, textAlign: 'center' },
-  subtitle: { color: '#6B7280', fontSize: 14, fontWeight: '500', textAlign: 'center' },
+  title: { color: '#111827', fontSize: 24, fontFamily: Brand.font.bold, marginTop: 8, textAlign: 'center' },
+  subtitle: { color: '#6B7280', fontSize: 14, fontFamily: Brand.font.medium, textAlign: 'center' },
   receipt: { alignSelf: 'stretch', gap: 14 },
   receiptHeader: { borderBottomColor: bookingColors.border, borderBottomWidth: 1, paddingBottom: 14 },
-  doctorName: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' },
-  doctorSpecialty: { color: bookingColors.green, fontSize: 13, fontWeight: '700', marginTop: 2 },
+  doctorName: { color: bookingColors.navy, fontSize: 17, fontFamily: Brand.font.extraBold },
+  doctorSpecialty: { color: bookingColors.green, fontSize: 13, fontFamily: Brand.font.bold, marginTop: 2 },
   receiptRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  receiptLabel: { color: '#91A4BF', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
-  receiptValue: { color: bookingColors.navy, fontSize: 14, fontWeight: '700' },
-  bookingIdValue: { color: bookingColors.navy, fontFamily: 'monospace', fontSize: 13, fontWeight: '700', letterSpacing: 0.3 },
+  receiptLabel: { color: '#91A4BF', fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 0.6 },
+  receiptValue: { color: bookingColors.navy, fontSize: 14, fontFamily: Brand.font.bold },
+  bookingIdValue: { color: bookingColors.navy, fontFamily: Brand.font.bold, fontSize: 13, letterSpacing: 0.3 },
   statusBadge: { backgroundColor: '#E9F6ED', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { color: bookingColors.green, fontSize: 12, fontWeight: '800' },
+  statusText: { color: bookingColors.green, fontSize: 12, fontFamily: Brand.font.extraBold },
   receiptTotalRow: { borderTopColor: bookingColors.border, borderTopWidth: 1, paddingTop: 14 },
-  receiptTotalLabel: { color: bookingColors.navy, fontSize: 13, fontWeight: '800' },
-  receiptTotalValue: { color: bookingColors.navy, fontSize: 20, fontWeight: '900' },
-  hint: { color: bookingColors.muted, fontSize: 12, textAlign: 'center' },
+  receiptTotalLabel: { color: bookingColors.navy, fontSize: 13, fontFamily: Brand.font.extraBold },
+  receiptTotalValue: { color: bookingColors.navy, fontSize: 20, fontFamily: Brand.font.extraBold },
+  hint: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 12, textAlign: 'center' },
   button: { alignSelf: 'stretch', bottom: 32, left: 24, position: 'absolute', right: 24 },
 });

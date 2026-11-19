@@ -2,10 +2,10 @@
 
 // Diabeatis360 Cloud Functions (DECISIONS.md D1: option A). The mobile app calls these; only these call Gemini.
 //   generateRecommendations({ kind: 'meal' | 'exercise' })   -> AI meal / exercise suggestions
-//   analyzeLabel({ imageBase64, mimeType, barcode? })          -> nutrition label reading
-//   lookupProduct({ barcode })                                 -> shared product memory (no Gemini call)
+//   analyzeLabel({ imageBase64, mimeType })                    -> nutrition label reading
 //   joinCall({ bookingId })                                    -> the LiveKit video room of an accepted call (D39)
 //   notifyFamily({ logId })                                    -> texts the family about a critical reading (D45)
+//   settleWallet / topUpWallet / withdrawFromWallet            -> the doctor's wallet (D47, demo money)
 // The Gemini key is the Functions secret GEMINI_API_KEY:   firebase functions:secrets:set GEMINI_API_KEY
 // (locally, for the emulator, put GEMINI_API_KEY=... in functions/.secret.local, which is gitignored).
 
@@ -15,11 +15,12 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 
 const { callGemini } = require('./lib/gemini')
-const { analyzeLabel, generateRecommendations, lookupProduct } = require('./lib/handlers')
+const { analyzeLabel, generateRecommendations } = require('./lib/handlers')
 const { joinCall } = require('./lib/calls')
 const { notifyFamily } = require('./lib/family')
 const { semaphoreSender } = require('./lib/sms')
 const { requireVerifiedEmail } = require('./lib/verified')
+const { settleBookings, topUpWallet, withdrawFromWallet } = require('./lib/wallet')
 
 initializeApp()
 const geminiKey = defineSecret('GEMINI_API_KEY')
@@ -54,13 +55,8 @@ exports.analyzeLabel = onCall(options, (request) =>
     db: getFirestore(),
     uid: requireUser(request),
     image: request.data && { base64: request.data.imageBase64, mimeType: request.data.mimeType },
-    barcode: request.data && request.data.barcode,
     callAi: askGemini,
   }))
-
-// Barcode lookup in the shared Products collection: no Gemini call, so no secret is needed (D12).
-exports.lookupProduct = onCall({ region: options.region, timeoutSeconds: 30, memory: '256MiB', maxInstances: 5 }, (request) =>
-  lookupProduct({ db: getFirestore(), uid: requireUser(request), barcode: request.data && request.data.barcode }))
 
 // The video room of an accepted call (D39). LiveKit's secret is the Functions secret LIVEKIT_API_SECRET; LIVEKIT_URL,
 // LIVEKIT_API_KEY and CALL_PAGE_URL (where public/call.html is served, e.g. the Vercel site) go in functions/.env.
@@ -83,3 +79,12 @@ exports.notifyFamily = onCall({ region: options.region, secrets: [semaphoreKey],
     sendSms: apiKey ? semaphoreSender({ apiKey, senderName: process.env.SEMAPHORE_SENDER_NAME }) : null,
   })
 })
+
+// The doctor's wallet (D47). No secret: these only read and write Firestore. All money changes are in lib/wallet.js.
+const walletOptions = { region: options.region, timeoutSeconds: 30, memory: '256MiB', maxInstances: 5 }
+exports.settleWallet = onCall(walletOptions, (request) =>
+  settleBookings({ db: getFirestore(), uid: requireUser(request), bookingId: request.data && request.data.bookingId }))
+exports.topUpWallet = onCall(walletOptions, (request) =>
+  topUpWallet({ db: getFirestore(), uid: requireUser(request), amount: request.data && request.data.amount, method: request.data && request.data.method }))
+exports.withdrawFromWallet = onCall(walletOptions, (request) =>
+  withdrawFromWallet({ db: getFirestore(), uid: requireUser(request), amount: request.data && request.data.amount }))

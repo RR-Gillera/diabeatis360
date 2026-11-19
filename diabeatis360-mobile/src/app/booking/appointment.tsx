@@ -10,6 +10,7 @@ import { useSafeBack } from '@/hooks/use-safe-back';
 import { isChatAvailable } from '@/constants/enums';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
+import { Brand } from '@/constants/theme';
 
 // The badge colours per status; the words come from constants/enums.ts in the person's language.
 const statusCopy: Record<BookingStatus, { color: string; background: string }> = {
@@ -115,24 +116,24 @@ export default function AppointmentScreen() {
 
 const styles = StyleSheet.create({
   status: { alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
-  statusText: { fontSize: 11, fontWeight: '800' },
+  statusText: { fontSize: 11, fontFamily: Brand.font.extraBold },
   queue: { alignItems: 'center', backgroundColor: '#E6F6EF', borderRadius: 16, marginTop: 18, paddingHorizontal: 20, paddingVertical: 18 },
-  queueLabel: { color: bookingColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
-  queueValue: { color: bookingColors.green, fontSize: 44, fontWeight: '900', letterSpacing: -1, marginTop: 4 },
-  queueHint: { color: bookingColors.muted, fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center' },
-  name: { color: bookingColors.navy, fontSize: 22, fontWeight: '900', marginTop: 18 },
-  specialty: { color: bookingColors.green, fontSize: 14, fontWeight: '700', marginTop: 5 },
+  queueLabel: { color: bookingColors.green, fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 0.8 },
+  queueValue: { color: bookingColors.green, fontSize: 44, fontFamily: Brand.font.extraBold, letterSpacing: -1, marginTop: 4 },
+  queueHint: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center' },
+  name: { color: bookingColors.navy, fontSize: 22, fontFamily: Brand.font.extraBold, marginTop: 18 },
+  specialty: { color: bookingColors.green, fontSize: 14, fontFamily: Brand.font.bold, marginTop: 5 },
   line: { borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, paddingTop: 14 },
-  label: { color: '#91A4BF', fontSize: 10, fontWeight: '800' },
-  value: { color: bookingColors.navy, fontSize: 14, fontWeight: '800' },
+  label: { color: '#91A4BF', fontSize: 10, fontFamily: Brand.font.extraBold },
+  value: { color: bookingColors.navy, fontSize: 14, fontFamily: Brand.font.extraBold },
   chatButton: { alignItems: 'center', borderColor: bookingColors.green, borderRadius: 12, borderWidth: 1.5, justifyContent: 'center', marginTop: 12, minHeight: 50 },
-  chatButtonText: { color: bookingColors.green, fontSize: 15, fontWeight: '800' },
+  chatButtonText: { color: bookingColors.green, fontSize: 15, fontFamily: Brand.font.extraBold },
   payButton: { alignItems: 'center', backgroundColor: bookingColors.green, borderRadius: 12, justifyContent: 'center', marginTop: 20, minHeight: 50 },
-  payButtonText: { color: '#FFF', fontSize: 15, fontWeight: '800' },
-  waitingNote: { color: '#B45309', fontSize: 12, lineHeight: 18, marginTop: 18 },
-  reference: { color: bookingColors.muted, fontSize: 11, marginTop: 24 },
+  payButtonText: { color: '#FFF', fontSize: 15, fontFamily: Brand.font.extraBold },
+  waitingNote: { color: '#B45309', fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18, marginTop: 18 },
+  reference: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 11, marginTop: 24 },
   empty: { color: bookingColors.muted },
-  note: { color: bookingColors.navy, fontSize: 14, lineHeight: 20, marginTop: 6 },
+  note: { color: bookingColors.navy, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20, marginTop: 6 },
   declined: { backgroundColor: '#FBE6E9', borderRadius: 14, marginTop: 16, padding: 12 },
-  declinedLabel: { color: '#D9364F', fontSize: 10, fontWeight: '800' },
+  declinedLabel: { color: '#D9364F', fontSize: 10, fontFamily: Brand.font.extraBold },
 });

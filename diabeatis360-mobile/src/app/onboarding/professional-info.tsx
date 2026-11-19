@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
@@ -10,22 +11,12 @@ import { useAuth } from '@/features/auth/auth-context';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
 import { birthdateToTimestamp, parseBirthdate } from '@/features/auth/birthdate';
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
+import { SPECIALIZATIONS } from '@/features/doctor/doctor-profile';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
+import { Brand } from '@/constants/theme';
 import { db } from '@/firebase';
 import { useT } from '@/i18n/language-context';
 import { resetTo } from '@/lib/navigation';
-
-// Kept in step with the specialty filter pills on the patient's Find a Doctor
-// screen — a specialty picked here that isn't in that list would make the
-// doctor unfindable under any filter.
-const SPECIALIZATIONS = [
-  'Endocrinologist',
-  'Diabetologist',
-  'Nutritionist',
-  'Internal Medicine',
-  'Family Medicine',
-  'General Practitioner',
-];
 
 export default function ProfessionalInfoScreen() {
   const router = useRouter();
@@ -38,6 +29,7 @@ export default function ProfessionalInfoScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [uploadNotice, setUploadNotice] = useState(false);
 
   // Resubmitting after a rejection (Figma D-04): start from what the doctor sent before, so only the fix is typed.
   const seeded = useRef(false);
@@ -58,7 +50,14 @@ export default function ProfessionalInfoScreen() {
   const complete = Boolean(specialty && licenseNumber.trim() && expiry && !expired && agreed);
 
   const submit = async () => {
-    if (!email || !complete || saving) return;
+    if (saving) return;
+    // The button stays tappable (as in the Figma frame) and says what is missing, instead of sitting greyed out with
+    // no reason given (QA ACC-06). An expired licence already has its own message under the date.
+    if (!complete) {
+      if (!expired) setError(t('setup.pro.incomplete'));
+      return;
+    }
+    if (!email) return;
     setSaving(true);
     setError('');
     try {
@@ -106,30 +105,33 @@ export default function ProfessionalInfoScreen() {
       <View style={styles.track}><View style={styles.fill} /></View>
 
       <KeyboardSafeScroll contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text accessibilityRole="button" style={styles.back} onPress={() => router.back()}>{`‹  ${t('common.back')}`}</Text>
-
         <View style={styles.titleRow}>
-          <View style={styles.titleIcon}><Text style={styles.titleIconText}>✚</Text></View>
+          <View style={styles.titleIcon}>
+            <SymbolView name={{ ios: 'leaf.fill', android: 'eco', web: 'eco' }} size={20} tintColor={Brand.colors.primaryBright} />
+          </View>
           <Text accessibilityRole="header" style={styles.title}>{t('setup.pro.title')}</Text>
         </View>
         <Text style={styles.subtitle}>{t('setup.pro.subtitle')}</Text>
 
-        <Text style={styles.label}>{t('setup.pro.specialization')}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={`${t('setup.pro.specialization')}: ${specialty || t('setup.pro.selectSpecialization')}`} style={styles.select} onPress={() => setPickerOpen(true)}>
-          <Text style={[styles.selectText, !specialty && styles.placeholder]}>{specialty || t('setup.pro.selectSpecialization')}</Text>
-          <Text style={styles.chevron}>⌄</Text>
+        <Text style={[styles.label, styles.firstLabel]}>{t('setup.pro.specialization')}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${t('setup.pro.specialization')}: ${specialty || t('setup.pro.selectSpecialization')}`} style={styles.field} onPress={() => setPickerOpen(true)}>
+          <Text style={styles.selectText}>{specialty || t('setup.pro.selectSpecialization')}</Text>
+          <SymbolView name={{ ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }} size={20} tintColor="#64748B" />
         </Pressable>
 
         <Text style={styles.label}>{t('doctor.profile.prc')}</Text>
-        <TextInput
-          value={licenseNumber}
-          onChangeText={setLicenseNumber}
-          accessibilityLabel={t('doctor.profile.prc')}
-          placeholder={t('setup.pro.licensePlaceholder')}
-          placeholderTextColor="#A7B8CD"
-          style={styles.input}
-          autoCapitalize="characters"
-        />
+        <View style={styles.field}>
+          <TextInput
+            value={licenseNumber}
+            onChangeText={setLicenseNumber}
+            accessibilityLabel={t('doctor.profile.prc')}
+            placeholder={t('setup.pro.licensePlaceholder')}
+            placeholderTextColor="#94A3B8"
+            style={styles.input}
+            autoCapitalize="characters"
+          />
+          <SymbolView name={{ ios: 'person.text.rectangle', android: 'badge', web: 'badge' }} size={20} tintColor="#CBD5E1" />
+        </View>
 
         <Text style={styles.label}>{t('setup.pro.expiry')}</Text>
         <BirthdateField
@@ -138,21 +140,24 @@ export default function ProfessionalInfoScreen() {
           title={t('setup.pro.expiryTitle')}
           placeholder={t('setup.pro.expiryPlaceholder')}
           years={FUTURE_YEARS}
+          iconSide="right"
+          fieldStyle={styles.field}
         />
         {expired ? <Text style={styles.error}>{t('setup.pro.expired')}</Text> : null}
 
-        <Text style={styles.label}>{t('setup.pro.upload')}</Text>
-        {/* Deliberately inert: storing photos needs Firebase Storage, which is
-            only available on the paid Blaze plan and has not been enabled for
-            this project. Showing a tile that appeared to accept an upload and
-            then silently dropped it would be worse than saying so. */}
-        <View style={styles.upload}>
-          <View style={styles.uploadIcon}><Text style={styles.uploadIconText}>☁</Text></View>
-          <Text style={styles.uploadTitle}>{t('setup.pro.uploadOff')}</Text>
-          <Text style={styles.uploadHint}>{t('setup.pro.uploadOffHint')}</Text>
-        </View>
+        <Text style={[styles.label, styles.uploadLabel]}>{t('setup.pro.upload')}</Text>
+        {/* Drawn as the Figma frame shows it, but storing photos needs Firebase Storage, which is only on the paid
+            Blaze plan (DECISIONS D18). So a tap says so instead of pretending to accept a photo and dropping it. */}
+        <Pressable accessibilityRole="button" accessibilityLabel={t('setup.pro.upload')} style={styles.upload} onPress={() => setUploadNotice(true)}>
+          <View style={styles.uploadIcon}>
+            <SymbolView name={{ ios: 'icloud.and.arrow.up.fill', android: 'cloud_upload', web: 'cloud_upload' }} size={22} tintColor={Brand.colors.primaryBright} />
+          </View>
+          <Text style={styles.uploadTitle}>{t('setup.pro.uploadTap')}</Text>
+          <Text style={styles.uploadHint}>{t('setup.pro.uploadFormats')}</Text>
+        </Pressable>
+        {uploadNotice ? <Text accessibilityLiveRegion="polite" style={styles.notice}>{`${t('setup.pro.uploadOff')}. ${t('setup.pro.uploadOffHint')}`}</Text> : null}
 
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} style={styles.terms} onPress={() => setAgreed(!agreed)}>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} style={styles.terms} onPress={() => { setAgreed(!agreed); setError(''); }}>
           <View style={[styles.checkbox, agreed && styles.checkboxOn]}>{agreed ? <Text style={styles.checkmark}>✓</Text> : null}</View>
           <Text style={styles.termsText}>
             {t('auth.signup.agreeStart')}<Text style={styles.termsLink} onPress={() => router.push('/terms-of-service')}>{t('profile.terms')}</Text>{t('auth.signup.and')}<Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>{t('profile.privacy')}</Text>.
@@ -161,10 +166,7 @@ export default function ProfessionalInfoScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <View style={styles.bottom}>
-          <AuthButton title={saving ? t('setup.pro.submitting') : t('setup.pro.submit')} onPress={submit} disabled={!complete || saving} />
-          <Text style={styles.hint}>{t('setup.pro.hint')}</Text>
-        </View>
+        <AuthButton title={saving ? t('setup.pro.submitting') : t('setup.pro.submit')} onPress={submit} disabled={saving} style={styles.submit} />
       </KeyboardSafeScroll>
 
       <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
@@ -188,47 +190,45 @@ export default function ProfessionalInfoScreen() {
   );
 }
 
+// Measurements follow the Figma frame for this screen (24px side padding, 56px fields, pill-shaped button).
 const styles = StyleSheet.create({
   screen: { padding: 24 },
   progress: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressLabel: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  step: { color: '#91A4BF', fontSize: 11, fontWeight: '700' },
-  track: { backgroundColor: '#DDE5EF', borderRadius: 4, height: 6, marginTop: 10 },
-  fill: { backgroundColor: authColors.green, borderRadius: 4, height: '100%', width: '100%' },
+  progressLabel: { color: authColors.green, fontFamily: Brand.font.extraBold, fontSize: 11, letterSpacing: 1 },
+  step: { color: '#94A3B8', fontFamily: Brand.font.bold, fontSize: 11 },
+  track: { backgroundColor: '#E2E8F0', borderRadius: 4, height: 8, marginTop: 12 },
+  fill: { backgroundColor: Brand.colors.primaryBright, borderRadius: 4, height: '100%', width: '100%' },
   scroll: { paddingBottom: 40 },
-  back: { color: '#91A4BF', fontSize: 15, marginTop: 28 },
-  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 14, marginTop: 22 },
-  titleIcon: { alignItems: 'center', backgroundColor: '#F1F8EB', borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
-  titleIconText: { color: authColors.green, fontSize: 22, fontWeight: '900' },
-  title: { color: authColors.navy, flex: 1, fontSize: 28, fontWeight: '900', lineHeight: 34 },
-  subtitle: { color: authColors.muted, fontSize: 15, lineHeight: 23, marginTop: 14 },
-  label: { color: authColors.navy, fontSize: 14, fontWeight: '700', marginBottom: 8, marginTop: 24 },
-  select: { alignItems: 'center', backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 48, paddingHorizontal: 14 },
-  selectText: { color: authColors.navy, fontSize: 15, fontWeight: '600' },
-  placeholder: { color: '#A7B8CD', fontWeight: '500' },
-  chevron: { color: '#91A4BF', fontSize: 18, fontWeight: '800' },
-  input: { backgroundColor: '#F5F7F9', borderColor: authColors.border, borderRadius: 12, borderWidth: 1, color: authColors.navy, fontSize: 15, minHeight: 48, paddingHorizontal: 14 },
-  upload: { alignItems: 'center', backgroundColor: '#F7FAFC', borderColor: '#C9D6E5', borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, paddingHorizontal: 20, paddingVertical: 28 },
-  uploadIcon: { alignItems: 'center', backgroundColor: '#E6EEF7', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  uploadIconText: { color: '#91A4BF', fontSize: 18 },
-  uploadTitle: { color: '#526580', fontSize: 14, fontWeight: '700', marginTop: 12 },
-  uploadHint: { color: '#91A4BF', fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center' },
-  terms: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginTop: 24 },
-  checkbox: { alignItems: 'center', borderColor: authColors.border, borderRadius: 6, borderWidth: 2, height: 22, justifyContent: 'center', marginTop: 1, width: 22 },
+  titleRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginTop: 36 },
+  titleIcon: { alignItems: 'center', backgroundColor: '#E8F5E9', borderRadius: 8, height: 36, justifyContent: 'center', width: 36 },
+  title: { color: authColors.navy, flex: 1, fontFamily: Brand.font.bold, fontSize: 24, lineHeight: 37 },
+  subtitle: { color: '#64748B', fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 24, marginTop: 14 },
+  label: { color: authColors.navy, fontFamily: Brand.font.bold, fontSize: 15, marginBottom: 12, marginTop: 24 },
+  firstLabel: { marginTop: 32 },
+  uploadLabel: { marginTop: 14 },
+  field: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', minHeight: 56, paddingHorizontal: 16 },
+  selectText: { color: authColors.navy, flex: 1, fontFamily: Brand.font.regular, fontSize: 16 },
+  input: { color: authColors.navy, flex: 1, fontFamily: Brand.font.regular, fontSize: 16, minHeight: 54 },
+  upload: { alignItems: 'center', backgroundColor: '#F3F6FA', borderColor: '#CBD5E1', borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, paddingBottom: 30, paddingHorizontal: 20, paddingTop: 26 },
+  uploadIcon: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 24, elevation: 1, height: 48, justifyContent: 'center', shadowColor: '#0F172A', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.06, shadowRadius: 3, width: 48 },
+  uploadTitle: { color: authColors.green, fontFamily: Brand.font.bold, fontSize: 14, marginTop: 16 },
+  uploadHint: { color: '#94A3B8', fontFamily: Brand.font.regular, fontSize: 12, marginTop: 6, textAlign: 'center' },
+  notice: { color: '#64748B', fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18, marginTop: 10, textAlign: 'center' },
+  terms: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, marginTop: 28 },
+  checkbox: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#94A3B8', borderRadius: 4, borderWidth: 1.5, height: 20, justifyContent: 'center', width: 20 },
   checkboxOn: { backgroundColor: authColors.green, borderColor: authColors.green },
-  checkmark: { color: '#FFF', fontSize: 13, fontWeight: '900' },
-  termsText: { color: '#526580', flex: 1, fontSize: 13, lineHeight: 20 },
-  termsLink: { color: authColors.green, fontWeight: '700' },
-  error: { color: '#D9364F', fontSize: 13, marginTop: 16 },
-  bottom: { marginTop: 32 },
-  hint: { color: '#91A4BF', fontSize: 12, marginTop: 16, textAlign: 'center' },
+  checkmark: { color: '#FFF', fontSize: 12, fontFamily: Brand.font.extraBold },
+  termsText: { color: '#475569', flex: 1, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 20 },
+  termsLink: { color: authColors.green, fontFamily: Brand.font.bold },
+  error: { color: Brand.colors.danger, fontFamily: Brand.font.regular, fontSize: 13, marginTop: 16 },
+  submit: { borderRadius: 28, marginTop: 40, minHeight: 56 },
   overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  sheetTitle: { color: authColors.navy, fontSize: 18, fontWeight: '800' },
-  cancel: { color: authColors.muted, fontSize: 14, fontWeight: '700' },
+  sheetTitle: { color: authColors.navy, fontSize: 18, fontFamily: Brand.font.extraBold },
+  cancel: { color: authColors.muted, fontSize: 14, fontFamily: Brand.font.bold },
   sheetRow: { alignItems: 'center', borderTopColor: '#EEF2F6', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 16 },
-  sheetRowText: { color: authColors.navy, fontSize: 16, fontWeight: '600' },
-  sheetRowActive: { color: authColors.green, fontWeight: '800' },
-  sheetCheck: { color: authColors.green, fontSize: 16, fontWeight: '900' },
+  sheetRowText: { color: authColors.navy, fontSize: 16, fontFamily: Brand.font.medium },
+  sheetRowActive: { color: authColors.green, fontFamily: Brand.font.extraBold },
+  sheetCheck: { color: authColors.green, fontSize: 16, fontFamily: Brand.font.extraBold },
 });

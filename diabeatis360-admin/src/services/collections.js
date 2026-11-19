@@ -13,7 +13,7 @@ export function subscribeToCollection(name, onChange, onError) {
 
 /**
  * Just a live count of documents matching one equality filter — for sidebar badges (pending doctors,
- * pending guardians, unverified products). A filtered listener stays small even as the collection grows;
+ * pending guardians). A filtered listener stays small even as the collection grows;
  * Firestore's count() aggregation reads (getCountFromServer) are not realtime, so a filtered onSnapshot is
  * the better fit here.
  */

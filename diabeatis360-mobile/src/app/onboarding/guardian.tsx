@@ -11,6 +11,7 @@ import { GUARDIAN_UPLOAD_UNAVAILABLE, submitGuardianVerification, subscribeToGua
 import { GUARDIAN_RELATIONSHIPS, type GuardianRelationship } from '@/constants/enums';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
+import { Brand } from '@/constants/theme';
 
 /**
  * The guardian's details for a pediatric account (DECISIONS.md D16, UT-005): reached from
@@ -150,36 +151,36 @@ export default function GuardianScreen() {
 const styles = StyleSheet.create({
   screen: { padding: 24 },
   progress: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressLabel: { color: authColors.green, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  step: { color: '#91A4BF', fontSize: 11, fontWeight: '700' },
+  progressLabel: { color: authColors.green, fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 1 },
+  step: { color: '#91A4BF', fontSize: 11, fontFamily: Brand.font.bold },
   track: { backgroundColor: '#DDE5EF', borderRadius: 4, height: 6, marginTop: 10 },
   fill: { backgroundColor: authColors.green, borderRadius: 4, height: '100%', width: '35%' },
-  back: { color: '#91A4BF', fontSize: 15, marginTop: 20 },
-  title: { color: authColors.navy, fontSize: 27, fontWeight: '900', lineHeight: 34, marginTop: 18 },
-  subtitle: { color: authColors.muted, fontSize: 15, lineHeight: 22, marginTop: 12 },
-  label: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6, marginTop: 24 },
-  input: { backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, color: authColors.navy, fontSize: 16, marginTop: 8, minHeight: 56, paddingHorizontal: 16 },
+  back: { color: '#91A4BF', fontFamily: Brand.font.regular, fontSize: 15, marginTop: 20 },
+  title: { color: authColors.navy, fontSize: 27, fontFamily: Brand.font.extraBold, lineHeight: 34, marginTop: 18 },
+  subtitle: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 22, marginTop: 12 },
+  label: { color: authColors.muted, fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 0.6, marginTop: 24 },
+  input: { backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderWidth: 1, color: authColors.navy, fontFamily: Brand.font.regular, fontSize: 16, marginTop: 8, minHeight: 56, paddingHorizontal: 16 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   chip: { backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 20, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 },
   chipActive: { backgroundColor: authColors.green, borderColor: authColors.green },
-  chipText: { color: authColors.muted, fontSize: 13, fontWeight: '700' },
+  chipText: { color: authColors.muted, fontSize: 13, fontFamily: Brand.font.bold },
   chipTextActive: { color: '#FFF' },
-  idHint: { color: '#91A4BF', fontSize: 12, lineHeight: 18, marginTop: 6 },
+  idHint: { color: '#91A4BF', fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18, marginTop: 6 },
   photoButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: authColors.border, borderRadius: 14, borderStyle: 'dashed', borderWidth: 2, justifyContent: 'center', marginTop: 12, minHeight: 100 },
-  photoButtonText: { color: authColors.green, fontSize: 15, fontWeight: '800' },
+  photoButtonText: { color: authColors.green, fontSize: 15, fontFamily: Brand.font.extraBold },
   photoPreviewWrap: { alignItems: 'center', marginTop: 12 },
   photoPreview: { backgroundColor: '#EEE', borderRadius: 14, height: 140, width: '100%' },
-  retake: { color: authColors.green, fontSize: 13, fontWeight: '800', marginTop: 8 },
-  error: { color: '#D9364F', fontSize: 13, marginTop: 16 },
+  retake: { color: authColors.green, fontSize: 13, fontFamily: Brand.font.extraBold, marginTop: 8 },
+  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, marginTop: 16 },
   bottom: { marginTop: 32, paddingBottom: 12 },
   camera: { backgroundColor: '#000', flex: 1 },
   cameraFrame: { alignItems: 'center', bottom: 0, justifyContent: 'center', left: 0, position: 'absolute', right: 0, top: 0 },
   // An ID card is about 1.6 times as wide as it is tall; the frame shows where to hold it (QA F-NO-FRAME).
   idFrame: { aspectRatio: 1.6, borderColor: 'rgba(255,255,255,0.9)', borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, marginBottom: 16, width: '82%' },
-  cameraHint: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, color: '#FFF', fontSize: 13, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8 },
+  cameraHint: { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, color: '#FFF', fontFamily: Brand.font.regular, fontSize: 13, overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8 },
   cameraBar: { alignItems: 'center', bottom: 0, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 44, paddingHorizontal: 32, position: 'absolute', right: 0, left: 0 },
   cameraCancel: { minWidth: 70 },
-  cameraCancelText: { color: '#FFF', fontSize: 15, fontWeight: '700' },
+  cameraCancelText: { color: '#FFF', fontSize: 15, fontFamily: Brand.font.bold },
   shutter: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 36, height: 72, justifyContent: 'center', width: 72 },
   shutterInner: { backgroundColor: '#FFF', borderRadius: 26, height: 52, width: 52 },
 });

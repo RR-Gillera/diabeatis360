@@ -21,10 +21,10 @@ firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node 
 | Function | Input | What it does |
 |---|---|---|
 | `generateRecommendations` | `{ kind: 'meal' \| 'exercise' }` | Reads the signed-in user's profile and latest glucose reading **on the server**, asks Gemini for 3 suggestions, removes anything that mentions the user's allergens, saves it to `AI_Suggestions`. |
-| `analyzeLabel` | `{ imageBase64, mimeType, barcode? }` | Sends a nutrition-label photo to Gemini, returns the nutrients, a personalised rating and healthier Filipino swaps, saves it to `Nutrition_Scans`. **The photo is never stored** (D2). |
-| `lookupProduct` | `{ barcode }` | Looks the barcode up in the shared `Products` collection (D12). Found: rates the saved nutrients for this person and returns the analysis with **no Gemini call** and no Free scan used. Not found: `{ found: false }`. |
+| `analyzeLabel` | `{ imageBase64, mimeType }` | Sends a nutrition-label photo to Gemini, returns the nutrients, a personalised rating and healthier Filipino swaps, saves it to `Nutrition_Scans`. **The photo is never stored** (D2). |
 | `joinCall` | `{ bookingId }` | Not AI (D39). For the caller or callee of an **accepted** call on a **confirmed** booking only: signs a LiveKit pass for that one person (no recording, must be used within 90 min) and returns `{ url }`, our call page (`public/call.html`) with the pass after "#". The pass is never stored. Needs `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` (Vercel variables); without them: "Video calls are not set up yet". Steps: `../docs/GO_LIVE.md` A11. |
 | `notifyFamily` | `{ logId }` | Not AI (D45). Texts the patient's family contacts (`Emergency_Contacts`, at most 2) about a **critical** reading, through Semaphore. The server checks the reading is the caller's, saved in the last 30 minutes, and critical by its own thresholds; sends at most once per reading, 3 alerts per patient per day and `FAMILY_SMS_DAILY_CAP` texts per day overall (default 100); records the outcome in `Family_Alerts/{logId}`. Needs `SEMAPHORE_API_KEY` (optional `SEMAPHORE_SENDER_NAME`); without it nothing is sent. Steps: `../docs/GO_LIVE.md` A16. |
+| `settleWallet` / `topUpWallet` / `withdrawFromWallet` | `{ bookingId? }` / `{ amount, method }` | Not AI (D47). The doctor's wallet, **demo money**. `settleWallet` settles a **completed** booking once (paid online: + fee and − the 15% commission; on-site or unpaid: − the commission only), for the booking's patient or doctor; with no `bookingId` it catches up all of the calling doctor's completed bookings. Top-up and withdrawal are for doctors only, ₱0.01 to ₱50,000, GCash or Credit / Debit Card; a withdrawal never takes the balance below 0. A balance below 0 sets `Providers.wallet_blocked`, and patients cannot book that doctor until a top-up. No secret needed. |
 
 Rules enforced here (the app cannot be trusted with them):
 - the caller must be signed in;
@@ -52,6 +52,8 @@ firebase emulators:exec --only firestore --project demo-diabeatis360 "node --tes
                               # joinCall against the Firestore emulator with a made-up LiveKit key
 firebase emulators:exec --only firestore --project demo-diabeatis360 "node --test functions/test/family.test.js"
                               # notifyFamily against the Firestore emulator with a fake SMS sender (no real text)
+firebase emulators:exec --only firestore --project demo-diabeatis360 "node --test functions/test/wallet.test.js"
+                              # the doctor's wallet (D47): settling, top-up, withdrawal, the booking block
 firebase emulators:exec --only auth,firestore --project demo-diabeatis360 "node --test functions/test/live-cleanup.test.js"
                               # the pre-launch clean-up and the Philippine food seed (D32)
 ```
