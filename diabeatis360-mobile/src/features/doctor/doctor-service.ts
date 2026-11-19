@@ -1,12 +1,11 @@
 import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
-import { normalizeDiabetesType, toAvailabilityMode } from '@/constants/enums';
+import { normalizeDiabetesType, toAvailabilityMode, type AvailabilityMode } from '@/constants/enums';
 import { feeProblem, MAX_CONSULTATION_FEE } from '@/constants/fees';
 import { parseBirthdate } from '@/features/auth/birthdate';
 
-import type { Availability } from './availability';
-import type { TimeRange } from './time-slots';
+import { weekForStore, weekFromStored, weekProblem, type WeeklyHours } from './availability';
 import type { DoctorProfile, PatientProfile, PatientSummary } from './types';
 
 export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -34,9 +33,9 @@ export function subscribeToDoctorProfile(
         rejectionReason: String(data.rejection_reason ?? ''),
         availabilityMode: toAvailabilityMode(data.availability_mode),
         availableDays: Array.isArray(data.available_days) ? data.available_days.map(Number) : [],
-        availableRanges: Array.isArray(data.available_ranges)
-          ? (data.available_ranges as TimeRange[]).filter((range) => range?.start && range?.end).map((range) => ({ start: String(range.start), end: String(range.end) }))
-          : [],
+        // Each day's own slots (D48); a doctor saved before D48 has only the shared available_ranges.
+        weeklyHours: weekFromStored(data.weekly_hours, data.available_ranges),
+        walletBlocked: data.wallet_blocked === true,
       });
     },
     (error) => onError(error),
@@ -64,19 +63,30 @@ export async function updateDoctorProfile(
   await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
 }
 
-// Saves how the doctor is available (Manage Schedule, DECISIONS.md D43): Available 24/7, or their own days and hours.
-// Which days and times patients are then offered is worked out in availability.ts (bookableSchedule).
-export async function updateDoctorAvailability(providerId: string, availability: Availability) {
-  const record: Record<string, unknown> = { availability_mode: availability.availabilityMode };
-  // The days and hours are written only with 'custom'. Switching to 24/7 leaves them exactly as they were stored, so
-  // switching back later brings the doctor's own hours back.
-  if (availability.availabilityMode === 'custom') {
-    record.available_days = [...availability.availableDays].sort((a, b) => a - b);
-    // Stored as the windows the doctor actually picked; the individual bookable
-    // slots are derived from them at read time so the two can never disagree.
-    record.available_ranges = availability.availableRanges.filter((range) => range.start && range.end).map((range) => ({ start: range.start, end: range.end }));
-  }
-  await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
+// Saves how the doctor is available (Manage Schedule, DECISIONS.md D43 and D48). Which days and times patients are
+// then offered is worked out in availability.ts (bookableSchedule).
+
+/**
+ * "Save Availability": only the mode. The days and slots stay exactly as they were stored, so switching to 24/7 and
+ * back later brings the doctor's own hours back.
+ */
+export async function updateAvailabilityMode(providerId: string, mode: AvailabilityMode) {
+  await setDoc(doc(db, 'Providers', providerId), { availability_mode: mode }, { merge: true });
+}
+
+/**
+ * "Save Custom Hours": the working days and each day's own slots, and the mode becomes 'custom'. A week that
+ * weekProblem refuses is never written, so patients never get the default hours by accident.
+ * The individual 30-minute slots are not stored; they are worked out from these windows when read, so the two can
+ * never disagree. The old shared `available_ranges` is no longer written (only read for doctors saved before D48).
+ */
+export async function updateCustomHours(providerId: string, availableDays: number[], week: WeeklyHours) {
+  if (weekProblem(availableDays, week)) throw new Error('The custom hours are not complete.');
+  await setDoc(doc(db, 'Providers', providerId), {
+    availability_mode: 'custom',
+    available_days: [...new Set(availableDays)].sort((a, b) => a - b),
+    weekly_hours: weekForStore(week),
+  }, { merge: true });
 }
 
 export function subscribeToPatientProfile(

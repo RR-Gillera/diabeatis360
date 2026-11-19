@@ -9,6 +9,7 @@ import { useSocialSignIn } from '@/features/auth/use-social-sign-in';
 import { resetTo } from '@/lib/navigation';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
+import { Brand } from '@/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -63,4 +64,4 @@ function loginErrorKey(value: unknown): MessageKey {
   return 'auth.error.signIn';
 }
 
-const styles = StyleSheet.create({ scroll: { flexGrow: 1, paddingHorizontal: 32, paddingTop: 48, paddingBottom: 36 }, brand: { alignItems: 'center' }, brandName: { color: authColors.navy, fontSize: 24, fontWeight: '900', marginTop: 14 }, green: { color: authColors.green }, tagline: { color: authColors.muted, fontSize: 15, marginTop: 8 }, form: { gap: 20, marginTop: 68, maxWidth: 430, width: '100%', alignSelf: 'center' }, passwordGroup: { gap: 8 }, passwordLabel: { flexDirection: 'row', justifyContent: 'space-between' }, passwordText: { color: authColors.muted, fontSize: 12, fontWeight: '800', letterSpacing: 0.7 }, forgot: { color: authColors.green, fontSize: 12, fontWeight: '700' }, error: { color: '#D9364F', fontSize: 13, marginTop: -8 }, divider: { alignItems: 'center', flexDirection: 'row', gap: 10, marginVertical: 10 }, line: { backgroundColor: '#E1E7EF', flex: 1, height: 1 }, dividerText: { color: '#8CA0BB', fontSize: 11, letterSpacing: 1 }, signup: { color: authColors.muted, fontSize: 14, marginTop: 66, textAlign: 'center' } });
+const styles = StyleSheet.create({ scroll: { flexGrow: 1, paddingHorizontal: 32, paddingTop: 48, paddingBottom: 36 }, brand: { alignItems: 'center' }, brandName: { color: authColors.navy, fontSize: 24, fontFamily: Brand.font.extraBold, marginTop: 14 }, green: { color: authColors.green }, tagline: { color: authColors.muted, fontSize: 15, marginTop: 8 }, form: { gap: 20, marginTop: 68, maxWidth: 430, width: '100%', alignSelf: 'center' }, passwordGroup: { gap: 8 }, passwordLabel: { flexDirection: 'row', justifyContent: 'space-between' }, passwordText: { color: authColors.muted, fontSize: 12, fontFamily: Brand.font.extraBold, letterSpacing: 0.7 }, forgot: { color: authColors.green, fontSize: 12, fontFamily: Brand.font.bold }, error: { color: '#D9364F', fontSize: 13, marginTop: -8 }, divider: { alignItems: 'center', flexDirection: 'row', gap: 10, marginVertical: 10 }, line: { backgroundColor: '#E1E7EF', flex: 1, height: 1 }, dividerText: { color: '#8CA0BB', fontSize: 11, letterSpacing: 1 }, signup: { color: authColors.muted, fontSize: 14, marginTop: 66, textAlign: 'center' } });

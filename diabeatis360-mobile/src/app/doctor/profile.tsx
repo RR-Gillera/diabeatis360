@@ -5,7 +5,7 @@ import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { feeProblem, MAX_CONSULTATION_FEE, parseFee, roundFee } from '@/constants/fees';
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor/doctor-service';
 import { DoctorBottomNav, DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
@@ -172,26 +172,26 @@ const styles = StyleSheet.create({
   identityCard: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   linkGap: { marginTop: 12 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
-  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 22, fontWeight: '800' },
+  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 22 },
   identityCopy: { flex: 1, gap: 2 },
-  identityName: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
-  identityEmail: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13 },
+  identityName: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
+  identityEmail: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13 },
   badgeRow: { flexDirection: 'row', marginTop: 6 },
   verifyBadge: { alignItems: 'center', borderRadius: 6, flexDirection: 'row', gap: 5, paddingHorizontal: 8, paddingVertical: 4 },
   verifyBadgeOn: { backgroundColor: '#E8F8F5' },
   verifyBadgeOff: { backgroundColor: '#FEF3C7' },
-  verifyText: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+  verifyText: { fontFamily: Brand.font.extraBold, fontSize: 10, textTransform: 'uppercase' },
   notice: { alignItems: 'center', backgroundColor: 'rgba(251, 146, 60, 0.08)', borderRadius: 14, flexDirection: 'row', gap: 10, marginTop: 16, padding: 14 },
-  noticeText: { color: homeColors.textMuted, flex: 1, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  noticeText: { color: homeColors.textMuted, flex: 1, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18 },
   sectionSpacing: { marginTop: 32 },
   formCard: { gap: 16, marginTop: 16 },
   field: { gap: 6 },
-  input: { backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, minHeight: 48, paddingHorizontal: 14 },
+  input: { backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 15, minHeight: 48, paddingHorizontal: 14 },
   saveButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', minHeight: 52 },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  saveButtonText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 15 },
   linkRow: { alignItems: 'center', flexDirection: 'row', gap: 14, marginTop: 16 },
   linkIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
-  linkText: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700' },
-  logout: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800', marginTop: 32, textAlign: 'center' },
+  linkText: { color: '#0F172A', flex: 1, fontFamily: Brand.font.bold, fontSize: 15 },
+  logout: { color: '#D9364F', fontFamily: Brand.font.extraBold, fontSize: 16, marginTop: 32, textAlign: 'center' },
 });

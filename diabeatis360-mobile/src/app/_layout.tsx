@@ -7,6 +7,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 
 import { screenAnimation } from '@/constants/screen-animation';
 import { screenTopStyle } from '@/constants/screen-top';
+import { SystemBars } from '@/components/ui/system-bars';
 import { BookingProvider } from '@/features/booking/booking-context';
 import { AuthProvider } from '@/features/auth/auth-context';
 import { RouteGuard } from '@/features/auth/route-guard';
@@ -56,6 +57,8 @@ export default function TabLayout() {
           <PinGate />
           {/* The intro (Figma "Splash"), on top of everything while the first screen loads underneath. Last, so it is on top. */}
           <IntroSplash />
+          {/* Dark strips behind the phone's clock and 3-button bar in dark mode, so its white icons stay visible. Above everything. */}
+          <SystemBars />
         </BookingProvider>
         </LanguageProvider>
       </AuthProvider>

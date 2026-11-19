@@ -9,13 +9,14 @@ import { BookingHeader, BookingHeaderActions, bookingColors, combineDateAndTime,
 import { BookingError, CONCERN_LIMIT, createBookingRequest, subscribeToBookedTimes } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { isPastSlot, manilaToday } from '@/features/booking/manila-time';
-import { bookableSchedule, DAY_PERIODS, periodOf } from '@/features/doctor/availability';
+import { bookableSchedule, DAY_PERIODS, periodOf, weekdayIndex } from '@/features/doctor/availability';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { auth } from '@/firebase';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
 import { monthNames } from '@/i18n/translate';
+import { Brand } from '@/constants/theme';
 
 const EMPTY_BOOKED_TIMES: Set<string> = new Set();
 // Monday first, shown as two capital letters ("MO", or "LU" in Filipino).
@@ -58,14 +59,15 @@ export default function SelectDateTimeScreen() {
     return subscribeToDoctorProfile(provider.id, setDoctorProfile, () => {});
   }, [provider]);
 
-  // The days and slots come from the doctor's availability (DECISIONS.md D43): every day and every half hour for a
-  // doctor who is Available 24/7, otherwise the doctor's own days and hours. A doctor who has not set any falls back to
-  // the default hours, so nobody becomes unbookable. One function decides it (features/doctor/availability.ts), the
-  // same one the doctor's own screen reads.
+  // The days and slots come from the doctor's availability (DECISIONS.md D43, D48): every day and every half hour for a
+  // doctor who is Available 24/7, otherwise the doctor's own days, each with its own hours. A doctor who has not set
+  // any falls back to the default hours, so nobody becomes unbookable. One function decides it
+  // (features/doctor/availability.ts), the same one the doctor's own screens read.
   const schedule = bookableSchedule(doctorProfile);
-  const times = schedule.slots;
   // The calendar starts its weeks on Monday (0), like Providers.available_days; getDay() starts on Sunday.
-  const isWorkingDay = (day: Date) => schedule.days.includes((day.getDay() + 6) % 7);
+  const isWorkingDay = (day: Date) => schedule.days.includes(weekdayIndex(day));
+  // The slots of the picked day only: Monday can be 9:00 AM – 1:00 PM while Tuesday is 9:00 AM – 5:00 PM (D48).
+  const times = selectedDate && isWorkingDay(selectedDate) ? schedule.slots[weekdayIndex(selectedDate)] ?? [] : [];
 
   // If the previously picked time turns out to already be taken (someone else
   // booked it, or the day changed), don't let a stale selection through.
@@ -114,6 +116,7 @@ export default function SelectDateTimeScreen() {
           })}</View>
         </View>
         <Text style={ui.sectionTitle}>{t('booking.slots')}</Text>
+        {!selectedDate ? <Text style={styles.noSlots}>{t('booking.pickDayFirst')}</Text> : null}
         {noneLeftToday ? <Text style={styles.noSlots}>{t('booking.noneToday')}</Text> : null}
         {/* Slots grouped by part of the day (early morning, morning, afternoon, evening); a part with no slots is left out. */}
         {DAY_PERIODS.map((period) => {
@@ -163,5 +166,5 @@ function TimeButton({ time, selected, taken, past, onPress }: { time: string; se
 }
 
 const styles = StyleSheet.create({
-  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontWeight: '800', textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontWeight: '800' }, periodBlock: { gap: 16 }, period: { color: '#91A4BF', fontSize: 12, fontWeight: '800', letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontWeight: '800' }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, textAlign: 'center' }, footer: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, gap: 12, paddingHorizontal: 24, paddingTop: 14 }, summary: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontWeight: '800' }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontWeight: '800', marginTop: 5 },
+  scroll: { gap: 16, padding: 24, paddingBottom: 40 }, notice: { color: bookingColors.muted, padding: 24 }, monthHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }, monthTitle: { color: bookingColors.navy, fontSize: 17, fontFamily: Brand.font.extraBold }, monthActions: { flexDirection: 'row', gap: 20 }, weekRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }, weekDay: { color: '#94A6C0', fontSize: 11, fontFamily: Brand.font.extraBold, textAlign: 'center', width: '14.28%' }, calendar: { flexDirection: 'row', flexWrap: 'wrap' }, day: { alignItems: 'center', height: 42, justifyContent: 'center', width: '14.28%' }, dayText: { color: bookingColors.navy, fontSize: 14 }, disabledDay: { color: '#B9C5D5' }, selectedDay: { backgroundColor: bookingColors.green, borderRadius: 22 }, selectedDayText: { color: '#FFF', fontFamily: Brand.font.extraBold }, periodBlock: { gap: 16 }, period: { color: '#91A4BF', fontSize: 12, fontFamily: Brand.font.extraBold, letterSpacing: 1 }, timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 }, timeButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, minHeight: 54, justifyContent: 'center', width: '47%' }, selectedTime: { backgroundColor: bookingColors.green, borderColor: bookingColors.green }, timeText: { color: bookingColors.muted, fontSize: 14, fontFamily: Brand.font.extraBold }, selectedTimeText: { color: '#FFF' }, takenTime: { opacity: 0.5 }, takenTimeText: { color: '#94A3B8' }, noSlots: { color: '#94A3B8', fontSize: 13, fontStyle: 'italic' }, requestError: { color: '#D9364F', fontSize: 13 }, concern: { backgroundColor: '#FFF', borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, color: bookingColors.navy, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' }, concernCount: { color: '#94A3B8', fontSize: 11, marginTop: -8, textAlign: 'right' }, requestHint: { color: '#94A3B8', fontSize: 12, lineHeight: 18, textAlign: 'center' }, footer: { backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, gap: 12, paddingHorizontal: 24, paddingTop: 14 }, summary: { flexDirection: 'row', gap: 12, justifyContent: 'space-between' }, summaryLabel: { color: '#91A4BF', fontSize: 10, fontFamily: Brand.font.extraBold }, summaryValue: { color: bookingColors.navy, fontSize: 13, fontFamily: Brand.font.extraBold, marginTop: 5 },
 });

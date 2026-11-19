@@ -21,7 +21,6 @@ This guide is split in two. **Part A works on the free Spark plan; do it now.** 
 |---|---|---|
 | AI meals and exercise | Home > AI Recommendations > Generate | An amber note under the Generate button |
 | Nutrition scanner (label photo) | The camera button | A screen titled "This feature isn't available yet" with only **Back** |
-| Product lookup (barcode) | The same scanner, on the first barcode it reads | The same screen |
 | Guardian ID photo | Sign-up > "Who is this account for?" > **For my child** > Next | An amber note on that screen. The choice is **not saved**, so the account is not locked as a child's. **For me** still works |
 
 How the app knows: on Spark the three functions answer HTTP 404 and no bucket exists (checked against the live project on 2026-10-04). The app turns a 404 into this message, and a function that exists but is busy still says "try again". `src/lib/feature-unavailable.ts` holds the rule, and `npm test` re-checks it against the real Firebase SDK.
@@ -109,7 +108,7 @@ EAS does not need a paid Firebase plan. Respondents install an APK instead of ru
 1. Patient: sign up as an adult ("For me"), finish onboarding, reach Home.
 2. Log 118 mg/dL before a meal (Normal), then 270 (Critical: emergency text and a notification).
 3. With a normal reading: Home > AI Recommendations > Generate. Expect the amber "This feature isn't available yet" note, no crash.
-4. Scanner (camera button): point at a barcode (it is read automatically) or press the shutter on a label. Expect the "This feature isn't available yet" screen with only Back.
+4. Scanner (camera button): press the shutter on a nutrition label. Expect the "This feature isn't available yet" screen with only Back.
 5. A new account: choose **For my child** > Next. Expect the amber note on that screen and no move to the next screen. Then choose **For me**: it must still continue.
 6. Admin panel on the live URL: admin signs in, a patient is refused.
 7. Book a doctor, accept as the doctor, chat, end the consultation, read the summary.
@@ -307,11 +306,11 @@ Upgrade `diabeatis360-b2ab8` to **Blaze** and set a budget alert (Google Cloud c
 npx firebase deploy --only storage,functions
 ```
 The first functions deploy asks to enable a few Google APIs; answer yes.
-Check: `npx firebase functions:list` shows `generateRecommendations`, `analyzeLabel` and `lookupProduct` in asia-southeast1, and the console's Storage > Rules tab shows today's date.
+Check: `npx firebase functions:list` shows `generateRecommendations` and `analyzeLabel` in asia-southeast1 (if an old `lookupProduct` is still listed, delete it: `npx firebase functions:delete lookupProduct --region asia-southeast1`), and the console's Storage > Rules tab shows today's date.
 
 ## B4. Re-test the four features (no new app build)
 1. Home > AI Recommendations > Generate meals: a real Gemini list with the disclaimer and "2 of 2 left" on the Free plan. Declare a peanut allergy first and check that no peanut dish appears. Then exercise.
-2. Scanner: a real nutrition label, then a real barcode (a second scan of the same product should be answered from the shared product memory without using a Free scan).
+2. Scanner: a real nutrition label (each scan uses one of the Free plan's 3 a day).
 3. Sign up a child: **For my child** > guardian details and a photo > Continue. In the admin panel > Users > Guardian Verification the request appears with the photo; approve it and book a consultation as that child.
 4. Record the rows in `docs/TEST_LOG.md`.
 
@@ -329,10 +328,10 @@ Table 24 has 23 module-points and 57 function-by-role ticks.
 |---|---|---|
 | AI Health Assistant | Generate Meal Recommendation | `generateRecommendations` (Functions and Gemini) |
 | AI Health Assistant | Generate Exercise Recommendation | the same function |
-| Nutrition Scanner | Scan Nutrition Label | `analyzeLabel` (and `lookupProduct` for barcodes) |
-| Nutrition Scanner | View Nutrition Analysis | the same functions |
+| Nutrition Scanner | Scan Nutrition Label | `analyzeLabel` |
+| Nutrition Scanner | View Nutrition Analysis | the same function |
 
-**Not in Table 24 but also blocked:** product lookup and shared product memory (D12, added scope), and the guardian ID photo (D16). In the admin panel the "Scanned Products" and "Guardian Verification" lists simply stay empty.
+**Not in Table 24 but also blocked:** the guardian ID photo (D16). In the admin panel the "Guardian Verification" list simply stays empty.
 
 **Testable with one caveat: 4 module-points (Patient).** Every tick works; one aspect does not.
 - **Account Management and Health Profile:** work for adult accounts. A child's account (manuscript UT-005) stops at "For my child".

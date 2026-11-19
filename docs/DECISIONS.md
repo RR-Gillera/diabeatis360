@@ -190,7 +190,19 @@ creates it (as `ringing`) and only on a `confirmed` booking.
 limitation that calls ring only while the app is open. Build after booking + chat are stable (plan item 16).
 **Manuscript needs editing:** data dictionary (Calls), scope & limitations, test plan (new tests).
 
-### D12 — Product memory for the nutrition scanner — CLOSED 2026-09-26: approved; unverified products shown, labelled
+### D12 — Product memory for the nutrition scanner — REVERSED 2026-11-19: barcode scanning removed
+**Reversed 2026-11-19 (team, with the adviser's agreement):** barcode scanning and the shared product memory are removed.
+The scanner reads **only the nutrition label** (photo → `analyzeLabel` → Gemini, image not stored, D2). Removed: the
+Barcode / label toggle and barcode reading in `app/scanner.tsx`, the "Scan a barcode instead" option on the Free limit
+screen, the "We don't know this product yet" share form (`features/scanner/product-service.ts`), the `lookupProduct`
+function (Firebase and Vercel) and `functions/lib/rating.js`, the `barcode` argument of `analyzeLabel`, the
+`Products` security rules (the collection is now closed to everyone), and the admin Content > Scanned Products tab.
+New `Nutrition_Scans` no longer get `product_id`; `source` is always `gemini_label`. Every label scan counts toward
+the Free plan's 3 a day. Existing `Products` documents, if any, are left in Firestore but nothing reads them.
+**Manuscript needs editing:** drop Products from the data dictionary and ERD, drop `Nutrition_Scans.product_id`, and
+describe the scanner as label-only (see MANUSCRIPT_CHANGES.md).
+
+The original decision, kept for the record:
 A **shared** product database keyed by barcode, so one patient's scan benefits all patients:
 1. The scanner reads the **barcode first**. If a `Products/{barcode}` doc exists, reuse its saved nutrients:
    no Gemini call.
@@ -216,7 +228,7 @@ ARE shown to other patients, labelled "Not yet verified", until an admin verifie
 Each is added with `npx expo install` (mobile) or `npm install` (admin/functions) in the work item that needs
 it, and that item's notes say why.
 - Mobile: `@expo-google-fonts/inter` + `expo-font` (Figma font), `eslint` (so `npm run lint` works),
-  `expo-notifications` (reminders), `expo-camera` (scanner + barcode), `react-native-webview` (in-app video call; Jitsi until D27, Daily.co until D39, now our call page with LiveKit).
+  `expo-notifications` (reminders), `expo-camera` (label scanner), `react-native-webview` (in-app video call; Jitsi until D27, Daily.co until D39, now our call page with LiveKit).
   All work in Expo Go.
 - Admin: `react-router-dom`, `tailwindcss`, `recharts`.
 - Cloud Functions (`functions/`, per D1): `firebase-functions`, `firebase-admin`, `@google/genai`.
@@ -752,3 +764,20 @@ timestamp), and on a phone set to Philippine time the saved values are the same 
 **Deploy order:** publish the app update first, then the rules. An older app on a phone whose clock is more than 5 minutes fast would have every new reading refused, because it has no second try. Run the data check on the live project before the rules go out.
 **Manuscript:** no new collection or field. The data dictionary notes the limits (fee 0–20,000; a reading's time; a birthdate that fits the account) and the test tables get rows (`MANUSCRIPT_CHANGES.md`, D46).
 **Still open from the report:** batch 2 (Medium) and batch 3 (Low), plus the team decisions on PAT-011, ADM-012, ADM-015 and DOC-013 part 2.
+
+### D48 — Custom Hours: each working day has its own time slots — CLOSED 2026-11-19 (team request in session with the new "Custom Hours" frame; choice: "per-day hours", the data change, over restyling the shared hours; changes D43 points 1–3)
+**Asked:** build the two new frames, "Set Your Availability" and "Custom Hours". Custom Hours shows one card per weekday, each with its own slots (Monday 9:00 AM – 1:00 PM and 2:00 PM – 6:00 PM, Tuesday 9:00 AM – 5:00 PM, Wednesday "Closed all day"…), "+ Add Slot" and "Save Custom Hours".
+**Conflict found:** D43 stored one set of hours for every working day (`available_ranges`), and listed "no per-day hours" as a limit. The frame needs a data change. The other option, a per-day-looking screen whose slots are shared by all days, was rejected: the screen would show something the app does not do.
+(D47 is the number used by the doctor-wallet work in progress, so this entry is D48.)
+**Decided:**
+1. **Data:** one new field, `Providers.weekly_hours`, a map with seven keys `mon` … `sun`, each a list of `{ start, end }` (e.g. `{ mon: [{ start: "09:00 AM", end: "01:00 PM" }, { start: "02:00 PM", end: "06:00 PM" }], wed: [] }`). A map rather than a list of lists, because Firestore cannot store a list inside a list. `available_days` still says which days are open, so a switched-off day keeps its slots and switching it back on brings them back. Slots are still 30 minutes, worked out when read, not stored.
+2. **No migration:** a doctor without `weekly_hours` (everyone saved before D48) is read as their old `available_ranges` on every day, which is exactly what they were offering. `available_ranges` is no longer written.
+3. **One place still decides what patients are offered:** `bookableSchedule` in `features/doctor/availability.ts` now gives the hours and slots per weekday. 24/7 is unchanged (every day, 48 slots). With custom hours, no days set still means every day, and a day with no usable slot still gets the default 8:00 AM – 6:00 PM.
+4. **Saving custom hours is refused** unless at least one day is on, every day that is on has a slot, every slot fits at least one 30-minute booking, and no two slots on a day overlap (`weekProblem`). The message names the day and its card gets the green border. The service checks it again before writing.
+5. **Screens:** Set Your Availability keeps the two options and the Current Configuration card; tapping "Set Custom Hours" opens the new Custom Hours screen, which saves the days, the slots and the mode. "Save Availability" saves only the mode (custom with no complete hours opens Custom Hours instead). The card says the hours on one line when every working day has the same ones, otherwise "Varies by day". The patient's time picker shows only the picked day's slots ("Pick a day to see the times" before a day is picked). The dashboard's "Available now" check (`available-now.ts`) uses the same per-day hours.
+6. **No security-rule change:** the Providers update rule is a deny-list of admin fields, so a doctor can already write `weekly_hours` on their own document, and the rules never checked a booking against the doctor's hours (D43 point 5).
+**Kept from D43:** no auto-accept, no "Response time" row, the 24/7 text says requests are still accepted by the doctor.
+**Built:** `app/doctor/custom-hours.tsx` (new), `app/doctor/schedule.tsx` (the per-day editor moved out), `features/doctor/saved-dialog.tsx` (the shared "Saved" pop-up, moved out of schedule.tsx), `features/doctor/{availability.ts,doctor-service.ts,types.ts}`, `app/booking/select-date-time.tsx`, English and Filipino texts.
+**Tested:** `availability.test.mjs` 16 tests (5 new: the Figma week, reading old and new documents, the save checks, the one-line hours, Monday-first weekdays); mobile unit 217 (211 pass, 6 emulator-only skipped); `tsc` and lint clean. **Not run in a browser on the emulators or on a phone yet.** The rules suite was not rerun because no rule changed.
+**Not done / limits:** a slot cannot cross midnight (11:00 PM – 1:00 AM must be two slots on two days); no "copy Monday to all days" button; leaving Custom Hours without saving drops the edits without asking.
+**Manuscript needs editing:** the Providers data dictionary gets `weekly_hours` (map of weekday → list of start/end times; Required: No) and `available_ranges` is described as the old shared hours, read only when `weekly_hours` is missing; the Manage Schedule description and test case mention per-day slots (`MANUSCRIPT_CHANGES.md`, row "8 Providers").

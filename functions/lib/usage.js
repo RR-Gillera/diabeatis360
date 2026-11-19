@@ -12,7 +12,6 @@
 // person cannot reset their own count. "day" is the Manila calendar day, the same day the Free limits reset on.
 //   Usage_Counters/{day}          { day, gemini }                      everyone together (the project-wide cap)
 //   Usage_Counters/{day}_{uid}    { day, user_id, ai, scan }           one person
-// A product lookup from the shared Products collection makes no Gemini call (D12), so it never touches these counters.
 
 const { FieldValue } = require('firebase-admin/firestore')
 const { HttpsError } = require('firebase-functions/v2/https')
@@ -84,10 +83,4 @@ async function reserveSlot({ db, uid, feature, premium, now = new Date() }) {
   }
 }
 
-/** How many of `feature` this person has used today (shown as "remaining" after a product lookup). */
-async function usedToday(db, uid, feature, now = new Date()) {
-  const snapshot = await db.doc(`Usage_Counters/${manilaDayKey(now)}_${uid}`).get()
-  return Number(snapshot.get(feature) ?? 0)
-}
-
-module.exports = { reserveSlot, usedToday }
+module.exports = { reserveSlot }

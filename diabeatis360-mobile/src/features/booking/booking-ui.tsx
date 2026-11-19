@@ -3,7 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { MoreMenu } from '@/components/ui/more-menu';
-import { Brand, Fonts, Spacing } from '@/constants/theme';
+import { Brand, Spacing } from '@/constants/theme';
 import { NotificationBell } from '@/features/notifications/notification-bell';
 import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
@@ -132,13 +132,13 @@ export const styles = StyleSheet.create({
   headerCopy: { flex: 1 },
   headerActions: { flexDirection: 'row', gap: 8 },
   headerActionButton: { alignItems: 'center', backgroundColor: '#F8FAFC', borderColor: '#F1F5F9', borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
-  title: { color: bookingColors.navy, fontFamily: Fonts.sans, fontSize: 24, fontWeight: '800' },
+  title: { color: bookingColors.navy, fontFamily: Brand.font.extraBold, fontSize: 24 },
   titleBesideActions: { fontSize: 20 },
-  subtitle: { color: bookingColors.muted, fontFamily: Fonts.sans, fontSize: 14, marginTop: 4 },
-  sectionTitle: { color: bookingColors.navy, fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
+  subtitle: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 14, marginTop: 4 },
+  sectionTitle: { color: bookingColors.navy, fontFamily: Brand.font.extraBold, fontSize: 17 },
   card: { backgroundColor: '#FFFFFF', borderColor: bookingColors.border, borderWidth: 1, borderRadius: 20, padding: Spacing.three },
   primaryButton: { alignItems: 'center', backgroundColor: bookingColors.green, borderRadius: 13, minHeight: 52, justifyContent: 'center', paddingHorizontal: Spacing.three },
-  primaryButtonText: { color: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  primaryButtonText: { color: '#FFFFFF', fontFamily: Brand.font.extraBold, fontSize: 16 },
   disabled: { backgroundColor: '#B9C5B0' },
   pressed: { opacity: 0.82 },
 });

@@ -32,7 +32,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Out-of-range → in-app notification ✔ (`glucoseAlert`)
 
 ## Tier 3 — Appointments & consultation (P, D, A)
-- [~] Doctor: Manage Schedule (availability + fee) ✔ (`doctor/schedule.tsx`, `updateDoctorAvailability`). **2026-11-12 (D43):** rebuilt to the "Set Your Availability" frame: Available 24/7 or Set Custom Hours, Current Configuration card, saved pop-ups; the patient's time picker and Find a Doctor follow it. Browser-tested on the emulators (31/31); needs a phone test and a new APK.
+- [~] Doctor: Manage Schedule (availability + fee) ✔ (`doctor/schedule.tsx`, `updateDoctorAvailability`). **2026-11-12 (D43):** rebuilt to the "Set Your Availability" frame: Available 24/7 or Set Custom Hours, Current Configuration card, saved pop-ups; the patient's time picker and Find a Doctor follow it. Browser-tested on the emulators (31/31); needs a phone test and a new APK. **2026-11-19 (D48):** new "Custom Hours" screen, each working day with its own slots (`Providers.weekly_hours`); unit-tested, not yet browser- or phone-tested.
 - [~] Patient: directory (verified + active doctors only, `subscribeToBookableProviders`) → slots → mock payment → booking ✔; double-booking guard built 2026-09-26: booking id `<providerId>_<slot UTC>` written in a transaction and enforced by the rules; 15% `platform_commission` stored per booking (D3) [item 4]; verified in the browser build against the emulators (not yet on a phone)
 - [~] Doctor: queue → accept / decline ✔; both see appointment history ✔ (`booking/appointment.tsx`, `doctor/appointments.tsx`)
 - [~] Chat (realtime, top-level `Messages` collection, not the D8 subcollection) ✔; doctor sees patient profile + glucose history ✔
@@ -60,7 +60,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Subscription: plans, mock subscribe, status, cancel ✔ (`subscription.tsx`); Free vs Premium comparison + hero (Figma 3:630) and `canUseFeature` daily-limit helper built 2026-09-26 [item 2]; **run `node seed-demo.cjs` to create the 4 plans (D5)**; admin plan CRUD + premium subscriber list ✘ [item 10]. A real bug found and fixed 2026-09-28: cancelling used to drop Premium access immediately instead of at the paid-through date (`activeSubscription`/`canUseFeature`/server-side `hasPremium` all fixed to treat a cancelled-but-unexpired subscription as still Premium).
 
 ## Added scope (adviser-requested, not in Table 24): after all 23 points
-- [~] Product memory (DECISIONS D12, closed) [item 15]: barcode lookup first (no Gemini, no Free scan used), label photo only for a new product, patient confirms name/brand and shares it as unverified, admin verifies in Scanned Products. Built, rules- and emulator-tested; needs a real phone camera for barcode reading.
+- ~~Product memory (DECISIONS D12) [item 15]~~: **removed 2026-11-19** with the adviser's agreement. The scanner reads only the nutrition label; no barcode lookup, no shared Products, no admin Scanned Products tab.
 - [~] Video call signaling (DECISIONS D11, closed) [item 16]: ringing, Accept/Decline, cancel, 30 s missed call with notification, in-app Jitsi (WebView / iframe) with a random room token. Built and rules-tested (149/149); needs a two-phone test for camera, microphone and real-device ringing. Rings only while the app is open (no FCM).
 
 ## Tier 7 — If time allows

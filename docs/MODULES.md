@@ -101,10 +101,8 @@ Legend: **P** = Patient (mobile) · **D** = Doctor (mobile) · **A** = Admin (we
   Healthier Alternatives). Save to Nutrition_Scans.
 - Handle unreadable/blurred labels gracefully ("Try again in better light").
 - Free plan: 3 scans/day. Image storage depends on DECISIONS.md D2. UT-011, UT-012, IT-005.
-- **Added scope (adviser, not in Table 24): Product Memory — P (scan), A (review).** Barcode first; a hit in the
-  shared `Products` collection reuses saved nutrients (no Gemini call); a miss reads the label with Gemini, the
-  user confirms name/brand, and it is saved `verified: false` for admin review. Health rating recomputed per
-  user every time. See DECISIONS.md D12.
+- **No barcode scanning.** The adviser-added Product Memory (barcode lookup, shared `Products`, admin review) was
+  removed on 2026-11-19 with the adviser's agreement; the scanner reads only the nutrition label. See DECISIONS.md D12.
 
 ## 6. Appointment — P, D, A
 | Function | P | D | A |

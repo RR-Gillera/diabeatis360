@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } fro
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
 import { subscribeToNotifications } from './notification-service';
@@ -37,5 +37,5 @@ export function NotificationBell({ style }: { style?: StyleProp<ViewStyle> }) {
 
 const styles = StyleSheet.create({
   dot: { alignItems: 'center', backgroundColor: homeColors.red, borderColor: '#FFF', borderRadius: 9, borderWidth: 2, height: 18, justifyContent: 'center', minWidth: 18, paddingHorizontal: 3, position: 'absolute', right: 0, top: 0 },
-  dotText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 9, fontWeight: '800' },
+  dotText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 9 },
 });
