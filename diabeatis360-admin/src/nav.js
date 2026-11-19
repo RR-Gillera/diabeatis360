@@ -9,7 +9,7 @@ export const navItems = [
   { to: '/', label: 'Overview', icon: HomeIcon },
   { to: '/users', label: 'Users', icon: UsersIcon, badge: 'guardians' },
   { to: '/providers', label: 'Providers', icon: StethoscopeIcon, badge: 'providers' },
-  { to: '/content', label: 'Content', icon: ContentIcon, badge: 'products' },
+  { to: '/content', label: 'Content', icon: ContentIcon },
   { to: '/analytics', label: 'Analytics', icon: ChartIcon },
   { to: '/revenue', label: 'Revenue', icon: RevenueIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },

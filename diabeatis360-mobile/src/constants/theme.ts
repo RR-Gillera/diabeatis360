@@ -89,6 +89,9 @@ export const Brand = {
     dangerTint: '#FBE6E9',
     neutral: '#475569',
     neutralTint: '#F1F5F9',
+    // Behind the phone's status bar / 3-button bar in dark mode, where the phone's icons are white
+    // (components/ui/system-bars.tsx). Same near-black as our text colour.
+    systemBarDark: '#111827',
   },
   radius: { card: 32, button: 16, pill: 999 },
   sizes: { buttonHeight: 64, screenPadding: 24 },

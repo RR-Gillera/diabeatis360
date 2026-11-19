@@ -6,7 +6,7 @@ import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
 import { homeColors } from '@/features/home/home-ui';
@@ -263,55 +263,55 @@ const styles = StyleSheet.create({
   overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: homeColors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
+  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
   readingRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   // minWidth 0 lets the box shrink beside "mg/dL" and the class badge on the web too (a web text box keeps its own width).
-  readingInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', flex: 1, minWidth: 0, fontFamily: Fonts.sans, fontSize: 28, fontWeight: '800', paddingHorizontal: 16, paddingVertical: 10 },
-  readingUnit: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  readingInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', flex: 1, minWidth: 0, fontFamily: Brand.font.extraBold, fontSize: 28, paddingHorizontal: 16, paddingVertical: 10 },
+  readingUnit: { color: homeColors.textMuted, fontFamily: Brand.font.bold, fontSize: 14 },
   previewBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  previewBadgeText: { fontFamily: Fonts.sans, fontSize: 12, fontWeight: '800' },
+  previewBadgeText: { fontFamily: Brand.font.extraBold, fontSize: 12 },
   contextRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   contextPill: { alignItems: 'center', backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, flex: 1, paddingVertical: 12 },
   contextPillActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
-  contextText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
+  contextText: { color: homeColors.textMuted, fontFamily: Brand.font.bold, fontSize: 13 },
   contextTextActive: { color: '#FFF' },
-  notesInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, marginTop: 16, minHeight: 60, padding: 14, textAlignVertical: 'top' },
-  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginTop: 14 },
-  hint: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginTop: 8 },
+  notesInput: { borderColor: homeColors.border, borderRadius: 12, borderWidth: 1, color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 14, marginTop: 16, minHeight: 60, padding: 14, textAlignVertical: 'top' },
+  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, marginTop: 14 },
+  hint: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, marginTop: 8 },
   confirmBox: { backgroundColor: '#FEF3C7', borderRadius: 14, gap: 4, marginTop: 14, padding: 12 },
-  confirmTitle: { color: '#92400E', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
-  confirmText: { color: '#92400E', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
+  confirmTitle: { color: '#92400E', fontFamily: Brand.font.extraBold, fontSize: 14 },
+  confirmText: { color: '#92400E', fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19 },
   saveButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 56 },
   saveButtonDisabled: { opacity: 0.55 },
-  saveButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
-  offline: { color: '#475569', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' },
+  saveButtonText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 16 },
+  offline: { color: '#475569', fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19, marginTop: 10, textAlign: 'center' },
   offlineButton: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', marginTop: 8, minHeight: 46 },
-  offlineButtonText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  offlineButtonText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
   deleteButton: { alignItems: 'center', borderRadius: 14, justifyContent: 'center', marginTop: 8, minHeight: 46 },
-  deleteButtonText: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  deleteButtonText: { color: '#D9364F', fontFamily: Brand.font.extraBold, fontSize: 14 },
 });
 
 const historyStyles = StyleSheet.create({
   box: { borderTopColor: homeColors.borderSoft, borderTopWidth: 1, gap: 8, marginTop: 12, paddingTop: 14 },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 14 },
   // Capped so a long history scrolls inside the sheet instead of pushing it off the screen.
   list: { maxHeight: 170 },
-  original: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600', marginBottom: 6 },
+  original: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 12, marginBottom: 6 },
   row: { borderLeftColor: homeColors.green, borderLeftWidth: 2, gap: 2, marginBottom: 8, paddingLeft: 10 },
-  when: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700' },
-  change: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13, fontWeight: '600', lineHeight: 19 },
-  muted: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
+  when: { color: homeColors.textFaint, fontFamily: Brand.font.bold, fontSize: 11 },
+  change: { color: '#0F172A', fontFamily: Brand.font.medium, fontSize: 13, lineHeight: 19 },
+  muted: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12 },
 });
 
 const recStyles = StyleSheet.create({
   section: { gap: 16 },
-  sectionTitle: { color: '#111827', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '700' },
+  sectionTitle: { color: '#111827', fontFamily: Brand.font.bold, fontSize: 18 },
   card: { backgroundColor: homeColors.card, borderColor: '#FFFFFF', borderRadius: 24, borderWidth: 1, gap: 16, padding: 20, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   cardTop: { flexDirection: 'row', gap: 16 },
   iconWrap: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 16, height: 48, justifyContent: 'center', width: 48 },
   copy: { flex: 1, gap: 4 },
-  cardTitle: { color: '#111827', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '700' },
-  cardText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
+  cardTitle: { color: '#111827', fontFamily: Brand.font.bold, fontSize: 16 },
+  cardText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 21 },
   button: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 12, justifyContent: 'center', minHeight: 45 },
-  buttonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  buttonText: { color: '#FFF', fontFamily: Brand.font.bold, fontSize: 14 },
 });

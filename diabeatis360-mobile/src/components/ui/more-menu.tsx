@@ -3,6 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyl
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 
 import { useT } from '@/i18n/language-context';
+import { Brand } from '@/constants/theme';
 
 export type MoreMenuItem = {
   label: string;
@@ -53,6 +54,6 @@ const styles = StyleSheet.create({
   item: { alignItems: 'center', borderRadius: 12, flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   itemDestructive: { backgroundColor: '#FDECEC' },
   pressed: { opacity: 0.7 },
-  label: { color: '#111827', fontSize: 15, fontWeight: '600' },
-  labelDestructive: { color: '#EF4444', fontWeight: '700' },
+  label: { color: '#111827', fontSize: 15, fontFamily: Brand.font.medium },
+  labelDestructive: { color: '#EF4444', fontFamily: Brand.font.bold },
 });

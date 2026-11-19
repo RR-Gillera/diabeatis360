@@ -3,7 +3,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { homeColors } from '@/features/home/home-ui';
 import { useT } from '@/i18n/language-context';
 import { labelFromMinutes, minutesFromLabel } from './time-slots';
@@ -117,14 +117,14 @@ const styles = StyleSheet.create({
   overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
-  preview: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 32, fontWeight: '900', letterSpacing: -1, marginTop: 14, textAlign: 'center' },
+  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
+  preview: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 32, letterSpacing: -1, marginTop: 14, textAlign: 'center' },
   columns: { flexDirection: 'row', gap: 10, marginTop: 16 },
   column: { flex: 1, gap: 8 },
-  columnLabel: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center' },
+  columnLabel: { color: homeColors.textMuted, fontFamily: Brand.font.extraBold, fontSize: 11, letterSpacing: 0.6, textAlign: 'center' },
   columnScroll: { backgroundColor: '#F9FBFC', borderRadius: 12, height: 200 },
-  wheelText: { color: '#A7B8CD', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '700', paddingVertical: 10, textAlign: 'center' },
+  wheelText: { color: '#A7B8CD', fontFamily: Brand.font.bold, fontSize: 16, paddingVertical: 10, textAlign: 'center' },
   active: { backgroundColor: homeColors.greenTint, color: homeColors.green, fontSize: 17 },
   confirm: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 52 },
-  confirmText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  confirmText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 16 },
 });
