@@ -652,10 +652,10 @@ timestamp), and on a phone set to Philippine time the saved values are the same 
 
 ### D42 — A 6-digit app PIN, like GCash — CLOSED 2026-11-12 (team request in session; choices: both patients and doctors, lock after 30 seconds, existing accounts also asked, new packages approved)
 **Asked:** after account setup, every user adds a 6-digit PIN that is asked each time the app opens. It is **not in MODULES.md or the manuscript**, so the team must add it there (security / authentication) and write it into Capstone 2.
-**Decided:** (1) Patients and doctors both. (2) The PIN is asked when the app opens with someone still signed in, and again when the app comes back after more than 30 seconds in the background (`LOCK_AFTER_MS`). A person who has just typed their password is not asked straight away. (3) Accounts that finished setup before this existed are asked to create a PIN the next time they open the app. (4) Five wrong tries in a row sign the person out (they log in with email and password and make a new PIN); "Forgot PIN? Log in again" does the same. (5) Profile has "Change PIN" (current PIN, then a new one twice) for both roles. (6) Logging out removes the PIN from the phone; the next login makes a new one. (7) PINs like 111111 or 123456 are refused.
+**Decided:** (1) Patients and doctors both. (2) The PIN is asked when the app opens with someone still signed in, and again when the app comes back after more than 30 seconds in the background (`LOCK_AFTER_MS`). A person who has just typed their password is not asked straight away. (3) Accounts that finished setup before this existed are asked to create a PIN the next time they open the app. (4) Five wrong tries in a row sign the person out (they log in with email and password and make a new PIN); "Forgot PIN? Log in again" does the same. (5) Profile has "Change PIN" (current PIN, then a new one twice) for both roles. (6) ~~Logging out removes the PIN from the phone; the next login makes a new one.~~ **Changed 2026-11-19 (team request: "after logging out and back in it asks to create a PIN again"):** logging out keeps the PIN, and logging back in as the same account uses the same PIN. The PIN is saved per account (`diabeatis360_pin_<uid>`), so another person logging in on the same phone gets their own setup. Only "Forgot PIN?" and five wrong tries delete it. Limit: after logout the salted hash stays in the phone's secure storage until that account changes or forgets its PIN. (7) PINs like 111111 or 123456 are refused.
 **Why on the phone, not in Firestore:** the PIN only unlocks the app on this phone; the real login is still Firebase Auth. So it is never sent anywhere. Only a salted SHA-256 hash is kept, in the phone's secure storage (`expo-secure-store`: the Android Keystore / iOS Keychain), and the wrong-try count lives there too, so closing the app does not give five fresh tries. `expo-crypto` makes the hash and the random salt. Both are Expo-maintained and work in Expo Go.
 **Limits (say so in the defense):** a 6-digit PIN has only a million combinations, so if someone could copy the phone's secure storage they could try them all offline; the five-try limit protects the app screen, not that case. It is an app lock, not a replacement for the password. The web build has no secure storage, so the PIN is off there. No fingerprint / Face ID yet (it could be added with `expo-local-authentication`). There is **no Figma frame** for these screens: built in the green style from FIGMA_MAP.md; Niño or Russell should check whether a frame exists.
-**Built:** `features/pin/` (`pin-rules.ts` + test, `pin-service.ts`, `pin-ui.tsx` keypad / create / unlock, `pin-gate.tsx` the full-screen cover mounted in `app/_layout.tsx`), `app/change-pin.tsx`, a "Change PIN" row in both Profile screens, `signOut` clears the PIN, English and Filipino texts (`pin.*`). **Needs a phone test** (cold start, 30 seconds in the background, five wrong tries, Change PIN, an old account).
+**Built:** `features/pin/` (`pin-rules.ts` + test, `pin-service.ts`, `pin-ui.tsx` keypad / create / unlock, `pin-gate.tsx` the full-screen cover mounted in `app/_layout.tsx`), `app/change-pin.tsx`, a "Change PIN" row in both Profile screens, "Forgot PIN?" clears the PIN (`signOut` no longer does, see point 6), English and Filipino texts (`pin.*`). **Needs a phone test** (cold start, 30 seconds in the background, five wrong tries, Change PIN, an old account).
 
 ### D43 — "Set Your Availability": Available 24/7 or custom hours — CLOSED 2026-11-12 (team request in session with the new frame; choice: "open all hours, the doctor still accepts each request"; changes D24 point 3)
 **Asked:** change the doctor's time-availability screen to the new Figma frame "Set Your Availability" (two options, a Current Configuration card, Save Availability) with its "24/7 Availability Enabled" pop-up, and add the missing states.
@@ -701,3 +701,54 @@ timestamp), and on a phone set to Philippine time the saved values are the same 
 **Known risk (accepted by the team):** until Semaphore is set up (GO_LIVE A16), patients can save contacts and the screens say "we text these people right away", but nothing is sent. Set it up before respondents, or tell them.
 **Not done / limits:** a critical reading saved offline is not texted when the connection returns; editing a reading into the critical range does not text (edits send no alerts, D44); the SMS sender has not been tried against the real service; texts come from "SEMAPHORE" until a sender name is approved.
 **Manuscript needs editing:** data dictionary gets `Emergency_Contacts` and `Family_Alerts`; the blood sugar / notification module description and a new test case mention the family text; the architecture lists the SMS service (`MANUSCRIPT_CHANGES.md`, rows D45). The designer should add frames for the setup step and Profile > Family alerts (`FIGMA_MAP.md`).
+
+### D46 — QA fixes from the 2026-11-16 parallel run, batch 1: fee limits, reading time, birthdate wheel, critical readings for the doctor, "Not answered", child's account — CLOSED 2026-11-19 (team request after the QA run, docs/reports/qa-par-2026-11-16.md; plan approved in session with its defaults: the forms refuse ₱0, a 5-minute clock margin, the birthdate rule included, the chart change for doctor and patient)
+**Context:** the run found one open High (ADM-005) and five Medium health-safety defects (DOC-009, DOC-010, DOC-012, ADM-009, DOC-013), plus PAT-001. The other High, PAT-002 (emulator mode reaching the live server), was already fixed and committed (`c8502f1`).
+**Decided and built:**
+- **Fee limits (ADM-005).** One rule everywhere: a consultation fee above ₱0 and at most ₱20,000 (`constants/fees.ts` in the app, `lib/fee.js` in the admin panel; change both with the rules). Add Provider let −100 through (`!Number(fee)` refused only 0 and blank) and verified that doctor at once. The doctor's own Profile screen also saved any number (found while fixing), and Set Fee dropped the minus sign, so −100 became ₱100. Now every fee screen refuses these, and `updateDoctorProfile` checks again. Add Provider checks before it creates the login, and writes the Users and Providers documents in one batch: a refused write used to leave a Users document behind. **Rules:** `Providers.consultation_fee`, whenever it is written (create, or a doctor's change), is a number from 0 to 20,000. 0 means "not set yet": a doctor who signs up has none, and Find a Doctor lists only fees above ₱0 (D35).
+- **Reading time (DOC-012).** **Rules:** a new `Glucose_Logs` reading needs `logged_at` as a timestamp at most 5 minutes past the server's clock, and `created_at == request.time`. The family-SMS server (D45) already relied on `created_at` being the server's time, but nothing enforced it. **App:** `READING_CLOCK_SKEW_MS` (`constants/glucose.ts`) and the service refuse a future time. The app dates a reading with the phone's clock, and a refused save shows "Unable to save" with no result screen, no Call 911 and no alerts. So if the server refuses the phone's time (a clock more than 5 minutes fast), the reading is saved once more with the server's own time (`lib/server-time-retry.ts`). A wrong phone clock never costs a reading.
+- **Birthdate wheel (PAT-001).** Cause: when a wheel first appears, Android sends a scroll event, and the wheel took it as a choice. That filled in January 1 from the full list of years, whose first year is this year. A moment later setup loaded the "For me" list (18 years back and earlier), which no longer had that year, so the wheel showed 2008 while 2026 was kept, Next said "must be 18", and TalkBack read "Taon, undefined". Now:
+  - a wheel picks only after the person's own input: a finger, a mouse wheel on the web, a tap or a screen-reader step (`features/auth/wheel-rules.ts`);
+  - tapping the highlighted row picks it;
+  - setup draws the wheels only once it knows the account type, so the list never changes under them;
+  - a year not in the list shows no row and reads "Not chosen".
+
+  Setup itself could not save the wrong year, because its age check refused it. **Edit Profile could:** it had no age check. Both now ask the same question (`birthdateProblem`, `constants/guardian.ts`): not in the future, 18 or older on an account "for me", under 18 on a child's account. **Rules:** `Users.birthdate`, whenever it is written, is not in the future and fits `account_type`, to within two days, because the app stores the person's own midnight while the rules count days on the server's clock. Only a written birthdate is checked, so an old wrong one never blocks the person's other edits.
+- **Critical reading for the doctor (DOC-009, D28).**
+  - The doctor's Notifications screen shows a red "Critical reading" card: red tint, red border, a solid red icon.
+  - While unread, it is always first, above requests waiting for an answer (`features/notifications/doctor-notices.ts`). Once opened, it keeps the red card and takes its place by time.
+  - The dashboard's Recent activity marks it red too.
+- **The chart (DOC-010).** The weekly chart is used on the doctor's patient record and the patient's Log tab. It keeps the daily-average line and adds:
+  - a bar from each day's lowest to highest reading;
+  - every critical reading as a red dot at its real value;
+  - a scale that reaches the real lowest and highest reading (no more cap at 200);
+  - dashed red lines at the D4 critical thresholds when the scale reaches them;
+  - a legend and a screen-reader summary.
+
+  The numbers come from `features/home/week-chart.ts`, moved out of `glucose-service.ts` so plain Node can test them. The doctor's Logs tab also lists "Critical this week" (the two newest, then "+N more") and "This week: lowest · highest". The week is still the calendar week (DOC-011, Low, later).
+- **"Not answered" (ADM-009).** The admin's patient drawer and the doctor's patient record (same gap, found while fixing) show "Not answered" for a blank allergy answer. "None" stays "None" / "None declared", because it is the patient saying they have none (D25).
+- **Child's account, part 1 (DOC-013).** Request Details and the doctor's patient record show "Child's account · run by a parent or guardian", from `Users.account_type`, which a booked doctor can already read.
+  - **OPEN (team):** the guardian's name. It lives in `Guardian_Verifications`, which a doctor cannot read, and that document also holds the guardian's ID-photo link. The options:
+    - copy the guardian's name and relationship onto the child's Users doc, with a rule that they match (recommended);
+    - let a booked doctor read the verification (exposes the photo link);
+    - move the photo link out first;
+    - no name.
+  - Linked to PAT-011 (the child's own name), also open.
+- **Data check.** `functions/scripts/check-data.js` is read-only. It lists:
+  - fees outside 0–20,000;
+  - readings dated after they were saved;
+  - birthdates in the future, or not fitting the account (Philippine calendar days);
+  - patients who finished setup without an allergy answer.
+
+  On the QA export (`qa-emulator-data`) it found nothing. A seeded bad record of each kind was found, and none of the good ones. Run it on the live project with `--live` before deploying the rules.
+
+**Checked:**
+- rules 493/493 (37 new; 6 older reading tests now send `logged_at` and `created_at` like the app);
+- a mutation check: each new rule weakened in turn (7 copies), and each copy made at least one test fail;
+- mobile `tsc` and lint clean, unit 200 (194 pass, 6 skipped; 22 new);
+- admin lint clean, unit 6/6 (a new `npm test` on Node's own runner, no package added), build.
+
+**Not run in the app or on a phone.** The new Filipino lines were written by Claude; a Filipino speaker should read them.
+**Deploy order:** publish the app update first, then the rules. An older app on a phone whose clock is more than 5 minutes fast would have every new reading refused, because it has no second try. Run the data check on the live project before the rules go out.
+**Manuscript:** no new collection or field. The data dictionary notes the limits (fee 0–20,000; a reading's time; a birthdate that fits the account) and the test tables get rows (`MANUSCRIPT_CHANGES.md`, D46).
+**Still open from the report:** batch 2 (Medium) and batch 3 (Low), plus the team decisions on PAT-011, ADM-012, ADM-015 and DOC-013 part 2.

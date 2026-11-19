@@ -4,7 +4,8 @@
 // Secrets come only from Vercel's environment settings, never from a file in the repo:
 //   FIREBASE_SERVICE_ACCOUNT  the whole service-account JSON (lets the server verify sign-ins and use Firestore)
 //   GEMINI_API_KEY            the Gemini key from Google AI Studio
-// Optional: GEMINI_MODEL (another model), GEMINI_BASE_URL (a fake Gemini in tests).
+// Optional: GEMINI_MODEL (another model), GEMINI_FALLBACK_MODEL (used when the main model is busy, lib/gemini.js),
+//           GEMINI_BASE_URL (a fake Gemini in tests).
 // Local tests run against the emulators instead (FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST), with no key.
 
 const { cert, getApps, initializeApp } = require('firebase-admin/app')
@@ -30,7 +31,14 @@ function askGemini(args) {
     console.error('GEMINI_API_KEY is not set in the Vercel environment settings.')
     throw new Error('missing GEMINI_API_KEY')
   }
-  return callGemini({ apiKey, model: process.env.GEMINI_MODEL, baseUrl: process.env.GEMINI_BASE_URL, ...args })
+  return callGemini({
+    apiKey,
+    model: process.env.GEMINI_MODEL,
+    fallbackModel: process.env.GEMINI_FALLBACK_MODEL,
+    baseUrl: process.env.GEMINI_BASE_URL,
+    onRetry: (error, nextModel) => console.warn(`Gemini try failed (${error.message}); trying ${nextModel}`),
+    ...args,
+  })
     .catch((error) => {
       // The app only sees "busy, try again"; the real reason goes to the Vercel logs for the team.
       console.error('Gemini call failed:', error.message)

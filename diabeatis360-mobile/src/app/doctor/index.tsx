@@ -158,12 +158,17 @@ export default function DoctorHomeScreen() {
           <Pressable accessibilityRole="button" onPress={() => router.navigate('/doctor/notifications')}><Text style={styles.seeAll}>{t('doctor.seeAll')}</Text></Pressable>
         </View>
         <View style={[doctorStyles.card, styles.gutterCard]}>
-          {activity.length === 0 ? <Text style={styles.muted}>{t('doctor.nothingYet')}</Text> : activity.slice(0, 3).map((item, index) => (
-            <View key={item.id} style={[styles.activityRow, index > 0 && styles.activityDivider]}>
-              <Text style={styles.activityText}>{item.message}</Text>
-              <Text style={styles.activityWhen}>{shortTime(item.sentAt, openedAt, language)}</Text>
-            </View>
-          ))}
+          {activity.length === 0 ? <Text style={styles.muted}>{t('doctor.nothingYet')}</Text> : activity.slice(0, 3).map((item, index) => {
+            // A patient's critical reading (D28) is red here too, as on the Notifications screen (QA DOC-009).
+            const critical = item.type === 'glucose_alert' && item.severity === 'critical';
+            return (
+              <View key={item.id} style={[styles.activityRow, index > 0 && styles.activityDivider]}>
+                {critical ? <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={15} tintColor="#DC2626" /> : null}
+                <Text style={[styles.activityText, critical && styles.activityCritical]}>{item.message}</Text>
+                <Text style={styles.activityWhen}>{shortTime(item.sentAt, openedAt, language)}</Text>
+              </View>
+            );
+          })}
         </View>
 
         <Text style={[doctorStyles.sectionTitle, styles.section]}>{t('doctor.quick')}</Text>
@@ -232,6 +237,7 @@ const styles = StyleSheet.create({
   activityRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, paddingVertical: 12 },
   activityDivider: { borderTopColor: homeColors.border, borderTopWidth: 1 },
   activityText: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
+  activityCritical: { color: '#B91C1C', fontWeight: '700' },
   activityWhen: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
   quickRow: { flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 14 },
   quickCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, flex: 1, gap: 10, paddingVertical: 20 },

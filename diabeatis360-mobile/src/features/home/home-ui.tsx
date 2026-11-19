@@ -3,9 +3,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
+import { GLUCOSE_THRESHOLDS } from '@/constants/glucose';
 import { Brand, Fonts } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
+
+import { chartScale, type ChartDay } from './week-chart';
 
 // Distinct palette for the dashboard/log screens — matches the Figma spec's exact
 // values rather than reusing authColors/bookingColors, which run a slightly
@@ -103,19 +106,27 @@ export function Sparkline({ values, width = 262, height = 96 }: { values: number
   );
 }
 
-// Weekly trend chart for the Glucose Log screen — 7 fixed day slots (gridlines,
-// left-hand mg/dL scale, day-of-week labels) with the line/area only drawn
-// across whichever days actually have a reading, rather than fabricating a
-// value for days with no logged data.
-export function WeeklyChart({ days, width = 264, height = 140 }: { days: { label: string; value: number | null }[]; width?: number; height?: number }) {
+/** The bar behind each day's point, from its lowest to its highest reading (QA DOC-010). */
+const RANGE_GRAY = '#94A3B8';
+
+// Weekly trend chart for the Glucose Log screen and the doctor's patient record — 7 fixed day slots (gridlines,
+// left-hand mg/dL scale, day-of-week labels) with the line/area only drawn across whichever days actually have a
+// reading, rather than fabricating a value for days with no logged data.
+// QA DOC-010: the line is each day's average, so the chart also shows what an average hides: a bar from the day's
+// lowest to its highest reading, and every critical reading as a red dot at its real value (262 is drawn at 262, not
+// inside a 174 average). The scale covers the real lowest and highest reading, and a dashed red line marks the
+// critical thresholds (constants/glucose.ts) whenever the scale reaches them. The numbers come from week-chart.ts.
+export function WeeklyChart({ days, width = 264, height = 140 }: { days: ChartDay[]; width?: number; height?: number }) {
   const { t } = useT();
   const present = days.map((day, index) => ({ ...day, index })).filter((day): day is typeof day & { value: number } => day.value !== null);
-  if (present.length < 2) return <Text style={styles.sparklineEmpty}>{t('home.trendEmptyWeek')}</Text>;
+  const scale = chartScale(days, GLUCOSE_THRESHOLDS.criticalLow, GLUCOSE_THRESHOLDS.criticalHigh);
+  if (!scale) return <Text style={styles.sparklineEmpty}>{t('home.trendEmptyWeek')}</Text>;
 
-  const values = present.map((day) => day.value);
-  const niceMin = Math.floor(Math.min(...values) / 20) * 20;
-  const niceMax = Math.max(niceMin + 60, Math.ceil(Math.max(...values) / 20) * 20);
+  const { min: niceMin, max: niceMax } = scale;
   const gridValues = [niceMax, niceMax - (niceMax - niceMin) / 3, niceMax - ((niceMax - niceMin) * 2) / 3, niceMin];
+  const criticalCount = present.reduce((count, day) => count + day.critical.length, 0);
+  const lowest = Math.min(...present.map((day) => day.low ?? day.value));
+  const highest = Math.max(...present.map((day) => day.high ?? day.value));
 
   // Inset on every side by the dot margin: Monday's dot, and a reading exactly on the top or bottom gridline, used to
   // be cut in half. It also puts each gridline level with the middle of its number on the left.
@@ -127,20 +138,32 @@ export function WeeklyChart({ days, width = 264, height = 140 }: { days: { label
   const areaAttr = `${pointsAttr} ${points[points.length - 1].x},${floorY} ${points[0].x},${floorY}`;
 
   return (
-    <View>
+    <View accessible accessibilityRole="image" accessibilityLabel={t('chart.a11y', { low: lowest, high: highest, critical: criticalCount })}>
       <View style={styles.chartRow}>
         <View style={[styles.chartAxis, { height }]}>
           {gridValues.map((value) => <Text key={value} style={styles.chartAxisLabel}>{Math.round(value)}</Text>)}
         </View>
         <Svg width={width} height={height}>
           {gridValues.map((value) => <Line key={value} x1={0} y1={plotY(value)} x2={width} y2={plotY(value)} stroke={homeColors.borderSoft} strokeWidth={1} />)}
+          {scale.thresholds.map((value) => <Line key={`critical-${value}`} x1={0} y1={plotY(value)} x2={width} y2={plotY(value)} stroke={homeColors.red} strokeWidth={1} strokeDasharray="4 4" />)}
+          {present.map((day) => (day.low !== null && day.high !== null && day.high > day.low
+            ? <Line key={`range-${day.index}`} x1={plotX(day.index)} y1={plotY(day.high)} x2={plotX(day.index)} y2={plotY(day.low)} stroke={RANGE_GRAY} strokeWidth={6} strokeLinecap="round" strokeOpacity={0.55} />
+            : null))}
           <Polygon points={areaAttr} fill={homeColors.greenBright} fillOpacity={0.08} />
           <Polyline points={pointsAttr} fill="none" stroke={homeColors.greenBright} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
           {points.map((point, index) => <Circle key={index} cx={point.x} cy={point.y} r={4} fill={homeColors.greenBright} />)}
+          {present.flatMap((day) => day.critical.map((value, index) => (
+            <Circle key={`critical-${day.index}-${index}`} cx={plotX(day.index)} cy={plotY(value)} r={5} fill={homeColors.red} stroke="#FFFFFF" strokeWidth={1.5} />
+          )))}
         </Svg>
       </View>
       <View style={[styles.chartDayRow, { paddingLeft: styles.chartAxis.width }]}>
         {days.map((day) => <Text key={day.label} style={styles.chartDayLabel}>{day.label}</Text>)}
+      </View>
+      <View style={[styles.legend, { paddingLeft: styles.chartAxis.width }]}>
+        <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: homeColors.greenBright }]} /><Text style={styles.legendText}>{t('chart.legend.average')}</Text></View>
+        <View style={styles.legendItem}><View style={styles.legendBar} /><Text style={styles.legendText}>{t('chart.legend.range')}</Text></View>
+        {criticalCount ? <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: homeColors.red }]} /><Text style={styles.legendText}>{t('chart.legend.critical')}</Text></View> : null}
       </View>
     </View>
   );
@@ -171,4 +194,9 @@ const styles = StyleSheet.create({
   chartAxisLabel: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 10, textAlign: 'right' },
   chartDayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   chartDayLabel: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 10, textAlign: 'center' },
+  legend: { columnGap: 14, flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, rowGap: 4 },
+  legendItem: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  legendDot: { borderRadius: 4, height: 8, width: 8 },
+  legendBar: { backgroundColor: RANGE_GRAY, borderRadius: 3, height: 12, opacity: 0.55, width: 6 },
+  legendText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11 },
 });

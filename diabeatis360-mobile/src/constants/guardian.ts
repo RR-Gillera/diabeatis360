@@ -19,6 +19,22 @@ export function isUnderAdultAge(birthdate: Date, now: Date = new Date()): boolea
   return ageOn(birthdate, now) < ADULT_MIN_AGE;
 }
 
+export type BirthdateProblem = 'future' | 'childForSelf' | 'adultForChild';
+
+/**
+ * Why a birthdate cannot be saved on this account, or null when it can (QA PAT-001, D16): a day that has not come yet,
+ * a child's birthdate on an account "for me", or an adult's on a child's account. The setup birthdate step and Edit
+ * Profile both ask this before saving (Edit Profile used to save any date, even this year for an adult), and
+ * firestore.rules check the same thing on every write, to within two days.
+ */
+export function birthdateProblem(birthdate: Date, accountType: 'self' | 'minor', now: Date = new Date()): BirthdateProblem | null {
+  if (birthdate.getTime() > now.getTime()) return 'future';
+  const isMinor = isUnderAdultAge(birthdate, now);
+  if (accountType === 'minor' && !isMinor) return 'adultForChild';
+  if (accountType !== 'minor' && isMinor) return 'childForSelf';
+  return null;
+}
+
 /**
  * The birth years the setup birthdate step offers, most recent first (DECISIONS.md D41): an account "for me" lists 18
  * years ago and earlier, a child's account the last 18 years (this year included). In the boundary year a person can

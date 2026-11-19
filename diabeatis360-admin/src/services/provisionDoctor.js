@@ -1,8 +1,9 @@
 import { deleteApp, initializeApp } from 'firebase/app'
 import { connectAuthEmulator, createUserWithEmailAndPassword, getAuth, sendPasswordResetEmail, signOut } from 'firebase/auth'
-import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { connectFirestoreEmulator, doc, getFirestore, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore'
 
 import { auth, db, firebaseConfig, usingEmulators } from '../firebase'
+import { feeProblem, storedFee } from '../lib/fee'
 
 // UT-A006 "Add Provider": an admin creates a doctor's login from the browser without ever touching their
 // own admin session. The Firebase JS SDK signs in whoever you last created or signed in on an app instance,
@@ -15,7 +16,10 @@ import { auth, db, firebaseConfig, usingEmulators } from '../firebase'
 //   - The temporary password is random, held only in a local variable, and never shown, logged, or stored.
 //   - The doctor sets their real password via a password-reset email sent right after the account is made.
 //   - `created_by_admin` on the Providers doc is the audit trail for the defense.
-//   - If the Firestore writes fail after the Auth user exists, that Auth user is deleted before we give up,
+//   - The fee is checked before anything is created (QA ADM-005: a fee of -100 used to be saved and verified).
+//   - The Users and Providers documents are written in ONE batch, so either both exist or neither does (a refused
+//     Providers write, for example a fee firestore.rules does not accept, used to leave a Users doc behind).
+//   - If that batch fails after the Auth user exists, that Auth user is deleted before we give up,
 //     so a half-created login is never left behind.
 
 function randomPassword() {
@@ -25,11 +29,14 @@ function randomPassword() {
 
 /**
  * @param {{ fullName: string, email: string, specialty: string, prcLicenseNumber: string, city: string,
- *   consultationFee: number }} form
+ *   consultationFee: string | number }} form  the fee as typed; lib/fee.js decides whether it can be saved
  * @param {string} adminUid
  * @returns {Promise<string>} the new doctor's Auth uid
  */
 export async function addProvider(form, adminUid) {
+  const feeError = feeProblem(form.consultationFee)
+  if (feeError) throw new Error(feeError)
+
   const scratchApp = initializeApp(firebaseConfig, `provision-${Date.now()}`)
   const scratchAuth = getAuth(scratchApp)
   const scratchDb = getFirestore(scratchApp)
@@ -44,8 +51,9 @@ export async function addProvider(form, adminUid) {
     uid = credential.user.uid
 
     // Same shape mobile/onboarding/professional-info.tsx writes when a doctor signs themselves up, plus
-    // is_active (defaults true in the rules) and created_by_admin for the audit trail.
-    await setDoc(doc(scratchDb, 'Users', uid), {
+    // is_active (defaults true in the rules) and created_by_admin for the audit trail. One batch: both or neither.
+    const batch = writeBatch(scratchDb)
+    batch.set(doc(scratchDb, 'Users', uid), {
       full_name: form.fullName.trim(),
       email: form.email.trim(),
       role: 'doctor',
@@ -53,16 +61,17 @@ export async function addProvider(form, adminUid) {
       onboarding_completed: true,
       created_at: serverTimestamp(),
     })
-    await setDoc(doc(scratchDb, 'Providers', uid), {
+    batch.set(doc(scratchDb, 'Providers', uid), {
       full_name: form.fullName.trim(),
       specialty: form.specialty,
       prc_license_number: form.prcLicenseNumber.trim(),
       city: form.city.trim(),
-      consultation_fee: Number(form.consultationFee),
+      consultation_fee: storedFee(form.consultationFee),
       is_verified: false,
       is_active: true,
       created_at: serverTimestamp(),
     })
+    await batch.commit()
 
     await signOut(scratchAuth)
   } catch (error) {

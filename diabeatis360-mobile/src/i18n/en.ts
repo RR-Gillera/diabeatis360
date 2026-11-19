@@ -50,6 +50,8 @@ export const en = {
   'setup.birth.placeholder': 'Select your date of birth',
   'setup.birth.adultForChild': "This looks like an adult's birthdate, but this account is for a child under 18. Please check the year you picked.",
   'setup.birth.childForSelf': 'You need to be 18 or older to use an account for yourself. Please check the year you picked.',
+  'setup.birth.future': "That date hasn't happened yet. Please check the date you picked.",
+  'setup.birth.saveFailed': 'Your date of birth could not be saved. Please check your connection and try again.',
   'setup.condition.title': 'Which best describes\nyour condition?',
   'setup.condition.subtitle': 'This helps us personalize your health monitoring and recommendations.',
   'setup.allergies.title': 'Any food\nallergies?',
@@ -93,6 +95,7 @@ export const en = {
   'date.day': 'Day',
   'date.year': 'Year',
   'date.pickAll': 'Select month, day and year',
+  'date.notChosen': 'Not chosen',
 
   // ---- profile
   'profile.yourName': 'Your name',
@@ -151,6 +154,7 @@ export const en = {
   'health.edit.allergyRequiredTitle': 'Allergies needed',
   'health.edit.saveFailed': 'Your health profile could not be saved. Please try again.',
   'health.edit.saveFailedTitle': "Couldn't save",
+  'health.edit.birthdateTitle': 'Check the date of birth',
   'health.edit.save': 'Save changes',
 
   // ---- profile > language
@@ -300,6 +304,10 @@ export const en = {
   'home.average': '7-DAY AVERAGE',
   'home.trendEmpty': 'Log a few more readings to see your trend.',
   'home.trendEmptyWeek': 'Log a few more readings this week to see your trend.',
+  'chart.legend.average': 'Daily average',
+  'chart.legend.range': 'Lowest to highest',
+  'chart.legend.critical': 'Critical',
+  'chart.a11y': "Weekly blood sugar chart. This week's lowest reading is {low} mg/dL and the highest {high} mg/dL. Critical readings: {critical}.",
   'home.exercise': 'EXERCISE',
   'home.exercise.reminder': 'Daily walk reminder',
   'home.exercise.tips': 'See exercise tips',
@@ -1109,6 +1117,12 @@ export const en = {
   'doctor.patient.disliked': 'Ingredients not eaten',
   'doctor.patient.allergies': 'Allergies',
   'doctor.patient.noAllergies': 'None declared',
+  'doctor.patient.notAnswered': 'Not answered',
+  'doctor.patient.criticalWeek': 'Critical this week',
+  'doctor.patient.criticalLine': '{value} mg/dL · {when}',
+  'doctor.patient.criticalMore': '+{count} more in the history below',
+  'doctor.patient.weekRange': 'This week: lowest {low} · highest {high} mg/dL',
+  'doctor.child.badge': "Child's account · run by a parent or guardian",
   'doctor.patient.location': 'Location',
   'doctor.patient.visible': 'Visible because this patient booked you.',
   'doctor.patient.latest': 'Latest',

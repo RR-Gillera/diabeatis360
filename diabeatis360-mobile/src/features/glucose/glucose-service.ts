@@ -1,10 +1,11 @@
 import { addDoc, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, Timestamp, where, writeBatch } from 'firebase/firestore';
 
 import { db } from '@/firebase';
-import { checkReading, interpretGlucose } from '@/constants/glucose';
+import { checkReading, interpretGlucose, isFutureReading } from '@/constants/glucose';
 import { INTERPRETATIONS, type Interpretation } from '@/constants/enums';
 import { requestFamilyAlert } from '@/features/family/family-service';
 import { createNotification, glucoseAlert } from '@/features/notifications/notification-service';
+import { saveWithServerTimeFallback } from '@/lib/server-time-retry';
 
 import { doctorCriticalAlert } from './doctor-alert';
 import type { Language } from '@/i18n/translate';
@@ -45,6 +46,8 @@ async function notifyDoctorsOfCriticalReading(patientId: string, readingMgdl: nu
  */
 export async function addGlucoseLog(patientId: string, readingMgdl: number, context: MealContext, notes: string, loggedAt: Date, language: Language = 'English', diabetesType = '') {
   assertPossibleReading(readingMgdl);
+  // QA DOC-012: never a time in the future (firestore.rules refuse more than 5 minutes past the server's clock too).
+  if (isFutureReading(loggedAt)) throw new Error('A reading cannot be dated in the future.');
   const record: GlucoseLogRecord = {
     patient_id: patientId,
     reading_mgdl: readingMgdl,
@@ -54,7 +57,14 @@ export async function addGlucoseLog(patientId: string, readingMgdl: number, cont
     interpretation: interpretGlucose(readingMgdl, context, diabetesType),
     created_at: serverTimestamp(),
   };
-  const reference = await addDoc(collection(db, 'Glucose_Logs'), record);
+  // If the rules refuse the phone's time (its clock runs more than 5 minutes fast), the reading is saved again with the
+  // server's time, so a wrong phone clock never costs the patient a reading, its result screen or its alerts.
+  const reference = await saveWithServerTimeFallback(
+    (data) => addDoc(collection(db, 'Glucose_Logs'), data),
+    record,
+    'logged_at',
+    serverTimestamp(),
+  );
 
   // A critical reading also texts the patient's family contacts (D45). Started first and never awaited: the result
   // screen and its Call 911 must not wait for a text message. The server re-checks the reading and decides.
@@ -165,27 +175,7 @@ export function subscribeToEditHistory(
   );
 }
 
-export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-// Buckets this calendar week's (Mon–Sun) entries by day, averaging same-day
-// readings — days with no reading stay null so charts leave them out rather
-// than fabricating a value. Shared by the patient's Log tab and the doctor's
-// patient-detail view so both read the same week the same way.
-export function bucketCurrentWeek(entries: GlucoseLogEntry[]) {
-  const now = new Date();
-  const monday = new Date(now); monday.setHours(0, 0, 0, 0); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
-  const days = WEEKDAY_LABELS.map((label, index) => {
-    const dayStart = new Date(monday); dayStart.setDate(monday.getDate() + index);
-    const dayEnd = new Date(dayStart); dayEnd.setDate(dayStart.getDate() + 1);
-    const dayEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= dayStart && entry.loggedAt < dayEnd);
-    const value = dayEntries.length ? Math.round(dayEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / dayEntries.length) : null;
-    return { label, value };
-  });
-  const weekEnd = new Date(monday); weekEnd.setDate(monday.getDate() + 7);
-  const weekEntries = entries.filter((entry) => entry.loggedAt && entry.loggedAt >= monday && entry.loggedAt < weekEnd);
-  const average = weekEntries.length ? Math.round(weekEntries.reduce((sum, entry) => sum + entry.readingMgdl, 0) / weekEntries.length) : null;
-  return { days, average };
-}
+// The weekly chart's numbers (bucketCurrentWeek) live in features/home/week-chart.ts, where plain Node can test them.
 
 // Single equality filter only, sorted client-side — matches the no-composite-index
 // convention already used by subscribeToBookingHistory in the booking feature.
@@ -203,7 +193,9 @@ export function subscribeToGlucoseHistory(
     (snapshot) => {
       const entries = snapshot.docs
         .map((document) => {
-          const data = document.data();
+          // 'estimate': a reading just saved with the server's time (a phone clock too far ahead, DOC-012) shows this
+          // phone's guess until the server answers, instead of no time at all at the bottom of the list.
+          const data = document.data({ serverTimestamps: 'estimate' });
           const readingMgdl = Number(data.reading_mgdl ?? 0);
           const context = (data.context === 'after_meal' ? 'after_meal' : 'before_meal') as MealContext;
           return {

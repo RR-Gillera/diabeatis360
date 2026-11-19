@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import DataTable from '../../components/DataTable'
 import { Button, ConfirmDialog, Drawer, Notice, SearchInput, StatusBadge, StatusToggle } from '../../components/ui'
 import { formatDate, formatDateTime, formatPoints, toDate } from '../../lib/format'
+import { allergyLabel } from '../../lib/labels'
 import { effectiveStatus } from '../../lib/subscriptions'
 import { useCollection, useFilteredCollection } from '../../lib/useCollection'
 import { setUserActive } from '../../services/users'
@@ -118,7 +119,8 @@ export default function PatientsTab() {
                 <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Registration date</p><p className="font-bold">{formatDate(selected.created_at)}</p></div>
                 <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Plan</p><p className="font-bold">{subByUser[selected.id] ?? 'Free'}</p></div>
                 <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Diabetes type</p><p className="font-bold">{selected.diabetes_type || '—'}</p></div>
-                <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Allergies</p><p className="font-bold">{selected.allergies || 'None'}</p></div>
+                {/* QA ADM-009: a blank answer is "Not answered" (amber), never "None", which reads as "no allergies". */}
+                <div className="rounded-2xl border border-gray-100 p-3 text-sm"><p className="text-xs text-muted">Allergies</p><p className={String(selected.allergies ?? '').trim() ? 'font-bold' : 'font-bold text-amber-800'}>{allergyLabel(selected.allergies)}</p></div>
               </div>
             </div>
 

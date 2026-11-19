@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { feeProblem, MAX_CONSULTATION_FEE, parseFee, roundFee } from '@/constants/fees';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor/doctor-service';
@@ -9,9 +10,6 @@ import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
-
-/** A sanity ceiling, so a typo such as an extra zero is caught before patients see it. */
-const MAX_FEE = 20000;
 
 // Set Consultation Fee (doctor frame "Background+HorizontalBorder", opened from "Modify fee" on Manage Schedule;
 // DECISIONS D24). The fee is the Providers document's consultation_fee: a patient's booking must carry exactly this
@@ -37,13 +35,16 @@ export default function ConsultationFeeScreen() {
   }, [uid]);
 
   const save = async () => {
-    const fee = Number(value.replace(/[^0-9.]/g, ''));
+    // The one fee rule (constants/fees.ts, QA ADM-005): above ₱0 and at most ₱20,000. A minus sign is no longer dropped,
+    // so "-100" is refused instead of being saved as ₱100.
+    const fee = parseFee(value);
     if (!uid || saving) return;
-    if (!Number.isFinite(fee) || fee <= 0) { setError(t('doctor.fee.tooLow')); return; }
-    if (fee > MAX_FEE) { setError(t('doctor.fee.tooHigh', { max: `₱${MAX_FEE.toLocaleString('en-PH')}` })); return; }
+    const problem = feeProblem(fee);
+    if (problem === 'tooHigh') { setError(t('doctor.fee.tooHigh', { max: `₱${MAX_CONSULTATION_FEE.toLocaleString('en-PH')}` })); return; }
+    if (problem) { setError(t('doctor.fee.tooLow')); return; }
     setSaving(true); setError(''); setMessage('');
     try {
-      await updateDoctorProfile(uid, { consultationFee: Math.round(fee * 100) / 100 });
+      await updateDoctorProfile(uid, { consultationFee: roundFee(fee) });
       setMessage(t('doctor.fee.saved'));
     } catch {
       setError(t('doctor.fee.failed'));

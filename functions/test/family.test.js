@@ -9,7 +9,7 @@ const { test } = require('node:test')
 const {
   notifyFamily, familyMessage, firstName, manilaClock, usableNumbers, PER_PATIENT_DAILY,
 } = require('../lib/family')
-const { semaphoreSender, localNumber, SEMAPHORE_URL } = require('../lib/sms')
+const { semaphoreSender, localNumber, isProduction, SEMAPHORE_URL } = require('../lib/sms')
 
 // ---- the message (no emulator needed)
 
@@ -65,7 +65,7 @@ test('Semaphore gets the local numbers, the message and the sender name; a refus
   assert.equal(localNumber('+639171234567'), '09171234567')
   const requests = []
   const fakeFetch = async (url, options) => { requests.push({ url, options }); return { ok: true, text: async () => '[]' } }
-  await semaphoreSender({ apiKey: 'k3y', senderName: 'DIABEATIS', fetchImpl: fakeFetch })({ numbers: ['+639171234567', '+639181234567'], message: 'hi' })
+  await semaphoreSender({ apiKey: 'k3y', senderName: 'DIABEATIS', fetchImpl: fakeFetch, env: {} })({ numbers: ['+639171234567', '+639181234567'], message: 'hi' })
   assert.equal(requests[0].url, SEMAPHORE_URL)
   const sent = new URLSearchParams(requests[0].options.body)
   assert.equal(sent.get('apikey'), 'k3y')
@@ -74,7 +74,21 @@ test('Semaphore gets the local numbers, the message and the sender name; a refus
   assert.equal(sent.get('sendername'), 'DIABEATIS')
 
   const refusing = async () => ({ ok: false, status: 401, text: async () => 'Invalid API key' })
-  await assert.rejects(semaphoreSender({ apiKey: 'bad', fetchImpl: refusing })({ numbers: ['+639171234567'], message: 'hi' }), /HTTP 401/)
+  await assert.rejects(semaphoreSender({ apiKey: 'bad', fetchImpl: refusing, env: {} })({ numbers: ['+639171234567'], message: 'hi' }), /HTTP 401/)
+})
+
+test('outside production no real text is sent: it is logged with the number masked (PAT-002)', async () => {
+  for (const env of [{ FUNCTIONS_EMULATOR: 'true' }, { VERCEL_ENV: 'development' }, { VERCEL_ENV: 'preview' }]) {
+    const logs = []
+    const fetchImpl = async () => { throw new Error('must not call Semaphore') }
+    await semaphoreSender({ apiKey: 'k3y', fetchImpl, env, log: (line) => logs.push(line) })({ numbers: ['+639171234567'], message: 'Critical' })
+    assert.equal(logs.length, 1)
+    assert.match(logs[0], /NOT SENT/)
+    assert.ok(!logs[0].includes('639171234567'), 'the full number is never logged')
+    assert.ok(logs[0].includes('4567'))
+  }
+  assert.equal(isProduction({ VERCEL_ENV: 'production' }), true)
+  assert.equal(isProduction({}), true, 'a deployed Cloud Function sets neither variable')
 })
 
 // ---- notifyFamily against the Firestore emulator

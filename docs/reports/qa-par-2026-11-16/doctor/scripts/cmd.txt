@@ -1,0 +1,59 @@
+chat SrskUoRk90mVb3688Zcwl0AvBkFs_202611170200
+send Hello, this is Dr. QA (QA test). Thanks for logging the 262. Please recheck in 2 hours and drink water. If you feel unwell, go to the nearest hospital.
+buttons
+shot e-call1-roomfailed
+click ^Try again$
+shot e-call1-tryagain
+click ^Message instead$
+shot e-call1-messageinstead
+policy decline
+policy ignore
+text
+shot e-call3-after-missed
+policy accept
+eval (()=>{const e=document.elementFromPoint(332,38);const b=e&&e.closest('[role=button],[tabindex]');(b||e).click();return (b||e).outerHTML.slice(0,200)})()
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(0,300)),2000))
+shot e-outcall-2
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(0,300)),6000))
+shot e-outcall-6
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(0,300)),15000))
+shot e-outcall-15
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(0,300)),32000))
+shot e-outcall-32
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(0,300)),40000))
+shot e-outcall-40
+policy decline
+eval new Promise(r=>setTimeout(()=>r(location.pathname),100))
+click ^Message patient$
+eval (()=>{const e=document.elementFromPoint(377,38);const b=e&&e.closest('[role=button],[tabindex]');(b||e).click();return (b||e).outerHTML.slice(0,160)})()
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(-300)),1500))
+shot e-chat-menu
+click ^End consultation$
+shot e-end-confirm
+click ^End consultation$
+shot e-notes-form
+buttons
+eval Array.from(document.querySelectorAll('input,textarea,select')).filter(e=>e.offsetParent).map(e=>e.tagName+':'+(e.placeholder||e.type||'')+':'+e.value)
+fill e.g. Readings steady this week. Continue the current care plan.|QA test notes: one critical after-meal reading (262 mg/dL) and one normal fasting reading (120). Discussed in chat; no symptoms reported.
+fill e.g. Keep logging morning and bedtime readings. Stay hydrated.|QA test advice: recheck 2 hours after meals, keep logging, drink water. Go to the nearest hospital if you feel unwell.
+click No follow-up
+shot e-notes-followup
+click ^December$
+click ^1$
+click ^2026$
+shot e-followup-picked
+click ^Done$
+shot e-followup-after-done
+click ^Save and end consultation$
+shot e-ended
+text
+click ^View summary$
+shot e-summary
+text
+eval (async()=>{location.assign('/doctor');return 'nav'})()
+eval new Promise(r=>setTimeout(()=>r(document.body.innerText.replace(/\s+/g,' ').slice(0,700)),9000))
+shot e-dashboard-after
+click ^history$
+shot e-history
+text
+quit

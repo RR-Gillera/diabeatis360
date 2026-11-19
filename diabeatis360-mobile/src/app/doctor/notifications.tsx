@@ -10,9 +10,13 @@ import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/book
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
+import { sortNotices } from '@/features/notifications/doctor-notices';
 import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
 import { useT } from '@/i18n/language-context';
 import { type Language, type MessageKey } from '@/i18n/translate';
+
+/** The red of a critical reading (D28), for the card's border and icon. */
+const criticalRed = '#DC2626';
 
 type Notice = {
   id: string;
@@ -23,6 +27,8 @@ type Notice = {
   unread?: boolean;
   /** A booking request still waiting for an answer: listed first. */
   pending?: boolean;
+  /** A patient's critical reading (D28): its own red card, and while unread, the very top of the list (QA DOC-009). */
+  critical?: boolean;
   title: string;
   detail: string;
   when: Date | null;
@@ -149,24 +155,20 @@ export default function DoctorNotificationsScreen() {
           // Unknown patient (the booking is not in the list yet): fall back to the consultation.
           bookingId: patientId ? undefined : entry.relatedId || undefined,
           unread: !entry.isRead,
+          critical: true,
           title: t('doctor.notif.critical'),
           detail: entry.message,
           when: entry.sentAt,
           icon: 'exclamationmark.triangle.fill' as const,
           iconAndroid: 'warning' as const,
-          color: '#D9364F',
-          background: '#FBE6E9',
+          color: '#FFFFFF',
+          background: criticalRed,
         };
       });
     const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...toNotices(appointments, t, language)];
-    // Pending requests first, then most recent — the doctor's action queue
-    // matters more than strict chronology.
-    return list.sort((a, b) => {
-      const aPending = a.unread || a.pending ? 0 : 1;
-      const bPending = b.unread || b.pending ? 0 : 1;
-      if (aPending !== bPending) return aPending - bPending;
-      return (b.when?.getTime() ?? 0) - (a.when?.getTime() ?? 0);
-    });
+    // An unread critical reading first (D28), then pending requests and other unread notices, then the rest; newest
+    // first within each — the doctor's action queue matters more than strict chronology (doctor-notices.ts).
+    return sortNotices(list);
   }, [appointments, stored, t, language]);
 
   return (
@@ -180,7 +182,8 @@ export default function DoctorNotificationsScreen() {
           <Pressable
             key={notice.id}
             accessibilityRole="button"
-            style={[doctorStyles.card, styles.card, notice.unread ? styles.cardUnread : null]}
+            accessibilityLabel={`${notice.title}. ${notice.detail}`}
+            style={[doctorStyles.card, styles.card, notice.critical ? styles.cardCritical : notice.unread ? styles.cardUnread : null]}
             onPress={() => {
               if (notice.notificationId) void markNotificationRead(notice.notificationId);
               if (notice.bookingId) router.push({ pathname: '/consultation/[id]', params: { id: notice.bookingId } });
@@ -191,8 +194,8 @@ export default function DoctorNotificationsScreen() {
               <SymbolView name={{ ios: notice.icon, android: notice.iconAndroid, web: notice.iconAndroid }} size={16} tintColor={notice.color} />
             </View>
             <View style={styles.copy}>
-              <Text style={styles.title}>{notice.title}</Text>
-              <Text style={styles.detail}>{notice.detail}</Text>
+              <Text style={[styles.title, notice.critical && styles.titleCritical]}>{notice.title}</Text>
+              <Text style={[styles.detail, notice.critical && styles.detailCritical]}>{notice.detail}</Text>
             </View>
           </Pressable>
         ))}
@@ -205,8 +208,13 @@ export default function DoctorNotificationsScreen() {
 const styles = StyleSheet.create({
   card: { alignItems: 'flex-start', flexDirection: 'row', gap: 14, marginTop: 12 },
   cardUnread: { borderColor: 'rgba(98, 156, 44, 0.4)' },
+  // D28's red "Critical reading" card (QA DOC-009): red tint, a thick red border and a solid red icon, so it never looks
+  // like the declined-booking card beside it. Text colours keep WCAG AA contrast on the tint (D37).
+  cardCritical: { backgroundColor: '#FEF2F2', borderColor: criticalRed, borderWidth: 2 },
   icon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   copy: { flex: 1, gap: 3 },
   title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  titleCritical: { color: '#B91C1C', textTransform: 'uppercase' },
   detail: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
+  detailCritical: { color: '#7F1D1D' },
 });

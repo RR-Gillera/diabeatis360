@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
+import { feeProblem, MAX_CONSULTATION_FEE, parseFee, roundFee } from '@/constants/fees';
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor/doctor-service';
@@ -57,6 +58,16 @@ export default function DoctorProfileScreen() {
 
   const save = async () => {
     if (!uid) return;
+    // The fee follows the one fee rule (constants/fees.ts, QA ADM-005): this box used to save any number, even -100. An
+    // empty box still means "not set yet" (0), which keeps the doctor off Find a Doctor until a fee is set.
+    const feeText = form.consultationFee.trim();
+    const fee = feeText ? parseFee(feeText) : 0;
+    const problem = feeText ? feeProblem(fee) : null;
+    if (problem) {
+      setSaved(false);
+      setError(problem === 'tooHigh' ? t('doctor.fee.tooHigh', { max: `₱${MAX_CONSULTATION_FEE.toLocaleString('en-PH')}` }) : t('doctor.fee.tooLow'));
+      return;
+    }
     setSaving(true); setSaved(false); setError('');
     try {
       await updateDoctorProfile(uid, {
@@ -65,7 +76,7 @@ export default function DoctorProfileScreen() {
         specialty: form.specialty,
         prcLicenseNumber: form.prcLicenseNumber,
         city: form.city,
-        consultationFee: Number(form.consultationFee) || 0,
+        consultationFee: roundFee(fee),
       });
       // Keep the Auth display name and the Users doc in step with the Providers
       // doc, so the doctor's name reads the same everywhere in the app.

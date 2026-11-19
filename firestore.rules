@@ -210,10 +210,22 @@ service cloud.firestore {
       function okHealth(data, keys) {
         return (!keys.hasAny(['diabetes_type']) || data.diabetes_type in ['Type 1', 'Type 2', 'Prediabetes'])
           && (!keys.hasAny(['allergies']) || (data.allergies is string && data.allergies.size() >= 1 && data.allergies.size() <= 500))
-          && (!keys.hasAny(['birthdate']) || data.birthdate is timestamp)
+          && (!keys.hasAny(['birthdate']) || okBirthdate(data))
           && (!keys.hasAny(['activity_level']) || data.activity_level in ['Sedentary', 'Light', 'Active', 'Very Active'])
           && (!keys.hasAny(['dietary_preference']) || data.dietary_preference in ['Everything', 'Vegetarian'])
           && (!keys.hasAny(['disliked_ingredients']) || (data.disliked_ingredients is string && data.disliked_ingredients.size() <= 300));
+      }
+      // A birthdate (QA PAT-001) is a date (D25), not in the future, and it fits the account (D16): an account "for me" is
+      // 18 or older, a child's account is under 18 (no account_type means "for me", as on accounts made before D16).
+      // 18 years is 6574 or 6575 days, depending on leap days. These rules allow two days either way, because the app
+      // stores the person's own midnight and the rules count days on the server's clock; the app checks the exact
+      // birthday first (constants/guardian.ts birthdateProblem).
+      function okBirthdate(data) {
+        return data.birthdate is timestamp
+          && data.birthdate <= request.time
+          && (data.get('account_type', 'self') == 'minor'
+                ? data.birthdate > request.time - duration.value(6576, 'd')
+                : data.birthdate <= request.time - duration.value(6573, 'd'));
       }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.
@@ -238,22 +250,34 @@ service cloud.firestore {
     }
 
     match /Providers/{providerId} {
+      // The consultation fee (QA ADM-005), whenever it is written: a number from 0 to 20,000 pesos. 0 means "not set yet"
+      // (a doctor who signs up has no fee, and Find a Doctor lists only fees above 0, so every screen that sets a fee asks
+      // for more than 0). 20,000 is the ceiling of the app's fee screens (mobile constants/fees.ts, admin lib/fee.js):
+      // change all three together. A patient's booking copies this fee, so a negative one would be negative revenue.
+      function okFee(data, keys) {
+        return !keys.hasAny(['consultation_fee'])
+          || (data.consultation_fee is number && data.consultation_fee >= 0 && data.consultation_fee <= 20000);
+      }
       // Any signed-in user can browse the doctor directory (patients need it to book).
       allow read: if signedIn();
       // A doctor creates their own profile, but can never create it pre-verified or pre-approved, and can never
       // create it carrying any admin/audit field (verified_by, reviewed_by, reviewed_at, created_by_admin) —
-      // otherwise a self-registered doctor could forge "an admin added me" in the audit trail.
+      // otherwise a self-registered doctor could forge "an admin added me" in the audit trail. (The admin panel's
+      // Add Provider writes this document as the new doctor, so the fee check covers it too.)
       allow create: if isUser(providerId)
                     && request.resource.data.get('is_verified', false) == false
                     && request.resource.data.get('is_active', true) == true
-                    && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin']);
+                    && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
+                    && okFee(request.resource.data, request.resource.data.keys());
       // Doctors edit their profile/schedule but cannot verify/activate themselves or touch the admin review
       // trail; they MAY still clear rejection_reason themselves when they resubmit (module 10, admin Figma pass).
       // Admins may additionally reject with a reason and record who reviewed it; created_by_admin (UT-A006,
       // "Add Provider") can be set once, the same one-shot pattern Users.account_type uses (D16). When an admin
       // writes created_by_admin or reviewed_by the value must be THEIR OWN uid, so the field names which admin
-      // account did it instead of being any string an admin chooses. verified_by is pinned the same way.
-      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin']))
+      // account did it instead of being any string an admin chooses. verified_by is pinned the same way. The fee is checked
+      // only when it changes, so a doctor with an old out-of-range fee can still edit their other fields.
+      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
+                        && okFee(request.resource.data, changedKeys()))
                     || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
                         && (!changedKeys().hasAny(['created_by_admin'])
                             || (!('created_by_admin' in resource.data) && request.resource.data.created_by_admin == request.auth.uid))
@@ -310,10 +334,21 @@ service cloud.firestore {
       // Readings are private health data: the patient, admins, and a doctor the patient shared them with by booking
       // that doctor (Care_Links, D22) only. A doctor's list query must name the patient (where patient_id ==).
       allow read: if signedIn() && (resource.data.patient_id == request.auth.uid || isAdmin() || canSeePatient(resource.data.patient_id));
+      // When a reading was taken (QA DOC-012). The app dates it with the phone's clock, which may run a little fast, so it
+      // may be at most 5 minutes past the server's clock (constants/glucose.ts READING_CLOCK_SKEW_MS says the same; change
+      // both together). A later time would keep a reading "latest" for days and put it in tomorrow's chart and alerts. An
+      // earlier time is fine: a reading kept on the phone while offline is sent when the connection returns.
+      function okLoggedAt(data) {
+        return data.logged_at is timestamp && data.logged_at <= request.time + duration.value(5, 'm');
+      }
       // You can only log readings for yourself, and only a possible value. A new reading starts with no edits (D44).
+      // created_at is the server's time of saving (the app sends serverTimestamp()), never the phone's: the family-SMS
+      // server (D45) trusts it to accept only a reading saved in the last 30 minutes.
       allow create: if signedIn() && request.resource.data.patient_id == request.auth.uid
                     && possibleReading(request.resource.data)
-                    && !('edit_count' in request.resource.data);
+                    && !('edit_count' in request.resource.data)
+                    && okLoggedAt(request.resource.data)
+                    && request.resource.data.created_at == request.time;
       // You can edit only your own readings, and only what the reading says: never whose it is or when it was taken.
       // Every change to the value, meal context or notes must add the next edit record in the same write (D44), so a
       // change can never skip the history. A save that changes none of those three must leave the edit count alone.

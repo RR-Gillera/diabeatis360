@@ -133,6 +133,9 @@ Not every flow has been re-verified live since teammates' latest merges.
 - On Expo web, screens that stay mounted during a transition can duplicate text in the DOM.
   Automated tests should use `.last()` / exact text.
 - Expo Go SDK mismatch → `npx expo install --fix`, or install a matching Expo Go build from expo.dev/go.
+- **Server calls (AI, scanner, video, family SMS) pick their address in `src/lib/server-target.ts` only.** In emulator mode
+  (dev build + `EXPO_PUBLIC_USE_EMULATORS=true`) `EXPO_PUBLIC_AI_BASE_URL` is ignored and the Functions emulator (127.0.0.1:5001)
+  is used. The server also refuses to send real SMS outside production (`functions/lib/sms.js`). QA defect PAT-002.
 - `.env` is gitignored. Share it privately (Discord/Drive), never commit it. There's no `.env.example` yet.
 
 ## Project background (shared with the admin app)

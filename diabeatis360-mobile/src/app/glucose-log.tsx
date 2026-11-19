@@ -5,10 +5,11 @@ import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AddReadingModal, readingColors } from '@/features/glucose/glucose-ui';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav, homeColors, WeeklyChart } from '@/features/home/home-ui';
+import { bucketCurrentWeek } from '@/features/home/week-chart';
 import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
 

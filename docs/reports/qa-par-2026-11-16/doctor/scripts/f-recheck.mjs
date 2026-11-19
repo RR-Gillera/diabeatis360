@@ -1,0 +1,12 @@
+import { launch, ensureDoctor, shot, text, log, settle, fsQuery, UID } from './lib.mjs';
+const b = await launch(); const { page } = await ensureDoctor(b, 'doc1');
+const T = async () => (await text(page)).replace(/\n+/g, ' | ');
+log('dashboard recent:', (await T()).match(/Recent Activity[\s\S]{0,300}/)?.[0]); await shot(page, 'x-dashboard-announcement');
+await page.getByText(/^notifications$/i).filter({ visible: true }).last().click(); await page.waitForTimeout(5000); await settle(page);
+const t = await T();
+log('notifications screen:', t.slice(0, 900));
+log('announcement listed on Notifications screen:', /QA-ADMIN doctors only \(re-run\)/.test(t) ? 'YES' : 'NO');
+await shot(page, 'x-notifications-announcement');
+const n = await fsQuery('Notifications', 'user_id', UID.doc1);
+log('Firestore doc1 notifications by type:', JSON.stringify(n.docs.reduce((a, d) => (a[d.notification_type] = (a[d.notification_type] ?? 0) + 1, a), {})));
+await b.close();

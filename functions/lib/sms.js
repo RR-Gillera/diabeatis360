@@ -16,12 +16,31 @@ function localNumber(e164) {
   return `0${String(e164).replace(/^\+63/, '')}`
 }
 
+/** False in the Firebase emulator or on a non-production Vercel environment; true on a deployed production server. */
+function isProduction(env) {
+  if (env.FUNCTIONS_EMULATOR === 'true') return false
+  if (env.VERCEL_ENV) return env.VERCEL_ENV === 'production'
+  return true // a deployed Cloud Function sets neither variable
+}
+
+/** "+639171234567" -> "+63*******4567" so logs never hold a full phone number. */
+function maskNumber(e164) {
+  const text = String(e164)
+  return `${text.slice(0, 3)}${'*'.repeat(Math.max(text.length - 7, 0))}${text.slice(-4)}`
+}
+
 /**
  * Returns a sender `({ numbers, message }) => Promise<void>` that throws if Semaphore does not accept the request.
  * `fetchImpl` is only replaced in tests.
  */
-function semaphoreSender({ apiKey, senderName, fetchImpl = fetch }) {
+function semaphoreSender({ apiKey, senderName, fetchImpl = fetch, env = process.env, log = console.log }) {
   return async function sendSms({ numbers, message }) {
+    // Guard (QA defect PAT-002): a real text goes out ONLY in production. In the Functions emulator, or on any Vercel
+    // environment that is not "production" (vercel dev, previews), the text is logged instead, with the number masked.
+    if (!isProduction(env)) {
+      log(`[SMS NOT SENT: not production] would text ${numbers.map(maskNumber).join(', ')}: ${message}`)
+      return
+    }
     const body = new URLSearchParams({ apikey: apiKey, number: numbers.map(localNumber).join(','), message })
     if (senderName) body.set('sendername', senderName)
     const response = await fetchImpl(SEMAPHORE_URL, {
@@ -37,4 +56,4 @@ function semaphoreSender({ apiKey, senderName, fetchImpl = fetch }) {
   }
 }
 
-module.exports = { semaphoreSender, localNumber, SEMAPHORE_URL }
+module.exports = { semaphoreSender, localNumber, isProduction, maskNumber, SEMAPHORE_URL }

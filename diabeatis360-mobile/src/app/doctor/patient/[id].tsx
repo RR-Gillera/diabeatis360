@@ -4,14 +4,15 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SymbolView } from 'expo-symbols';
 
 import { Fonts } from '@/constants/theme';
-import { bucketCurrentWeek, subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
+import { bucketCurrentWeek } from '@/features/home/week-chart';
 import { EditHistory } from '@/features/glucose/glucose-ui';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
 import { useAuth } from '@/features/auth/auth-context';
 import type { ProviderBookingEntry } from '@/features/booking/types';
-import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
+import { ChildAccountBadge, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { PatientProfile } from '@/features/doctor/types';
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { homeColors, WeeklyChart } from '@/features/home/home-ui';
@@ -23,7 +24,7 @@ import { ageFrom, weeklyInsights } from '@/features/doctor/doctor-stats';
 import { ACTIVITY_LEVELS, DIETS, dislikedText, foodList, normalizeDiet } from '@/features/auth/health-profile';
 import { foodLabel } from '@/constants/food-words';
 import { useT } from '@/i18n/language-context';
-import { shortDay, type MessageKey } from '@/i18n/translate';
+import { clockTime, shortDay, type MessageKey } from '@/i18n/translate';
 
 // The badge colours per reading; the words come from constants/enums.ts in the person's language.
 const readingStyle: Record<Interpretation, { color: string; background: string }> = {
@@ -85,7 +86,12 @@ export default function DoctorPatientDetailScreen() {
     return subscribeToBookingsForProvider(uid, setAppointments, () => {});
   }, [uid]);
 
-  const { days: weekDays, average: weekAverage } = useMemo(() => bucketCurrentWeek(entries), [entries]);
+  const week = useMemo(() => bucketCurrentWeek(entries), [entries]);
+  const { days: weekDays, average: weekAverage } = week;
+  // The critical readings of this week, listed above the chart so no average can hide them (QA DOC-010). The two newest
+  // are shown; every one is also in the history list below, marked Critical.
+  const shownCritical = week.criticalReadings.slice(0, 2);
+  const moreCritical = week.criticalReadings.length - shownCritical.length;
   const latest = entries[0];
   // The class saved with each reading, which was worked out for the patient's diabetes type (D40). A critical reading
   // still counts as high or low, depending on which way it is off.
@@ -124,6 +130,7 @@ export default function DoctorPatientDetailScreen() {
               <View style={styles.whoCopy}>
                 <Text style={styles.whoName}>{profile.fullName}</Text>
                 <Text style={styles.whoMeta}>{age !== null ? t('doctor.patient.age', { age }) : t('doctor.request.noAge')}</Text>
+                {profile.isMinor ? <ChildAccountBadge /> : null}
               </View>
             </View>
             <View style={styles.segment}>
@@ -145,7 +152,11 @@ export default function DoctorPatientDetailScreen() {
                     <Text style={doctorStyles.label}>{t('doctor.patient.allergies')}</Text>
                     {allergyList.length ? (
                       <View style={styles.chips}>{allergyList.map((item) => <View key={item} style={styles.chip}><Text style={styles.chipText}>{foodLabel(item, language)}</Text></View>)}</View>
-                    ) : <Text style={[styles.profileValue, styles.profileValueMissing]}>{t('doctor.patient.noAllergies')}</Text>}
+                    ) : (
+                      // QA ADM-009 (the same gap as the admin panel): a blank answer means the patient never answered,
+                      // which must not read as "no allergies". "None" is the patient saying they have none (D25).
+                      <Text style={[styles.profileValue, styles.profileValueMissing]}>{profile.allergies.trim() ? t('doctor.patient.noAllergies') : t('doctor.patient.notAnswered')}</Text>
+                    )}
                   </View>
                   {profile.location ? <ProfileRow label={t('doctor.patient.location')} value={profile.location} /> : null}
                 </View>
@@ -177,6 +188,23 @@ export default function DoctorPatientDetailScreen() {
                       <Text style={styles.summaryLabel}>{label('interpretation', 'low')}</Text>
                     </View>
                   </View>
+                  {shownCritical.length ? (
+                    <View accessible style={styles.criticalBox}>
+                      <View style={styles.criticalHeader}>
+                        <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={15} tintColor="#DC2626" />
+                        <Text style={styles.criticalTitle}>{t('doctor.patient.criticalWeek')}</Text>
+                      </View>
+                      {shownCritical.map((entry, index) => (
+                        <Text key={`${entry.loggedAt.getTime()}-${index}`} style={styles.criticalLine}>
+                          {t('doctor.patient.criticalLine', { value: entry.readingMgdl, when: `${shortDay(entry.loggedAt, language)}, ${clockTime(entry.loggedAt)}` })}
+                        </Text>
+                      ))}
+                      {moreCritical > 0 ? <Text style={styles.criticalLine}>{t('doctor.patient.criticalMore', { count: moreCritical })}</Text> : null}
+                    </View>
+                  ) : null}
+                  {week.lowest !== null && week.highest !== null ? (
+                    <Text style={styles.weekRange}>{t('doctor.patient.weekRange', { low: week.lowest, high: week.highest })}</Text>
+                  ) : null}
                   <View style={styles.chartWrap}>
                     <WeeklyChart days={weekDays} width={252} />
                   </View>
@@ -300,6 +328,11 @@ const styles = StyleSheet.create({
   summaryValueLow: { color: homeColors.orange },
   summaryLabel: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '600', marginTop: 2 },
   chartWrap: { borderTopColor: homeColors.borderSoft, borderTopWidth: 1, paddingTop: 16 },
+  criticalBox: { backgroundColor: '#FEF2F2', borderColor: '#DC2626', borderRadius: 16, borderWidth: 1.5, gap: 4, padding: 12 },
+  criticalHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  criticalTitle: { color: '#B91C1C', fontFamily: Fonts.sans, fontSize: 12, fontWeight: '900', letterSpacing: 0.4, textTransform: 'uppercase' },
+  criticalLine: { color: '#7F1D1D', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700', lineHeight: 20 },
+  weekRange: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13 },
   consultCard: { alignItems: 'center', flexDirection: 'row', gap: 14, marginTop: 12 },
   consultIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
   consultCopy: { flex: 1 },
