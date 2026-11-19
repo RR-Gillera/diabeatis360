@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { SymbolView } from 'expo-symbols';
 
@@ -57,6 +58,66 @@ function DailyRing({ percent }: { percent: number }) {
 }
 
 /**
+ * "We don't know this product yet" (Figma P-18): after a label scan of a product with an unknown barcode, the person
+ * checks the name and brand read from the label, then shares the product with all patients (DECISIONS.md D12).
+ * "From scan" marks a value nobody has changed yet.
+ */
+function ShareProduct({ analysis, barcode, onSave }: { analysis: Readable; barcode?: string; onSave: (name: string, brand: string) => Promise<void> }) {
+  const [name, setName] = useState(analysis.product_name);
+  const [brand, setBrand] = useState(analysis.brand);
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const { t } = useT();
+  if (state === 'saved') {
+    return <AppText style={styles.shareDone}>{t('share.thanks')}</AppText>;
+  }
+  const save = async () => {
+    setState('saving');
+    try {
+      await onSave(name, brand);
+      setState('saved');
+    } catch {
+      setState('failed');
+    }
+  };
+  const field = (label: string, value: string, original: string, onChange: (text: string) => void, maxLength: number) => (
+    <View style={styles.fieldGroup}>
+      <AppText style={styles.fieldLabel}>{label}</AppText>
+      <View style={styles.fieldBox}>
+        <TextInput accessibilityLabel={label} style={styles.fieldInput} value={value} onChangeText={onChange} placeholder={label} placeholderTextColor={Brand.colors.textFaint} maxLength={maxLength} />
+        {value && value === original ? <View style={styles.fromScan}><AppText weight="bold" style={styles.fromScanText}>{t('share.fromScan')}</AppText></View> : null}
+      </View>
+    </View>
+  );
+  return (
+    <View style={styles.share}>
+      <View style={styles.shareHead}>
+        <View style={styles.shareIcon}><SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={26} tintColor={Brand.colors.primary} /></View>
+        <View style={styles.shareHeadText}>
+          <AppText weight="bold" style={styles.shareTitle}>{t('share.title')}</AppText>
+          <AppText style={styles.shareSub}>{t('share.sub')}</AppText>
+        </View>
+      </View>
+      <Card style={styles.shareCard}>
+        {field(t('share.name'), name, analysis.product_name, setName, 100)}
+        {field(t('share.brand'), brand, analysis.brand, setBrand, 80)}
+        {barcode ? (
+          <View style={styles.fieldGroup}>
+            <AppText style={styles.fieldLabel}>{t('share.barcode')}</AppText>
+            <View style={[styles.fieldBox, styles.fieldLocked]}>
+              <SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={16} tintColor={Brand.colors.textMuted} />
+              <AppText style={styles.lockedText}>{barcode}</AppText>
+            </View>
+          </View>
+        ) : null}
+      </Card>
+      {state === 'failed' ? <AppText style={styles.shareError}>{t('share.failed')}</AppText> : null}
+      <PrimaryButton title={t('share.save')} loading={state === 'saving'} disabled={!name.trim()} onPress={save} />
+      <AppText style={styles.shareNote}>{t('share.note')}</AppText>
+    </View>
+  );
+}
+
+/**
  * The server writes each allergy warning in English ("Contains nuts", functions/lib/prompts.js). The card says the
  * whole sentence in the person's language, so only the allergen is taken from it: a listed food is translated as on
  * the Health Profile ("shrimp" -> "hipon", constants/food-words.ts), and one the person typed is shown as typed.
@@ -66,9 +127,9 @@ function allergenName(warning: string, language: Language) {
   return language === 'English' ? allergen : foodLabel(allergen, language).toLowerCase();
 }
 
-/** The analysis of one scanned label (Figma 195:2908). */
-export function ScanResult({ analysis, onAlternatives, onScanAgain }: {
-  analysis: Readable; onAlternatives: () => void; onScanAgain: () => void;
+/** The analysis of one scanned label (Figma 195:2908). onShare is set only for a new product that has a barcode. */
+export function ScanResult({ analysis, onAlternatives, onScanAgain, onShare, barcode }: {
+  analysis: Readable; onAlternatives: () => void; onScanAgain: () => void; onShare?: (name: string, brand: string) => Promise<void>; barcode?: string;
 }) {
   const { t, label, language } = useT();
   const percent = (analysis.calories / DAILY_CALORIE_REFERENCE) * 100;
@@ -79,6 +140,9 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain }: {
           <AppText weight="bold" style={styles.small}>{t('scan.product')}</AppText>
           <StatusPill label={label('healthRating', analysis.health_rating).toUpperCase()} tone={tones[analysis.health_rating]} />
         </View>
+        {analysis.from_memory ? (
+          <AppText style={styles.memory}>{analysis.verified ? t('scan.sharedVerified') : t('scan.sharedUnverified')}</AppText>
+        ) : null}
         <AppText weight="extraBold" style={styles.name}>{analysis.product_name}</AppText>
         {analysis.brand ? <AppText style={styles.brand}>{analysis.brand}</AppText> : null}
         <View style={styles.kcalRow}>
@@ -113,11 +177,13 @@ export function ScanResult({ analysis, onAlternatives, onScanAgain }: {
             <View style={styles.insightIcon}>
               <SymbolView name={{ ios: 'sparkles', android: 'auto_awesome', web: 'auto_awesome' }} size={16} tintColor={Brand.colors.primary} />
             </View>
-            <AppText weight="bold" style={styles.insightTitle}>{t('scan.aiInsight')}</AppText>
+            <AppText weight="bold" style={styles.insightTitle}>{analysis.from_memory ? t('scan.insight') : t('scan.aiInsight')}</AppText>
           </View>
           <AppText style={styles.insightText}>{analysis.insight}</AppText>
         </Card>
       ) : null}
+
+      {onShare ? <ShareProduct analysis={analysis} barcode={barcode} onSave={onShare} /> : null}
 
       {analysis.alternatives.length ? <PrimaryButton title={t('scan.viewAlternatives')} onPress={onAlternatives} style={styles.button} /> : null}
       <PrimaryButton title={t('scan.another')} variant="outline" onPress={onScanAgain} style={styles.button} />
@@ -155,4 +221,23 @@ const styles = StyleSheet.create({
   insightTitle: { fontSize: 15 },
   insightText: { color: Brand.colors.textMuted, fontSize: 15, lineHeight: 23 },
   button: { marginTop: 16 },
+  memory: { color: Brand.colors.primary, fontSize: 12, marginTop: 6 },
+  share: { gap: 14, marginTop: 24 },
+  shareHead: { alignItems: 'center', flexDirection: 'row', gap: 14 },
+  shareIcon: { alignItems: 'center', backgroundColor: '#DCF2A9', borderRadius: 18, height: 56, justifyContent: 'center', width: 56 },
+  shareHeadText: { flex: 1, gap: 2 },
+  shareTitle: { fontSize: 16 },
+  shareSub: { color: Brand.colors.textMuted, fontSize: 13 },
+  shareCard: { gap: 14 },
+  fieldGroup: { gap: 6 },
+  fieldLabel: { color: Brand.colors.textMuted, fontSize: 13 },
+  fieldBox: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E5E7EB', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 54, paddingHorizontal: 14 },
+  fieldInput: { color: Brand.colors.text, flex: 1, fontSize: 16, paddingVertical: 12 },
+  fieldLocked: { backgroundColor: '#F3F4F6' },
+  lockedText: { color: Brand.colors.textMuted, fontSize: 16 },
+  fromScan: { backgroundColor: 'rgba(220, 242, 169, 0.6)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  fromScanText: { color: Brand.colors.primary, fontSize: 11 },
+  shareNote: { color: Brand.colors.textMuted, fontSize: 12, textAlign: 'center' },
+  shareError: { color: Brand.colors.danger, fontSize: 13 },
+  shareDone: { color: Brand.colors.primary, fontSize: 14, lineHeight: 20, marginTop: 16, textAlign: 'center' },
 });

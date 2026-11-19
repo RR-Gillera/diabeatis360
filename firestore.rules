@@ -126,10 +126,6 @@ service cloud.firestore {
         && request.resource.data.fee == get(/databases/$(database)/documents/Providers/$(request.resource.data.provider_id)).data.get('consultation_fee', 0)
         && request.resource.data.platform_commission is number
         && math.abs(request.resource.data.platform_commission - request.resource.data.fee * 0.15) < 0.01
-        // D47: a doctor whose wallet is below 0 (commission owed on on-site payments) cannot be booked until they top up.
-        // The balance is written only by the server (functions/lib/wallet.js); a doctor with no wallet yet is at 0.
-        && (!exists(/databases/$(database)/documents/Wallets/$(request.resource.data.provider_id))
-            || get(/databases/$(database)/documents/Wallets/$(request.resource.data.provider_id)).data.get('balance', 0) >= 0)
         && request.resource.data.scheduled_at is timestamp
         // D26: only a time that has not started yet, by the SERVER's clock (request.time), so a wrong phone clock cannot
         // book the past. Philippine time does not matter here: both sides are exact moments.
@@ -231,12 +227,6 @@ service cloud.firestore {
                 ? data.birthdate > request.time - duration.value(6576, 'd')
                 : data.birthdate <= request.time - duration.value(6573, 'd'));
       }
-      // A doctor's mobile number (My Profile, D49): '' (none) or the one stored form +639XXXXXXXXX. On Users, not
-      // Providers, so patients never read it.
-      function okPhone(data, keys) {
-        return !keys.hasAny(['phone_number'])
-          || (data.phone_number is string && (data.phone_number == '' || data.phone_number.matches('^[+]639[0-9]{9}$')));
-      }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.
       allow read: if isUser(userId) || isAdmin() || canSeePatient(userId);
@@ -244,8 +234,7 @@ service cloud.firestore {
       // if present, must be 'self' or 'minor' — anything else is rejected outright, not silently ignored.
       allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
                     && request.resource.data.get('account_type', 'self') in ['self', 'minor']
-                    && okHealth(request.resource.data, request.resource.data.keys())
-                    && okPhone(request.resource.data, request.resource.data.keys());
+                    && okHealth(request.resource.data, request.resource.data.keys());
       // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
       // account_type (D16) is set once — the Users doc already exists by the time onboarding chooses "For me" /
       // "For my child" (it is created earlier, at email verification), so this has to be an update, not a
@@ -254,7 +243,6 @@ service cloud.firestore {
       allow update: if isAdmin() && changedKeys().hasOnly(['is_active'])
                     || (isUser(userId) && !changedKeys().hasAny(['is_active'])
                         && okHealth(request.resource.data, changedKeys())
-                        && okPhone(request.resource.data, changedKeys())
                         && (!changedKeys().hasAny(['account_type'])
                             || (!('account_type' in resource.data) && request.resource.data.account_type in ['self', 'minor'])));
       // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
@@ -279,9 +267,8 @@ service cloud.firestore {
       allow create: if isUser(providerId)
                     && request.resource.data.get('is_verified', false) == false
                     && request.resource.data.get('is_active', true) == true
-                    && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin', 'wallet_blocked'])
+                    && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
                     && okFee(request.resource.data, request.resource.data.keys());
-      // wallet_blocked (D47) is written only by the server, so a doctor cannot unblock themselves without topping up.
       // Doctors edit their profile/schedule but cannot verify/activate themselves or touch the admin review
       // trail; they MAY still clear rejection_reason themselves when they resubmit (module 10, admin Figma pass).
       // Admins may additionally reject with a reason and record who reviewed it; created_by_admin (UT-A006,
@@ -289,7 +276,7 @@ service cloud.firestore {
       // writes created_by_admin or reviewed_by the value must be THEIR OWN uid, so the field names which admin
       // account did it instead of being any string an admin chooses. verified_by is pinned the same way. The fee is checked
       // only when it changes, so a doctor with an old out-of-range fee can still edit their other fields.
-      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin', 'wallet_blocked'])
+      allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
                         && okFee(request.resource.data, changedKeys()))
                     || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
                         && (!changedKeys().hasAny(['created_by_admin'])
@@ -482,37 +469,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ------------------------------------------------------------------ the doctor's wallet (DECISIONS.md D47)
-    // Demo money. Only the server (functions/lib/wallet.js, with the Admin SDK) changes a balance or adds a transaction,
-    // so no app can give anyone money. A doctor reads their own wallet and history; admins read all of them.
-    match /Wallets/{providerId} {
-      allow read: if isUser(providerId) || isAdmin();
-      allow write: if false;
-    }
-    match /Wallet_Transactions/{transactionId} {
-      allow read: if signedIn() && (resource.data.provider_id == request.auth.uid || isAdmin());
-      allow write: if false;
-    }
-    // Where the doctor's withdrawals go (D47, "Payout account" on My Wallet). The DOCTOR writes it, since it moves no money:
-    // the server only reads it to name the account on each withdrawal. Only the bank's name (from a fixed list, kept in
-    // step with PAYOUT_BANKS in diabeatis360-mobile/src/features/wallet/payout.ts) or GCash, the holder's name and the
-    // LAST 4 DIGITS are allowed, so a full account number can never be stored here. Patients cannot read it.
-    match /Payout_Accounts/{providerId} {
-      allow read: if isUser(providerId) || isAdmin();
-      allow create, update: if isUser(providerId)
-        && exists(/databases/$(database)/documents/Providers/$(providerId))
-        && request.resource.data.keys().hasOnly(['kind', 'provider_name', 'account_name', 'last4', 'updated_at'])
-        && request.resource.data.keys().hasAll(['kind', 'provider_name', 'account_name', 'last4', 'updated_at'])
-        && ((request.resource.data.kind == 'gcash' && request.resource.data.provider_name == 'GCash')
-            || (request.resource.data.kind == 'bank'
-                && request.resource.data.provider_name in ['BDO', 'BPI', 'Metrobank', 'Land Bank', 'UnionBank', 'Security Bank', 'PNB', 'RCBC', 'China Bank']))
-        && request.resource.data.account_name is string
-        && request.resource.data.account_name.size() >= 2 && request.resource.data.account_name.size() <= 80
-        && request.resource.data.last4 is string && request.resource.data.last4.matches('^[0-9]{4}$')
-        && request.resource.data.updated_at == request.time;
-      allow delete: if false;
-    }
-
     // ------------------------------------------------------------------ booked time slots (DECISIONS.md D22)
     // One document per doctor and time, id "<providerId>_<epoch milliseconds>", so the booking screen can grey out taken
     // times without anyone reading other people's bookings. It holds NO patient information: a doctor, a time and
@@ -604,10 +560,7 @@ service cloud.firestore {
                     && inBooking(request.resource.data.booking_id)
                     && bookingData(request.resource.data.booking_id).status == 'confirmed'
                     && request.resource.data.message is string
-                    && request.resource.data.message.size() <= 2000
-                    // A shared blood sugar trend (the chart in the chat): optional, a short list of daily averages.
-                    && (!('trend' in request.resource.data)
-                        || (request.resource.data.trend is list && request.resource.data.trend.size() <= 7));
+                    && request.resource.data.message.size() <= 2000;
       // Sent messages are a medical-consultation record, so they can be neither edited nor deleted.
       allow update, delete: if false;
     }
@@ -803,6 +756,26 @@ service cloud.firestore {
         get(/databases/$(database)/documents/AI_Suggestions/$(resource.data.suggestion_id)).data.user_id == request.auth.uid
         || isAdmin());
       allow create, update, delete: if false;
+    }
+
+    // Shared product memory for the scanner (DECISIONS.md D12), keyed by barcode.
+    match /Products/{barcode} {
+      // Any signed-in person can read it; the app labels products that are not verified yet.
+      allow read: if signedIn();
+      // Any signed-in person can add a product that is not in the collection yet (create, never overwrite). It must
+      // start unverified and carry their own id, and the document id must look like a real barcode.
+      allow create: if signedIn()
+        && barcode.matches('^[0-9]{6,14}$')
+        && request.resource.data.barcode == barcode
+        && request.resource.data.created_by == request.auth.uid
+        && request.resource.data.verified == false
+        && request.resource.data.verified_by == null
+        && request.resource.data.product_name is string && request.resource.data.product_name.size() > 0
+        && request.resource.data.nutrients is map;
+      // Only admins review: they may change nothing except the verification fields.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verified', 'verified_by', 'verified_at']);
+      allow delete: if false;
     }
 
     match /Nutrition_Scans/{scanId} {

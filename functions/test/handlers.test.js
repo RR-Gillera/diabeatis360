@@ -202,6 +202,61 @@ test('label scan rejects unsupported or missing images', { skip }, async () => {
   assert.equal(ai.calls, 0)
 })
 
+// ---- product memory (D12) ------------------------------------------------------------------------------------
+const { lookupProduct } = require('../lib/handlers')
+const barBarcode = '4800016123456'
+const addProduct = (extra = {}) => db.doc(`Products/${barBarcode}`).set({
+  barcode: barBarcode, product_name: 'Berry Energy Bar', brand: 'Acme', serving_size: '45 g', ingredients_text: 'oats, sugar, peanuts, berries',
+  nutrients: { calories: 250, carbs_g: 45, sugar_g: 22, fiber_g: 2, protein_g: 5, sodium_mg: 150 },
+  alternatives: [{ instead_of: 'Energy bar', try: 'Fresh guava' }, { instead_of: 'Candy', try: 'Peanut brittle' }],
+  verified: false, ...extra,
+})
+
+test('product memory: a barcode that is not saved yet is reported as not found', { skip }, async () => {
+  await reset()
+  await addUser('u13')
+  assert.deepEqual(await lookupProduct({ db, uid: 'u13', barcode: barBarcode }), { found: false })
+  assert.equal(await code(lookupProduct({ db, uid: 'u13', barcode: 'abc' })), 'invalid-argument')
+})
+
+test('product memory: a hit is rated per person, warns about their allergy, and makes no Gemini call or scan count', { skip }, async () => {
+  await reset()
+  await db.collection('Products').doc(barBarcode).delete()
+  await addProduct()
+  await addUser('u14', { allergies: 'peanuts' })
+  await addUser('u15', { allergies: 'shellfish' })
+
+  const peanut = await lookupProduct({ db, uid: 'u14', barcode: barBarcode })
+  assert.equal(peanut.found, true)
+  assert.equal(peanut.from_memory, true)
+  assert.equal(peanut.verified, false)
+  assert.equal(peanut.health_rating, 'unsuitable')
+  assert.deepEqual(peanut.allergen_warnings, ['Contains peanuts'])
+  assert.deepEqual(peanut.alternatives, [{ instead_of: 'Energy bar', try: 'Fresh guava' }]) // the peanut swap is filtered out
+
+  const other = await lookupProduct({ db, uid: 'u15', barcode: barBarcode })
+  assert.equal(other.allergen_warnings.length, 0)
+  assert.equal(other.health_rating, 'unsuitable') // 22 g sugar per serving is high for everyone
+  assert.equal(other.alternatives.length, 2)
+
+  // The lookups are saved as scans linked to the product, but do not use up any of the 3 Free scans.
+  const scans = await db.collection('Nutrition_Scans').where('user_id', '==', 'u14').get()
+  assert.equal(scans.docs[0].data().product_id, barBarcode)
+  for (let i = 0; i < 3; i += 1) await analyzeLabel({ db, uid: 'u14', image: png, callAi: fakeAi(labelAnswer) })
+  assert.equal(await code(analyzeLabel({ db, uid: 'u14', image: png, callAi: fakeAi(labelAnswer) })), 'resource-exhausted')
+  assert.equal((await lookupProduct({ db, uid: 'u14', barcode: barBarcode })).found, true) // still works at the limit
+})
+
+test('product memory: a label scan with a barcode links the scan to the product', { skip }, async () => {
+  await reset()
+  await addUser('u16')
+  const result = await analyzeLabel({ db, uid: 'u16', image: png, barcode: barBarcode, callAi: fakeAi(labelAnswer) })
+  const scan = (await db.doc(`Nutrition_Scans/${result.scan_id}`).get()).data()
+  assert.equal(scan.product_id, barBarcode)
+  assert.equal(scan.source, 'gemini_label')
+  assert.equal(result.ingredients_text, 'oats, sugar, peanuts, berries')
+})
+
 // ---- daily limits, fair use and the project-wide cap (D20) ---------------------------------------------------
 const failure = async (promise) => { try { await promise; return null } catch (error) { return error } }
 const counter = async (id) => (await db.doc(`Usage_Counters/${id}`).get()).data() ?? {}
@@ -256,7 +311,7 @@ test('the Free refusal says why and offers Premium; its details tell the app whi
   assert.match(refused.message, /Upgrade to Premium/)
 })
 
-test('the whole project has a daily cap, shared by suggestions and label scans', { skip }, async () => {
+test('the whole project has a daily cap; a product lookup, which uses no Gemini, still works at the cap', { skip }, async () => {
   await reset()
   const before = process.env.GEMINI_DAILY_CAP
   process.env.GEMINI_DAILY_CAP = '3'
@@ -275,8 +330,11 @@ test('the whole project has a daily cap, shared by suggestions and label scans',
     assert.equal((await counter(manilaDayKey())).gemini, 3)
     assert.equal((await counter(`${manilaDayKey()}_c4`)).ai ?? 0, 0, 'a refused request is not counted against the person')
 
-    // Label scans share the same project cap.
+    // Label scans share the same project cap ...
     assert.equal((await failure(analyzeLabel({ db, uid: 'c4', image: png, callAi: fakeAi(labelAnswer) }))).details.scope, 'project')
+    // ... but a product answered from the shared Products collection makes no Gemini call.
+    await addProduct()
+    assert.equal((await lookupProduct({ db, uid: 'c4', barcode: barBarcode })).found, true)
   } finally {
     if (before === undefined) delete process.env.GEMINI_DAILY_CAP
     else process.env.GEMINI_DAILY_CAP = before
@@ -319,17 +377,17 @@ test('the allowance starts again on the next Manila day, not at midnight UTC', {
   assert.equal(await code(generateRecommendations({ db, uid: 'd1', kind: 'exercise', callAi: ai, now: new Date('2026-10-12T16:00:00Z') })), 'ok')
 })
 
-// DECISIONS.md D25: no suggestions or label scans until the allergy question is answered.
+// DECISIONS.md D25: no suggestions, label scans or barcode ratings until the allergy question is answered.
 test('without an allergy answer every AI feature is refused: no Gemini call, nothing saved or counted', { skip }, async () => {
   await reset()
   const { ALLERGIES_MESSAGE } = require('../lib/handlers')
   await addUser('uNoAllergies', { allergies: '' })
+  await db.doc('Products/4800000000017').set({ barcode: '4800000000017', product_name: 'Test Crackers', ingredients_text: 'wheat', nutrients: { calories: 100, carbs_g: 10, sugar_g: 1, fiber_g: 1, protein_g: 2, sodium_mg: 50 }, alternatives: [], verified: true })
   const ai = fakeAi(mealsAnswer)
-  // Each call is started only when it is checked (a function, not a promise), so a refusal is never left waiting
-  // unobserved while an earlier one is checked; Node counts that as an unhandled rejection and fails the test.
   for (const call of [
-    () => generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai }),
-    () => analyzeLabel({ db, uid: 'uNoAllergies', image: png, callAi: fakeAi(labelAnswer) }),
+    generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai }),
+    analyzeLabel({ db, uid: 'uNoAllergies', image: png, callAi: fakeAi(labelAnswer) }),
+    lookupProduct({ db, uid: 'uNoAllergies', barcode: '4800000000017' }),
   ]) {
     await assert.rejects(call, (error) => error.code === 'failed-precondition' && error.message === ALLERGIES_MESSAGE)
   }

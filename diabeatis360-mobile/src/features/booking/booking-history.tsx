@@ -6,7 +6,6 @@ import { bookingColors, formatDate, formatFee } from './booking-ui';
 import { subscribeToBookingHistory, subscribeToProviders } from './booking-service';
 import { useT } from '@/i18n/language-context';
 import type { AppointmentHistoryEntry, BookingStatus, Provider } from './types';
-import { Brand } from '@/constants/theme';
 
 // The badge colours per status; the words come from constants/enums.ts in the person's language.
 const statusCopy: Record<BookingStatus, { color: string; background: string }> = {
@@ -62,14 +61,14 @@ export function AppointmentHistoryList({ patientId }: { patientId: string | null
 }
 
 const styles = StyleSheet.create({
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13 },
-  empty: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 14 },
+  error: { color: '#D9364F', fontSize: 13 },
+  empty: { color: bookingColors.muted, fontSize: 14 },
   list: { gap: 10 },
   card: { alignItems: 'center', backgroundColor: '#F5F7F9', borderRadius: 12, flexDirection: 'row', gap: 10, justifyContent: 'space-between', padding: 14 },
   copy: { flex: 1, gap: 4 },
-  name: { color: bookingColors.navy, fontSize: 15, fontFamily: Brand.font.extraBold },
-  meta: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 12 },
-  queue: { color: bookingColors.green, fontSize: 12, fontFamily: Brand.font.extraBold },
+  name: { color: bookingColors.navy, fontSize: 15, fontWeight: '800' },
+  meta: { color: bookingColors.muted, fontSize: 12 },
+  queue: { color: bookingColors.green, fontSize: 12, fontWeight: '800' },
   badge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  badgeText: { fontSize: 11, fontFamily: Brand.font.extraBold },
+  badgeText: { fontSize: 11, fontWeight: '800' },
 });

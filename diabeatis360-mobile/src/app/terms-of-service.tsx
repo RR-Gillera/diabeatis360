@@ -4,7 +4,6 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { RoundBackButton } from '@/components/ui/round-back-button';
 import { BrandMark, authColors, authStyles } from '@/features/auth/auth-ui';
 import { useT } from '@/i18n/language-context';
-import { Brand } from '@/constants/theme';
 
 export default function TermsOfServiceScreen() {
   const router = useRouter();
@@ -15,4 +14,4 @@ export default function TermsOfServiceScreen() {
 
 function PolicySection({ title, text }: { title: string; text: string }) { return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.body}>{text}</Text></View>; }
 
-const styles = StyleSheet.create({ content: { padding: 24, paddingBottom: 48 }, back: { alignSelf: 'flex-start', marginBottom: 24 }, heading: { alignItems: 'center', marginBottom: 28 }, title: { color: authColors.navy, fontSize: 28, fontFamily: Brand.font.extraBold, marginTop: 14 }, updated: { color: authColors.muted, fontSize: 13, marginTop: 8 }, intro: { color: authColors.muted, fontSize: 16, lineHeight: 25, marginBottom: 12 }, section: { borderTopColor: authColors.border, borderTopWidth: 1, gap: 8, paddingVertical: 18 }, sectionTitle: { color: authColors.navy, fontSize: 18, fontFamily: Brand.font.extraBold }, body: { color: authColors.muted, fontSize: 15, lineHeight: 24 } });
+const styles = StyleSheet.create({ content: { padding: 24, paddingBottom: 48 }, back: { alignSelf: 'flex-start', marginBottom: 24 }, heading: { alignItems: 'center', marginBottom: 28 }, title: { color: authColors.navy, fontSize: 28, fontWeight: '900', marginTop: 14 }, updated: { color: authColors.muted, fontSize: 13, marginTop: 8 }, intro: { color: authColors.muted, fontSize: 16, lineHeight: 25, marginBottom: 12 }, section: { borderTopColor: authColors.border, borderTopWidth: 1, gap: 8, paddingVertical: 18 }, sectionTitle: { color: authColors.navy, fontSize: 18, fontWeight: '800' }, body: { color: authColors.muted, fontSize: 15, lineHeight: 24 } });

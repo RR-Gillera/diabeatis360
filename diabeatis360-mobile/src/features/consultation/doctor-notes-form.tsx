@@ -4,7 +4,7 @@ import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { RoundBackButton } from '@/components/ui/round-back-button';
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
 import { parseBirthdate } from '@/features/auth/birthdate';
 import { manilaInstant, manilaWallClock } from '@/features/booking/manila-time';
@@ -125,17 +125,17 @@ export function DoctorNotesForm({ visible, title, patientName, initial, submitLa
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { gap: 10, padding: 24, paddingBottom: 140, paddingTop: 48 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 26, marginTop: 8 },
-  subtitle: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 15, marginBottom: 6 },
-  label: { color: '#64748B', fontFamily: Brand.font.regular, fontSize: 14, marginTop: 8 },
-  input: { backgroundColor: '#FFFFFF', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 15, minHeight: 96, padding: 16, textAlignVertical: 'top' },
+  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900', marginTop: 8 },
+  subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 15, marginBottom: 6 },
+  label: { color: '#64748B', fontFamily: Fonts.sans, fontSize: 14, marginTop: 8 },
+  input: { backgroundColor: '#FFFFFF', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, minHeight: 96, padding: 16, textAlignVertical: 'top' },
   followRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   time: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: homeColors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
-  timeText: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15 },
-  clear: { color: '#EF4444', fontFamily: Brand.font.bold, fontSize: 14 },
-  hint: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 6 },
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13 },
+  timeText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700' },
+  clear: { color: '#EF4444', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  hint: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, marginTop: 6 },
+  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13 },
   submit: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 18, bottom: 32, height: 60, justifyContent: 'center', left: 24, position: 'absolute', right: 24 },
-  submitText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 17 },
+  submitText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
   disabled: { opacity: 0.6 },
 });

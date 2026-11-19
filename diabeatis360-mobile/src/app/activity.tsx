@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
 import { manilaWallClock } from '@/features/booking/manila-time';
@@ -135,24 +135,24 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 14, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 16 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24 },
-  subtitle: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14, marginTop: 2 },
+  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
+  subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500', marginTop: 2 },
   filters: { flexDirection: 'row', gap: 8, paddingHorizontal: 24, paddingTop: 16 },
   filter: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
   filterActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
-  filterText: { color: homeColors.textMuted, fontFamily: Brand.font.bold, fontSize: 13 },
+  filterText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
   filterTextActive: { color: '#FFFFFF' },
   scroll: { padding: 24, paddingBottom: 140 },
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, marginBottom: 12 },
+  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginBottom: 12 },
   loader: { marginTop: 24 },
-  empty: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 13, marginTop: 16, textAlign: 'center' },
+  empty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 13, marginTop: 16, textAlign: 'center' },
   card: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 24, borderWidth: 1, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   row: { alignItems: 'center', borderBottomColor: homeColors.borderSoft, borderBottomWidth: 1, flexDirection: 'row', gap: 12, paddingVertical: 16 },
   pressed: { opacity: 0.85 },
   iconWrap: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   copy: { flex: 1 },
-  rowTitle: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 14 },
-  rowMeta: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 12, marginTop: 2 },
-  rowWhen: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 11, marginTop: 2 },
-  points: { color: homeColors.green, fontFamily: Brand.font.bold, fontSize: 13 },
+  rowTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  rowMeta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  rowWhen: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, marginTop: 2 },
+  points: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
 });

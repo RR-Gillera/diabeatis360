@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { REQUEST_TABS, ageFrom, dailyEarnings, dashboardStats, filterRequests, requestTabFor, startsIn, weeklyInsights } from './doctor-stats.ts';
+import { REQUEST_TABS, ageFrom, dashboardStats, requestTabFor, weeklyInsights } from './doctor-stats.ts';
 import { manilaInstant } from '../booking/manila-time.ts';
 
 test('requests are split like the frame; finished ones belong to History', () => {
@@ -54,41 +54,4 @@ test('weekly insights use only the last 7 days', () => {
   ];
   assert.deepEqual(weeklyInsights(readings, now), { count: 4, average: 115, inRangePercent: 50, highest: 190, lowest: 60 });
   assert.equal(weeklyInsights([{ readingMgdl: 120, interpretation: 'normal', loggedAt: daysAgo(10) }], now), null);
-});
-
-test('the earnings line: one total per Philippine day for the last 7 days, same rule as Total Earnings', () => {
-  const now = manilaInstant(2026, 9, 24, 9, 0);
-  const at = (day, hour) => manilaInstant(2026, 9, day, hour, 0);
-  const bookings = [
-    { status: 'completed', scheduledAt: at(24, 8), fee: 500, paymentStatus: 'paid' },
-    { status: 'completed', scheduledAt: at(24, 7), fee: 500, paymentStatus: 'paid' },
-    { status: 'completed', scheduledAt: at(20, 9), fee: 800, paymentStatus: 'paid' },
-    { status: 'completed', scheduledAt: at(20, 10), fee: 300, paymentStatus: 'onsite' },
-    { status: 'confirmed', scheduledAt: at(22, 9), fee: 500, paymentStatus: 'paid' },
-    { status: 'completed', scheduledAt: at(10, 9), fee: 900, paymentStatus: 'paid' },
-  ];
-  // Oct 18 … Oct 24. Oct 10 is older than a week; on-site and not-yet-finished consultations are not earnings.
-  assert.deepEqual(dailyEarnings(bookings, 0.15, now), [0, 0, 680, 0, 0, 0, 850]);
-  assert.equal(dailyEarnings([], 0.15, now).length, 7);
-});
-
-test('the "In 15 mins" pill', () => {
-  const now = new Date(2026, 9, 24, 9, 45);
-  assert.deepEqual(startsIn(new Date(2026, 9, 24, 10, 0), now), { unit: 'minutes', value: 15 });
-  assert.deepEqual(startsIn(new Date(2026, 9, 24, 12, 30), now), { unit: 'hours', value: 2 });
-  assert.deepEqual(startsIn(new Date(2026, 9, 26, 10, 0), now), { unit: 'days', value: 2 });
-  assert.deepEqual(startsIn(new Date(2026, 9, 24, 9, 30), now), { unit: 'now', value: 0 }, 'already started');
-});
-
-test('the Requests "Filters" sheet: order and day range in Philippine days', () => {
-  const now = manilaInstant(2026, 10, 19, 9, 0);
-  const a = { id: 'a', scheduledAt: manilaInstant(2026, 10, 19, 15, 0) };
-  const b = { id: 'b', scheduledAt: manilaInstant(2026, 10, 22, 10, 0) };
-  const c = { id: 'c', scheduledAt: manilaInstant(2026, 11, 5, 10, 0) };
-  const d = { id: 'd', scheduledAt: null };
-  const ids = (list) => list.map((entry) => entry.id);
-  assert.deepEqual(ids(filterRequests([c, d, a, b], 'soonest', 'all', now)), ['a', 'b', 'c', 'd']);
-  assert.deepEqual(ids(filterRequests([c, d, a, b], 'latest', 'all', now)), ['c', 'b', 'a', 'd']);
-  assert.deepEqual(ids(filterRequests([c, d, a, b], 'soonest', 'today', now)), ['a']);
-  assert.deepEqual(ids(filterRequests([c, d, a, b], 'soonest', 'week', now)), ['a', 'b']);
 });

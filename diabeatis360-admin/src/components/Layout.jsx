@@ -11,6 +11,7 @@ function useAdminBadges() {
   return {
     providers: useFilteredCount('Providers', 'is_verified', false),
     guardians: useFilteredCount('Guardian_Verifications', 'verification_status', 'pending'),
+    products: useFilteredCount('Products', 'verified', false),
   }
 }
 

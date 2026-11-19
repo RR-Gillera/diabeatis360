@@ -4,7 +4,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
 import { SymbolView } from 'expo-symbols';
 
 import { RoundBackButton } from '@/components/ui/round-back-button';
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
@@ -126,26 +126,26 @@ export default function ConsultationSummaryScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { gap: 16, padding: 24, paddingBottom: 60, paddingTop: 16 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 26, marginTop: 8 },
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13 },
+  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900', marginTop: 8 },
+  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13 },
   loader: { marginTop: 30 },
   card: { backgroundColor: homeColors.card, borderRadius: 28, gap: 12, padding: 18, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.06, shadowRadius: 8 },
   who: { alignItems: 'center', flexDirection: 'row', gap: 14 },
   avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
-  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 17 },
+  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
   whoText: { flex: 1 },
-  name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 17 },
-  meta: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, marginTop: 2 },
+  name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
+  meta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, marginTop: 2 },
   divider: { backgroundColor: homeColors.border, height: 1 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
-  label: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14 },
-  value: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 14 },
+  label: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14 },
+  value: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   sectionHead: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  sectionTitle: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
-  followNote: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18 },
-  sectionText: { color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 21 },
+  sectionTitle: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  followNote: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12, lineHeight: 18 },
+  sectionText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
   empty: { alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 80 },
   emptyCircle: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 48, height: 96, justifyContent: 'center', width: 96 },
-  emptyTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18, marginTop: 8 },
-  emptyText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  emptyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800', marginTop: 8 },
+  emptyText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, textAlign: 'center' },
 });

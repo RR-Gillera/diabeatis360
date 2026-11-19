@@ -33,7 +33,6 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
       consultationFee: Number(data.consultation_fee ?? 0),
     }),
     availabilityMode: toAvailabilityMode(data.availability_mode),
-    walletBlocked: data.wallet_blocked === true,
   };
 }
 
@@ -56,9 +55,8 @@ export function subscribeToBookableProviders(
   onError: (error: Error) => void,
 ) {
   return subscribeToProviders(
-    // Only doctors patients can actually book: verified, active, with a complete profile (city, fee...), and whose
-    // wallet is not below ₱0 (D47: commission owed on on-site payments; firestore.rules refuses the booking too).
-    (providers) => onChange(providers.filter((provider) => provider.isVerified && provider.isActive && provider.profileComplete && !provider.walletBlocked)),
+    // Only doctors patients can actually book: verified, active, and with a complete profile (city, fee...).
+    (providers) => onChange(providers.filter((provider) => provider.isVerified && provider.isActive && provider.profileComplete)),
     onError,
   );
 }
@@ -90,7 +88,7 @@ export const CONCERN_LIMIT = 300;
 
 /** Why a booking request was refused. The code lets the screen say it in the person's language (D33). */
 export class BookingError extends Error {
-  code: 'past' | 'guardian' | 'taken' | 'takenOrUnconfirmed' | 'doctorUnavailable';
+  code: 'past' | 'guardian' | 'taken' | 'takenOrUnconfirmed';
   constructor(code: BookingError['code'], message: string) {
     super(message);
     this.code = code;
@@ -109,13 +107,6 @@ export async function createBookingRequest(patientId: string, providerId: string
     if (guardianSnapshot.data()?.verification_status !== 'approved') {
       throw new BookingError('guardian', 'This account needs guardian verification to be approved before booking a consultation. An admin is reviewing it, or you can resubmit it from Profile if it was rejected.');
     }
-  }
-
-  // A doctor whose wallet went below ₱0 cannot take new bookings until they top up (D47). firestore.rules checks the
-  // wallet itself; this is the friendly message for a patient who still had the doctor's page open.
-  const providerSnapshot = await getDoc(doc(db, 'Providers', providerId));
-  if (providerSnapshot.data()?.wallet_blocked === true) {
-    throw new BookingError('doctorUnavailable', 'This doctor is not taking new bookings right now. Please choose another doctor or try again later.');
   }
 
   const reference = doc(db, 'Bookings', bookingIdFor(providerId, selectedDate));

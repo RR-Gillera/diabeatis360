@@ -18,7 +18,7 @@ pass"; screen → file map: `../docs/FIGMA_MAP.md`). Seven sidebar pages:
 | `/` | Overview | 4 stat cards, daily-active chart, weekday consultations, revenue, Recent Activity Feed, Export Data |
 | `/users` | Users | tabs: Patients (list, search, details drawer with blood sugar logs, activate/deactivate) · Guardian Verification (D16) · Award Points |
 | `/providers` | Providers | Verified / Pending Approval tabs, credential modal (verify, reject with reason, activate/deactivate), **+ Add Provider** |
-| `/content` | Content | Food Database (add / edit / hide / delete). Scanned Products was removed with barcode scanning (D12, 2026-11-19) |
+| `/content` | Content | tabs: Food Database (add / edit / hide / delete) · Scanned Products (verify, D12) |
 | `/analytics` | Analytics & Reports | period control, 5 stat cards, 4 charts, **Generate Report** modal (users, appointments & revenue, blood sugar trends; Print + CSV) |
 | `/revenue` | Revenue | 4 stat cards, growth chart (Monthly/Quarterly), tabs: Consultation Payments (payment-details modal, receipt, CSV) · Premium Subscribers · Membership Plans |
 | `/settings` | Settings | tabs: Announcements (publish, drafts, history) · My Account |

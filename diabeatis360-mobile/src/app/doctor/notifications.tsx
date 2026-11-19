@@ -3,35 +3,23 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/booking-ui';
-import { DoctorBottomNav, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
+import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { sortNotices } from '@/features/notifications/doctor-notices';
-import { shortTime } from '@/features/notifications/notification-display';
-import { markAllNotificationsRead, markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
+import { markNotificationRead, subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
 import { useT } from '@/i18n/language-context';
 import { type Language, type MessageKey } from '@/i18n/translate';
 
 /** The red of a critical reading (D28), for the card's border and icon. */
 const criticalRed = '#DC2626';
 
-/** The frame's three filter chips. Critical readings and credential reviews are listed under All only. */
-type DoctorFilter = 'all' | 'appointments' | 'messages';
-const FILTERS: DoctorFilter[] = ['all', 'appointments', 'messages'];
-
-/** The frame's blue for a message notice (Blue-600 on Blue-100). */
-const messageBlue = { color: '#2563EB', background: '#DBEAFE' };
-
 type Notice = {
   id: string;
-  /** Which filter chip lists it. */
-  kind: 'appointment' | 'message' | 'other';
-  /** The patient's name inside `detail`, shown in bold like the frame. */
-  highlight?: string;
   patientId: string;
   /** Set when the notice is a stored Notifications doc rather than derived. */
   notificationId?: string;
@@ -56,11 +44,7 @@ type Translate = (key: MessageKey, vars?: Record<string, string | number>) => st
 // the (still unused) Notifications collection — nothing writes that collection
 // yet, so deriving keeps this screen truthful instead of empty or seeded.
 function toNotices(appointments: ProviderBookingEntry[], t: Translate, language: Language): Notice[] {
-  return appointments.map((entry) => ({ ...toNotice(entry, t, language), kind: 'appointment', highlight: entry.patientName }));
-}
-
-function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language): Omit<Notice, 'kind'> {
-  {
+  return appointments.map((entry) => {
     const when = entry.scheduledAt;
     if (entry.status === 'pending') {
       return {
@@ -69,7 +53,7 @@ function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language)
         detail: when
           ? t('doctor.notif.requestOn', { name: entry.patientName, date: shortApptDay(when, language), time: formatApptTime(when), fee: formatFee(entry.fee) })
           : t('doctor.notif.request', { name: entry.patientName, fee: formatFee(entry.fee) }),
-        when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: homeColors.green, background: homeColors.greenTint,
+        when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: '#B45309', background: '#FEF3C7',
       };
     }
     if (entry.status === 'confirmed') {
@@ -77,7 +61,7 @@ function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language)
         id: entry.id, patientId: entry.patientId,
         title: t('doctor.notif.confirmed'),
         detail: when ? t('doctor.notif.confirmedOn', { name: entry.patientName, date: shortApptDay(when, language) }) : t('doctor.notif.confirmedText', { name: entry.patientName }),
-        when, icon: 'calendar.badge.checkmark', iconAndroid: 'event_available', color: homeColors.green, background: homeColors.greenTint,
+        when, icon: 'checkmark.circle.fill', iconAndroid: 'check_circle', color: homeColors.green, background: homeColors.greenTint,
       };
     }
     if (entry.status === 'completed') {
@@ -102,7 +86,7 @@ function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language)
       detail: t('doctor.notif.declinedText', { name: entry.patientName }),
       when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
     };
-  }
+  });
 }
 
 export default function DoctorNotificationsScreen() {
@@ -112,9 +96,6 @@ export default function DoctorNotificationsScreen() {
   const [appointments, setAppointments] = useState<ProviderBookingEntry[]>([]);
   const [failed, setFailed] = useState(false);
   const [stored, setStored] = useState<NotificationEntry[]>([]);
-  const [filter, setFilter] = useState<DoctorFilter>('all');
-  const [marking, setMarking] = useState(false);
-  const [markFailed, setMarkFailed] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -133,7 +114,6 @@ export default function DoctorNotificationsScreen() {
       .filter((entry) => entry.type === 'message')
       .map((entry) => ({
         id: entry.id,
-        kind: 'message' as const,
         patientId: '',
         notificationId: entry.id,
         bookingId: entry.relatedId,
@@ -141,15 +121,15 @@ export default function DoctorNotificationsScreen() {
         title: t('notif.kind.message'),
         detail: entry.message,
         when: entry.sentAt,
-        icon: 'ellipsis.bubble.fill' as const,
-        iconAndroid: 'chat' as const,
-        ...messageBlue,
+        icon: 'bubble.left.and.bubble.right.fill' as const,
+        iconAndroid: 'forum' as const,
+        color: homeColors.green,
+        background: homeColors.greenTint,
       }));
     const verificationNotices: Notice[] = stored
       .filter((entry) => entry.type === 'doctor_verification')
       .map((entry) => ({
         id: entry.id,
-        kind: 'other' as const,
         patientId: '',
         notificationId: entry.id,
         unread: !entry.isRead,
@@ -170,7 +150,6 @@ export default function DoctorNotificationsScreen() {
         const patientId = patientOfBooking.get(entry.relatedId) ?? '';
         return {
           id: entry.id,
-          kind: 'other' as const,
           patientId,
           notificationId: entry.id,
           // Unknown patient (the booking is not in the list yet): fall back to the consultation.
@@ -192,127 +171,50 @@ export default function DoctorNotificationsScreen() {
     return sortNotices(list);
   }, [appointments, stored, t, language]);
 
-  const shown = filter === 'all' ? notices : notices.filter((notice) => notice.kind === (filter === 'appointments' ? 'appointment' : 'message'));
-  // Only stored Notifications docs have a read state. Booking activity is derived from the bookings, so "Mark all as
-  // read" leaves it alone (a request waiting for an answer stays near the top until the doctor answers it).
-  const unreadIds = stored.filter((entry) => !entry.isRead).map((entry) => entry.id);
-  const now = new Date();
-
-  const markAll = async () => {
-    if (marking || unreadIds.length === 0) return;
-    setMarking(true); setMarkFailed(false);
-    try {
-      await markAllNotificationsRead(unreadIds);
-    } catch {
-      setMarkFailed(true);
-    } finally {
-      setMarking(false);
-    }
-  };
-
   return (
     <View style={doctorStyles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text accessibilityRole="header" style={styles.headerTitle}>{t('notif.title')}</Text>
-          {unreadIds.length > 0 ? (
-            <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
-              <Text style={styles.markAll}>{marking ? t('notif.marking') : t('notif.markAll')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        <View style={styles.chips}>
-          {FILTERS.map((key) => (
-            <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: filter === key }} style={[styles.chip, filter === key && styles.chipActive]} onPress={() => setFilter(key)}>
-              <Text style={[styles.chipText, filter === key && styles.chipTextActive]}>{t(`notif.tab.${key}`)}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {failed || markFailed ? <Text style={[doctorStyles.error, styles.error]}>{markFailed ? t('notif.markFailed') : t('booking.history.loadFailed')}</Text> : null}
-        {shown.length === 0 ? (
-          <EmptyState
-            icon="bell.fill"
-            iconAndroid="inbox"
-            title={t('doctor.notif.none')}
-            detail={filter === 'all' ? t('doctor.notif.noneText') : t(`doctor.notif.empty.${filter}`)}
-          />
-        ) : (
-          <View style={styles.list}>
-            {shown.map((notice) => (
-              <Pressable
-                key={notice.id}
-                accessibilityRole="button"
-                accessibilityLabel={`${notice.unread ? `${t('notif.unread')}. ` : ''}${notice.title}. ${notice.detail}`}
-                style={[styles.row, notice.critical ? styles.rowCritical : notice.unread ? styles.rowUnread : null]}
-                onPress={() => {
-                  if (notice.notificationId) void markNotificationRead(notice.notificationId);
-                  if (notice.bookingId) router.push({ pathname: '/consultation/[id]', params: { id: notice.bookingId } });
-                  else if (notice.patientId) router.push({ pathname: '/doctor/patient/[id]', params: { id: notice.patientId } });
-                }}
-              >
-                <View style={[styles.icon, { backgroundColor: notice.background }]}>
-                  <SymbolView name={{ ios: notice.icon, android: notice.iconAndroid, web: notice.iconAndroid }} size={20} tintColor={notice.color} />
-                </View>
-                <View style={styles.copy}>
-                  <View style={styles.titleRow}>
-                    <Text style={[styles.title, notice.critical && styles.titleCritical]}>{notice.title}</Text>
-                    <Text style={styles.when}>{shortTime(notice.when, now, language)}</Text>
-                  </View>
-                  <Text style={[styles.detail, notice.critical && styles.detailCritical]}>
-                    <BoldName text={notice.detail} name={notice.highlight} />
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        )}
+      <DoctorHeader title={t('notif.title')} subtitle={t('doctor.notif.subtitle')} />
+      <ScrollView contentContainerStyle={doctorStyles.scroll}>
+        {failed ? <Text style={doctorStyles.error}>{t('booking.history.loadFailed')}</Text> : null}
+        {notices.length === 0 ? (
+          <EmptyState icon="bell.fill" iconAndroid="inbox" title={t('doctor.notif.none')} detail={t('doctor.notif.noneText')} />
+        ) : notices.map((notice) => (
+          <Pressable
+            key={notice.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${notice.title}. ${notice.detail}`}
+            style={[doctorStyles.card, styles.card, notice.critical ? styles.cardCritical : notice.unread ? styles.cardUnread : null]}
+            onPress={() => {
+              if (notice.notificationId) void markNotificationRead(notice.notificationId);
+              if (notice.bookingId) router.push({ pathname: '/consultation/[id]', params: { id: notice.bookingId } });
+              else if (notice.patientId) router.push({ pathname: '/doctor/patient/[id]', params: { id: notice.patientId } });
+            }}
+          >
+            <View style={[styles.icon, { backgroundColor: notice.background }]}>
+              <SymbolView name={{ ios: notice.icon, android: notice.iconAndroid, web: notice.iconAndroid }} size={16} tintColor={notice.color} />
+            </View>
+            <View style={styles.copy}>
+              <Text style={[styles.title, notice.critical && styles.titleCritical]}>{notice.title}</Text>
+              <Text style={[styles.detail, notice.critical && styles.detailCritical]}>{notice.detail}</Text>
+            </View>
+          </Pressable>
+        ))}
       </ScrollView>
       <DoctorBottomNav active="notifications" />
     </View>
   );
 }
 
-/** The detail sentence with the patient's name in bold, as in the frame. Plain text when the name is not in it. */
-function BoldName({ text, name }: { text: string; name?: string }) {
-  const at = name ? text.indexOf(name) : -1;
-  if (!name || at < 0) return <>{text}</>;
-  return (
-    <>
-      {text.slice(0, at)}
-      <Text style={styles.name}>{name}</Text>
-      {text.slice(at + name.length)}
-    </>
-  );
-}
-
 const styles = StyleSheet.create({
-  header: { backgroundColor: homeColors.card, paddingBottom: 16, paddingHorizontal: 24, paddingTop: 16 },
-  headerRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  headerTitle: { color: '#0F172A', flex: 1, fontFamily: Brand.font.extraBold, fontSize: 24 },
-  markAll: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 14 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 },
-  chip: { backgroundColor: '#EEF2F6', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
-  chipActive: { backgroundColor: homeColors.green },
-  chipText: { color: '#475569', fontFamily: Brand.font.bold, fontSize: 14 },
-  chipTextActive: { color: '#FFFFFF' },
-  scroll: { paddingBottom: 140 },
-  error: { marginHorizontal: 24, marginTop: 12 },
-  // Full-width rows on white, like the frame. Unread: a light green row with a green bar on the left.
-  list: { backgroundColor: homeColors.card, borderTopColor: homeColors.border, borderTopWidth: 1 },
-  row: { alignItems: 'flex-start', borderLeftColor: 'transparent', borderLeftWidth: 4, flexDirection: 'row', gap: 16, paddingLeft: 20, paddingRight: 24, paddingVertical: 20 },
-  rowUnread: { backgroundColor: '#EFF5EA', borderLeftColor: homeColors.green },
-  // D28's red "Critical reading" (QA DOC-009): red tint, a red bar and a solid red icon, so it never looks like the
-  // declined-booking row. Text colours keep WCAG AA contrast on the tint (D37).
-  rowCritical: { backgroundColor: '#FEF2F2', borderLeftColor: criticalRed },
-  icon: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  copy: { flex: 1, gap: 4 },
-  titleRow: { alignItems: 'baseline', flexDirection: 'row', gap: 8 },
-  title: { color: '#0F172A', flex: 1, fontFamily: Brand.font.extraBold, fontSize: 15 },
+  card: { alignItems: 'flex-start', flexDirection: 'row', gap: 14, marginTop: 12 },
+  cardUnread: { borderColor: 'rgba(98, 156, 44, 0.4)' },
+  // D28's red "Critical reading" card (QA DOC-009): red tint, a thick red border and a solid red icon, so it never looks
+  // like the declined-booking card beside it. Text colours keep WCAG AA contrast on the tint (D37).
+  cardCritical: { backgroundColor: '#FEF2F2', borderColor: criticalRed, borderWidth: 2 },
+  icon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  copy: { flex: 1, gap: 3 },
+  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   titleCritical: { color: '#B91C1C', textTransform: 'uppercase' },
-  when: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12 },
-  detail: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20 },
+  detail: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
   detailCritical: { color: '#7F1D1D' },
-  name: { color: '#0F172A', fontFamily: Brand.font.bold },
 });

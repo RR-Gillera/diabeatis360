@@ -1,7 +1,7 @@
 import { Linking, Pressable, StyleSheet, Text } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
 
 /** The Philippines' national emergency hotline (one number for police, fire and ambulance). */
@@ -29,5 +29,5 @@ const styles = StyleSheet.create({
   button: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#B91C1C', borderRadius: 16, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
   compact: { minHeight: 44 },
   pressed: { opacity: 0.82 },
-  text: { color: '#FFFFFF', fontFamily: Brand.font.extraBold, fontSize: 15 },
+  text: { color: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
 });

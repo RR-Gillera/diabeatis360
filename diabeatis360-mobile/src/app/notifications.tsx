@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { filterLabel, NOTIFICATION_FILTERS, matchesFilter, notificationTitle, shortTime, type NotificationFilter } from '@/features/notifications/notification-display';
 import { markAllNotificationsRead, markNotificationRead, subscribeToNotifications, type NotificationEntry, type NotificationType } from '@/features/notifications/notification-service';
@@ -128,28 +128,28 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingTop: 16 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
-  title: { color: '#0F172A', flex: 1, fontFamily: Brand.font.extraBold, fontSize: 26 },
-  markAll: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 14 },
+  title: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900' },
+  markAll: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   tabsScroll: { flexGrow: 0, marginTop: 16 },
   tabs: { gap: 8, paddingHorizontal: 24 },
   tab: { backgroundColor: '#FFFFFF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   tabActive: { backgroundColor: 'rgba(220, 242, 169, 0.9)' },
-  tabText: { color: '#64748B', fontFamily: Brand.font.bold, fontSize: 14 },
+  tabText: { color: '#64748B', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
   tabTextActive: { color: homeColors.green },
   scroll: { padding: 24, paddingBottom: 140 },
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, marginBottom: 12 },
+  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13, marginBottom: 12 },
   list: { backgroundColor: homeColors.card, borderRadius: 28, paddingHorizontal: 20, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.06, shadowRadius: 8 },
   row: { alignItems: 'flex-start', flexDirection: 'row', gap: 14, paddingVertical: 16 },
   rowDivider: { borderTopColor: homeColors.border, borderTopWidth: 1 },
   icon: { alignItems: 'center', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
   copy: { flex: 1, gap: 3 },
-  rowTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 15 },
-  message: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19 },
+  rowTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  message: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
   side: { alignItems: 'flex-end', gap: 8, minWidth: 44 },
-  when: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12 },
+  when: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
   unreadDot: { backgroundColor: homeColors.green, borderRadius: 5, height: 10, width: 10 },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 60 },
   emptyIcon: { alignItems: 'center', backgroundColor: homeColors.borderSoft, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  emptyTitle: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15, marginTop: 4 },
-  emptyDetail: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 20, maxWidth: 260, textAlign: 'center' },
+  emptyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700', marginTop: 4 },
+  emptyDetail: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, maxWidth: 260, textAlign: 'center' },
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
@@ -265,8 +265,7 @@ function Wheel<T>({ label, emptyLabel, items, selectedIndex, onSelect, render, s
  * A tappable field that opens the wheels in a sheet — for places like the
  * profile editor where a full-screen picker would be overkill.
  */
-// `iconSide` puts the calendar icon after the text, as the doctor's Professional Information frame draws it.
-export function BirthdateField({ value, onChange, title = 'Date of Birth', placeholder = 'Select your date of birth', years, iconSide = 'left', fieldStyle }: { value: string; onChange: (formatted: string) => void; title?: string; placeholder?: string; years?: number[]; iconSide?: 'left' | 'right'; fieldStyle?: StyleProp<ViewStyle> }) {
+export function BirthdateField({ value, onChange, title = 'Date of Birth', placeholder = 'Select your date of birth', years }: { value: string; onChange: (formatted: string) => void; title?: string; placeholder?: string; years?: number[] }) {
   const { t, date } = useT();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string | null>(value || null);
@@ -276,10 +275,9 @@ export function BirthdateField({ value, onChange, title = 'Date of Birth', place
 
   return (
     <>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${title}: ${value ? date(value) : placeholder}`} style={[styles.field, fieldStyle]} onPress={show}>
-        {iconSide === 'left' ? <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor="#64748B" /> : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={`${title}: ${value ? date(value) : placeholder}`} style={styles.field} onPress={show}>
+        <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor="#64748B" />
         <Text style={[styles.fieldText, !value && styles.fieldPlaceholder]}>{value ? date(value) : placeholder}</Text>
-        {iconSide === 'right' ? <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor="#CBD5E1" /> : null}
       </Pressable>
 
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
@@ -310,25 +308,25 @@ const styles = StyleSheet.create({
   monthColumn: { flex: 1.5 },
   dayColumn: { flex: 0.8 },
   yearColumn: { flex: 1 },
-  columnLabel: { color: authColors.muted, fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 0.6, marginBottom: 8, textAlign: 'center' },
+  columnLabel: { color: authColors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.6, marginBottom: 8, textAlign: 'center' },
   wheelArea: { height: ROW_HEIGHT * VISIBLE_ROWS },
   // The fixed selection band: one row tall, in the exact middle, spanning all three wheels.
   highlight: { backgroundColor: '#ECEFF3', borderRadius: 14, height: ROW_HEIGHT, left: 0, position: 'absolute', right: 0, top: PAD_ROWS * ROW_HEIGHT },
   wheel: { height: ROW_HEIGHT * VISIBLE_ROWS },
   wheelContent: { paddingVertical: PAD_ROWS * ROW_HEIGHT },
   row: { alignItems: 'center', height: ROW_HEIGHT, justifyContent: 'center' },
-  wheelText: { color: authColors.navy, fontSize: 18, fontFamily: Brand.font.bold, textAlign: 'center' },
+  wheelText: { color: authColors.navy, fontSize: 18, fontWeight: '700', textAlign: 'center' },
   field: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 56, paddingHorizontal: 16 },
   fieldText: { color: authColors.navy, flex: 1, fontFamily: Brand.font.medium, fontSize: 16 },
   fieldPlaceholder: { color: '#A7B8CD' },
   overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  sheetTitle: { color: authColors.navy, fontSize: 18, fontFamily: Brand.font.extraBold },
-  cancel: { color: authColors.muted, fontSize: 14, fontFamily: Brand.font.bold },
+  sheetTitle: { color: authColors.navy, fontSize: 18, fontWeight: '800' },
+  cancel: { color: authColors.muted, fontSize: 14, fontWeight: '700' },
   preview: { alignItems: 'center', marginTop: 20 },
-  previewText: { color: authColors.navy, fontSize: 15, fontFamily: Brand.font.extraBold },
+  previewText: { color: authColors.navy, fontSize: 15, fontWeight: '800' },
   confirm: { alignItems: 'center', backgroundColor: authColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 20, minHeight: 52 },
   confirmDisabled: { opacity: 0.5 },
-  confirmText: { color: '#FFF', fontSize: 16, fontFamily: Brand.font.extraBold },
+  confirmText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
 });

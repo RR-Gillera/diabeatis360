@@ -51,6 +51,7 @@ before(async () => {
   const endpoints = {
     generateRecommendations: require('../api/generateRecommendations'),
     analyzeLabel: require('../api/analyzeLabel'),
+    lookupProduct: require('../api/lookupProduct'),
     joinCall: require('../api/joinCall'),
   }
   host = http.createServer((req, res) => {
@@ -159,6 +160,7 @@ test('an account whose email is not confirmed is refused by every AI endpoint; n
   const calls = [
     ['generateRecommendations', { kind: 'exercise' }],
     ['analyzeLabel', { imageBase64: 'aGVsbG8=', mimeType: 'image/png' }],
+    ['lookupProduct', { barcode: '4800016123456' }],
   ]
   for (const [name, data] of calls) {
     const error = await failure(client.call(name, data))
@@ -223,6 +225,13 @@ test('label scan through Vercel: read, rated, saved as a scan; the photo is not 
   const scans = await db.collection('Nutrition_Scans').where('user_id', '==', uid).get()
   assert.equal(scans.size, 1)
   assert.equal(scans.docs[0].data().image_url, null)
+})
+
+test('unknown barcode through Vercel: { found: false }, no Gemini call', { skip }, async () => {
+  await patient()
+  const before = geminiCalls
+  assert.deepEqual(await client.call('lookupProduct', { barcode: '4800000000001' }), { found: false })
+  assert.equal(geminiCalls, before)
 })
 
 test('a bad request is refused with the handler message (400)', { skip }, async () => {

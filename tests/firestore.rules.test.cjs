@@ -464,9 +464,21 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await allow('ring again after a declined call', setDoc(doc(p1, 'Calls/bConfirmed'), newCall()));
   await allow('caller marks the ring as missed', updateDoc(doc(p1, 'Calls/bConfirmed'), { status: 'missed', ended_at: serverTimestamp() }));
   await deny('delete a call record', require('firebase/firestore').deleteDoc(doc(p1, 'Calls/bConfirmed')));
-  // ---- barcode product memory was removed (D12 reversed): the Products collection has no rule, so nobody can use it
-  await deny('patient reads a Products doc', getDoc(doc(p1, 'Products/4800016123456')));
-  await deny('patient creates a Products doc', setDoc(doc(p1, 'Products/4800016123456'), { product_name: 'Berry Bar', created_by: 'p1', verified: false }));
+  // ---- product memory (D12): Products/{barcode}
+  const newProduct = (over = {}) => ({ barcode: '4800016123456', product_name: 'Berry Bar', brand: 'Acme', nutrients: { sugar_g: 5 }, source: 'gemini_label', created_by: 'p1', verified: false, verified_by: null, created_at: serverTimestamp(), ...over });
+  const dfs = require('firebase/firestore');
+  await allow('patient adds a new unverified product', setDoc(doc(p1, 'Products/4800016123456'), newProduct()));
+  await allow('another patient reads it', getDoc(doc(p2, 'Products/4800016123456')));
+  await deny('signed-out user reads it', getDoc(doc(anon, 'Products/4800016123456')));
+  await deny('patient overwrites an existing product', setDoc(doc(p2, 'Products/4800016123456'), newProduct({ created_by: 'p2', product_name: 'Hacked' })));
+  await deny('product created as already verified', setDoc(doc(p1, 'Products/4800016000001'), newProduct({ barcode: '4800016000001', verified: true })));
+  await deny('product created in another user\'s name', setDoc(doc(p1, 'Products/4800016000002'), newProduct({ barcode: '4800016000002', created_by: 'p2' })));
+  await deny('barcode field differs from the document id', setDoc(doc(p1, 'Products/4800016000003'), newProduct({ barcode: '4800016999999' })));
+  await deny('document id that is not a barcode', setDoc(doc(p1, 'Products/not-a-barcode'), newProduct({ barcode: 'not-a-barcode' })));
+  await deny('patient verifies a product', updateDoc(doc(p1, 'Products/4800016123456'), { verified: true, verified_by: 'p1' }));
+  await allow('admin verifies a product', updateDoc(doc(a1, 'Products/4800016123456'), { verified: true, verified_by: 'a1', verified_at: serverTimestamp() }));
+  await deny('admin edits the nutrients', updateDoc(doc(a1, 'Products/4800016123456'), { nutrients: { sugar_g: 0 } }));
+  await deny('admin deletes a product', dfs.deleteDoc(doc(a1, 'Products/4800016123456')));
   // ---- email confirmation (D21): booking, chat, video calls and a doctor's access to patient data need the signed
   // email_verified claim. Each case below differs from a known-good case ABOVE only in that claim.
   const p1Unconfirmed = signedIn('p1', { email_verified: false }).firestore();
@@ -800,54 +812,6 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   const pOldBirth = signedIn('pOldBirth').firestore();
   await allow('PAT-001: a profile with an old wrong birthdate can still change its other fields', updateDoc(doc(pOldBirth, 'Users/pOldBirth'), { diabetes_type: 'Type 2' }));
   await allow('PAT-001: ...and can correct the birthdate', updateDoc(doc(pOldBirth, 'Users/pOldBirth'), { birthdate: yearsAgo(35) }));
-
-  // ---- the doctor's wallet (D47): only the server moves money; a wallet below 0 blocks new bookings
-  await env.withSecurityRulesDisabled(async (ctx) => {
-    const db = ctx.firestore();
-    await setDoc(doc(db, 'Providers/dWallet'), { full_name: 'Dr Wallet', is_verified: true, is_active: true, consultation_fee: 500 });
-    await setDoc(doc(db, 'Wallets/dWallet'), { balance: -75 });
-    await setDoc(doc(db, 'Providers/dZero'), { full_name: 'Dr Zero', is_verified: true, is_active: true, consultation_fee: 500 });
-    await setDoc(doc(db, 'Wallets/dZero'), { balance: 0 });
-    await setDoc(doc(db, 'Wallet_Transactions/dWallet_tx1'), { provider_id: 'dWallet', type: 'commission', amount: -75 });
-  });
-  const dWallet = signedIn('dWallet').firestore();
-  await deny('D47: a doctor whose wallet is below 0 cannot be booked', book(p1, 'bk-wallet-neg', { provider: 'dWallet', n: 300 }));
-  await allow('D47: a doctor at exactly 0 can be booked', book(p1, 'bk-wallet-zero', { provider: 'dZero', n: 301 }));
-  await allow('D47: a doctor with no wallet yet can be booked (d1)', book(p2, 'bk-wallet-none', { n: 302, patient: 'p2' }));
-  await allow('D47: the doctor reads their own wallet', getDoc(doc(dWallet, 'Wallets/dWallet')));
-  await allow('D47: an admin reads a wallet', getDoc(doc(a1, 'Wallets/dWallet')));
-  await deny('D47: a patient cannot read a doctor\'s wallet', getDoc(doc(p1, 'Wallets/dWallet')));
-  await deny('D47: another doctor cannot read the wallet', getDoc(doc(d1, 'Wallets/dWallet')));
-  await deny('D47: the doctor cannot write their own balance', setDoc(doc(dWallet, 'Wallets/dWallet'), { balance: 1000 }));
-  await deny('D47: an admin cannot write a balance from the panel either', updateDoc(doc(a1, 'Wallets/dWallet'), { balance: 0 }));
-  await allow('D47: the doctor reads their own transactions', getDocs(query(collection(dWallet, 'Wallet_Transactions'), where('provider_id', '==', 'dWallet'))));
-  await deny('D47: a patient cannot list a doctor\'s transactions', getDocs(query(collection(p1, 'Wallet_Transactions'), where('provider_id', '==', 'dWallet'))));
-  await deny('D47: the doctor cannot add a transaction', addDoc(collection(dWallet, 'Wallet_Transactions'), { provider_id: 'dWallet', type: 'topup', amount: 1000 }));
-  await deny('D47: the doctor cannot unblock themselves on their profile', updateDoc(doc(dWallet, 'Providers/dWallet'), { wallet_blocked: false }));
-  await allow('D47: ...but can still edit the rest of their profile', updateDoc(doc(dWallet, 'Providers/dWallet'), { city: 'Cebu City' }));
-  // The payout account (D47): the doctor saves it; only a known bank or GCash, a name and the last 4 digits.
-  const payout = (fields = {}) => ({ kind: 'bank', provider_name: 'BDO', account_name: 'Dr Wallet', last4: '4821', updated_at: serverTimestamp(), ...fields });
-  await allow('D47: the doctor saves a bank payout account', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout()));
-  await allow('D47: ...and can change it to GCash', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ kind: 'gcash', provider_name: 'GCash', last4: '4567' })));
-  await deny('D47: a full account number cannot be stored', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ last4: '001234564821' })));
-  await deny('D47: no extra fields (e.g. account_number)', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ account_number: '001234564821' })));
-  await deny('D47: an unknown bank is refused', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ provider_name: 'Fake Bank' })));
-  await deny('D47: GCash must be kind gcash', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ provider_name: 'GCash' })));
-  await deny('D47: a patient cannot create a payout account', setDoc(doc(p1, 'Payout_Accounts/p1'), payout()));
-  await deny('D47: nobody saves an account for another doctor', setDoc(doc(d1, 'Payout_Accounts/dWallet'), payout()));
-  await allow('D47: the doctor reads their payout account', getDoc(doc(dWallet, 'Payout_Accounts/dWallet')));
-  await allow('D47: an admin reads a payout account', getDoc(doc(a1, 'Payout_Accounts/dWallet')));
-  await deny('D47: a patient cannot read a payout account', getDoc(doc(p1, 'Payout_Accounts/dWallet')));
-
-  // ---- the doctor's mobile number on their own Users doc (D49)
-  await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), 'Users/dWallet'), { full_name: 'Dr Wallet', role: 'doctor', onboarding_completed: true });
-  });
-  await allow('D49: the doctor saves a mobile number', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '+639171234567' }));
-  await allow('D49: ...and can clear it', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '' }));
-  await deny('D49: a number in another form is refused', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '0917 123 4567' }));
-  await deny('D49: a landline or short number is refused', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '+63321234567' }));
-  await deny('D49: a patient cannot read the doctor\'s number', getDoc(doc(p1, 'Users/dWallet')));
 
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));
