@@ -161,6 +161,12 @@ Keep rules simple enough to explain in the defense; test them with the Firebase 
   `expires_at` within one day of start + the plan's length. A missing or null `expires_at`, a Free or unknown plan, an
   extra field and a client-chosen start are all refused. Cancelling (owner, `status` only) is unchanged.
   `Usage_Counters` has an explicit `allow read, write: if false`. 248 rules-emulator cases, 0 failed.
+- **QA fixes, batch 1 (D46, 2026-11-19):** `Providers.consultation_fee`, whenever written (create, or a doctor's
+  change), is a number from 0 to 20,000. A new `Glucose_Logs` reading needs `logged_at` as a timestamp at most
+  5 minutes past `request.time`, and `created_at == request.time`. `Users.birthdate`, whenever written, is not in the
+  future and fits `account_type` (18 or older for `self` or no type, under 18 for `minor`), to within two days. Only
+  fields being written are checked, so an old out-of-range value does not block a person's other edits. 493
+  rules-emulator cases, 0 failed.
 - **Email confirmation (D21, 2026-10-16):** a `verifiedEmail()` helper (`request.auth.token.email_verified == true`, the signed
   sign-in token's claim, which nobody can fake from the app or by editing a document) is required for `Bookings` create and
   re-book, `Messages` create, `Calls` create and re-ring, and inside `isVerifiedDoctor()` (so patient profiles and readings

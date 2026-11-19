@@ -1,0 +1,179 @@
+{
+  "home": {
+    "url": "http://localhost:8081/doctor",
+    "text": "Good morning, Dr. QA!\nMonday, Nov 16\nQO\nCustom hours\nTue – Thu · 9:00 AM – 12:00 PM, 1:00 PM – 5:00 PM\nManage\nTODAY'S\nAPPOINTMENTS\n0\nPENDING\nREQUESTS\n0\nCOMPLETED\n0\nTOTAL EARNINGS\n₱0.00\nEarnings: recorded fees of consultations paid online, after the 15% platform commission. On-site payments go to you at the clinic and are not counted. Payments are a demo.\nUpcoming Appointment\nNo confirmed appointments coming up.\nRecent Activity\nSee all\nQA-ADMIN doctors only v2: QA test announcement (doctors only). Fake data, please ignore.\n4m\nQA-ADMIN doctors only: QA test announcement for doctors only. Fake da",
+    "small": [
+      "79x33 \"Manage\"",
+      "42x19 \"See all\"",
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "requests-pending": {
+    "url": "http://localhost:8081/doctor/appointments",
+    "text": "Appointment Requests\nPending\nAccepted\nDeclined\n\nNo pending requests right now\nNew requests from patients will appear here.\n\nHOME\n\nREQUESTS\n\nHISTORY\n\nNOTIFICATIONS\n\nPROFILE",
+    "small": [
+      "119x41 \"Pending\"",
+      "119x41 \"Accepted\"",
+      "119x41 \"Declined\"",
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "requests-tab-declined": {
+    "url": "http://localhost:8081/doctor/appointments",
+    "text": "Appointment Requests\nPending\nAccepted\nDeclined\n\nNo declined requests\nRequests you decline or that were cancelled will appear here.\n\nHOME\n\nREQUESTS\n\nHISTORY\n\nNOTIFICATIONS\n\nPROFILE",
+    "small": [
+      "119x41 \"Pending\"",
+      "119x41 \"Accepted\"",
+      "119x41 \"Declined\"",
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "requests-tab-history": {
+    "url": "http://localhost:8081/doctor/history",
+    "text": "Bundling...\napp/doctor/history.tsx",
+    "small": [],
+    "teal": [],
+    "greens": []
+  },
+  "history": {
+    "url": "http://localhost:8081/doctor/history",
+    "text": "Consultation History\nFinished consultations, newest first\n\nNo finished consultations yet\nWhen a consultation ends it moves here, with its notes.\n\nHOME\n\nREQUESTS\n\nHISTORY\n\nNOTIFICATIONS\n\nPROFILE",
+    "small": [
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "notifications": {
+    "url": "http://localhost:8081/doctor/notifications",
+    "text": "Bundling...\napp/doctor/notifications.tsx",
+    "small": [],
+    "teal": [],
+    "greens": []
+  },
+  "profile": {
+    "url": "http://localhost:8081/doctor/profile",
+    "text": "Bundling...\napp/doctor/profile.tsx",
+    "small": [
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "home-again": {
+    "url": "http://localhost:8081/doctor",
+    "text": "Good morning, Dr. QA!\nMonday, Nov 16\nQO\nCustom hours\nTue – Thu · 9:00 AM – 12:00 PM, 1:00 PM – 5:00 PM\nManage\nTODAY'S\nAPPOINTMENTS\n0\nPENDING\nREQUESTS\n0\nCOMPLETED\n0\nTOTAL EARNINGS\n₱0.00\nEarnings: recorded fees of consultations paid online, after the 15% platform commission. On-site payments go to you at the clinic and are not counted. Payments are a demo.\nUpcoming Appointment\nNo confirmed appointments coming up.\nRecent Activity\nSee all\nQA-ADMIN doctors only v2: QA test announcement (doctors only). Fake data, please ignore.\n4m\nQA-ADMIN doctors only: QA test announcement for doctors only. Fake da",
+    "small": [
+      "79x33 \"Manage\"",
+      "42x19 \"See all\"",
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "schedule": {
+    "url": "http://localhost:8081/doctor/schedule",
+    "text": "\nSet Your Availability\nChoose how you want to manage your consultation hours and patient bookings.\n\nAvailable 24/7\nPatients can request consultations at any time.\n\nSet Custom Hours\nDefine specific days and time slots for patients.\nWORKING DAYS\nMonday\nOff\nTuesday\n9:00 AM – 12:00 PM, 1:00 PM – 5:00 PM\nWednesday\n9:00 AM – 12:00 PM, 1:00 PM – 5:00 PM\nThursday\n9:00 AM – 12:00 PM, 1:00 PM – 5:00 PM\nFriday\nOff\nSaturday\nOff\nSunday\nOff\nWORKING HOURS\nThe same hours apply to every day that is switched on.\n09:00 AM\nto\n12:00 PM\n\n01:00 PM\nto\n05:00 PM\n\n\nAdd time window\nCURRENT CONFIGURATION\n\nActive Se",
+    "small": [
+      "40x40 \"\"",
+      "40x20 \"Monday\"",
+      "40x20 \"Tuesday\"",
+      "40x20 \"Wednesday\"",
+      "40x20 \"Thursday\"",
+      "40x20 \"Friday\"",
+      "40x20 \"Saturday\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "patients": {
+    "url": "http://localhost:8081/doctor/patients",
+    "text": "My Patients\nPatients who have booked with you\n\n\n\nNo patients yet\nOnce a patient books an appointment with you, they will appear here with their health records.\n\nHOME\n\nREQUESTS\n\nHISTORY\n\nNOTIFICATIONS\n\nPROFILE",
+    "small": [
+      "302x20 \"Search patients...\"",
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "profile2": {
+    "url": "http://localhost:8081/doctor/profile",
+    "text": "My Profile\nHow patients see you\n\nD\nDr. QA Doctor One\nqa-doctor-1@test.com\n\nPRC VERIFIED\nProfessional Details\nFULL NAME\nSPECIALTY\nPRC LICENSE NUMBER\nCITY\nCONSULTATION FEE (₱)\nSave Profile\nAccount\n\nManage Schedule\n\n\nLanguage\n\n\nChange PIN\n\nLog out\n\nHOME\n\nREQUESTS\n\nHISTORY\n\nNOTIFICATIONS\n\nPROFILE",
+    "small": [
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  },
+  "fee": {
+    "url": "http://localhost:8081/doctor/profile",
+    "text": "My Profile\nHow patients see you\n\nD\nDr. QA Doctor One\nqa-doctor-1@test.com\n\nPRC VERIFIED\nProfessional Details\nFULL NAME\nSPECIALTY\nPRC LICENSE NUMBER\nCITY\nCONSULTATION FEE (₱)\nSave Profile\nAccount\n\nManage Schedule\n\n\nLanguage\n\n\nChange PIN\n\nLog out\n\nHOME\n\nREQUESTS\n\nHISTORY\n\nNOTIFICATIONS\n\nPROFILE",
+    "small": [
+      "56x38 \"\nHOME\"",
+      "56x38 \"\nREQUESTS\"",
+      "56x38 \"\nHISTORY\"",
+      "82x38 \"\nNOTIFICATIONS\"",
+      "56x38 \"\nPROFILE\""
+    ],
+    "teal": [],
+    "greens": [
+      "rgb(77, 124, 34)"
+    ]
+  }
+}

@@ -82,3 +82,15 @@ export function checkReading(value: number): ReadingCheck {
   }
   return { ok: true, needsConfirmation: value < READING_LIMITS.confirmBelow || value > READING_LIMITS.confirmAbove };
 }
+
+// When a reading was taken (QA DOC-012, DECISIONS.md D46). The app dates a new reading with the phone's clock, which can
+// run a little fast. firestore.rules (Glucose_Logs) refuse a time more than this far past the server's clock, so a
+// reading can never be dated tomorrow, where it would stay the "latest" reading and sit in the wrong day of the chart.
+// Change both together. (A phone clock that is further off is handled in glucose-service.ts: the reading is then saved
+// with the server's own time instead, so it is never lost.)
+export const READING_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
+/** True when a reading's time is too far ahead of `now` to be saved. */
+export function isFutureReading(loggedAt: Date, now: Date = new Date()): boolean {
+  return loggedAt.getTime() > now.getTime() + READING_CLOCK_SKEW_MS;
+}

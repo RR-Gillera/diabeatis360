@@ -2,6 +2,7 @@ import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, where } 
 
 import { db } from '@/firebase';
 import { normalizeDiabetesType, toAvailabilityMode } from '@/constants/enums';
+import { feeProblem, MAX_CONSULTATION_FEE } from '@/constants/fees';
 import { parseBirthdate } from '@/features/auth/birthdate';
 
 import type { Availability } from './availability';
@@ -48,6 +49,11 @@ export async function updateDoctorProfile(
   providerId: string,
   fields: Partial<{ fullName: string; email: string; specialty: string; prcLicenseNumber: string; city: string; consultationFee: number }>,
 ) {
+  // The fee rule is checked here too (QA ADM-005), so no screen can skip it: 0 ("not set yet") or above ₱0 up to the
+  // ceiling. The screens show their own message first; firestore.rules refuse anything outside 0–20,000 as well.
+  if (fields.consultationFee !== undefined && fields.consultationFee !== 0 && feeProblem(fields.consultationFee)) {
+    throw new Error(`The consultation fee must be above ₱0 and at most ₱${MAX_CONSULTATION_FEE.toLocaleString('en-PH')}.`);
+  }
   const record: Record<string, unknown> = {};
   if (fields.fullName !== undefined) record.full_name = fields.fullName.trim();
   if (fields.email !== undefined) record.email = fields.email.trim();
@@ -97,6 +103,8 @@ export function subscribeToPatientProfile(
         dislikedIngredients: String(data.disliked_ingredients ?? ''),
         location: String(data.location ?? ''),
         languagePreference: String(data.language_preference ?? ''),
+        // A child's account run by a parent or guardian (D16; shown to the doctor, QA DOC-013).
+        isMinor: data.account_type === 'minor',
       });
     },
     (error) => onError(error),

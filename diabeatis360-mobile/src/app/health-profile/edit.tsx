@@ -4,9 +4,11 @@ import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 
 import { DIABETES_TYPES } from '@/constants/enums';
+import { birthdateProblem } from '@/constants/guardian';
 import { Brand } from '@/constants/theme';
 import { AuthButton } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
+import { BIRTHDATE_PROBLEM_TEXT, parseBirthdate } from '@/features/auth/birthdate';
 import { BirthdateField } from '@/features/auth/birthdate-picker';
 import { FoodSearch, NoAllergiesButton } from '@/features/auth/food-search';
 import {
@@ -63,6 +65,11 @@ function EditForm({ profile, fallbackName, onDone }: { profile: HealthProfile; f
     if (!email || saving) return;
     if (!name.trim()) { setProblem(NAME_MISSING); return; }
     if (healthFormProblem(form)) { setProblem(ALLERGY_MISSING); return; }
+    // QA PAT-001: a changed birthdate must fit the account, exactly as on the setup step (this screen used to save any
+    // date, even this year on an adult's account). An unchanged one is not re-checked, as in firestore.rules.
+    const birthdate = form.dateOfBirth !== profile.stored.dateOfBirth ? parseBirthdate(form.dateOfBirth) : null;
+    const birthProblem = birthdate ? birthdateProblem(birthdate, profile.accountType === 'minor' ? 'minor' : 'self') : null;
+    if (birthProblem) { setProblem({ titleKey: 'health.edit.birthdateTitle', textKey: BIRTHDATE_PROBLEM_TEXT[birthProblem] }); return; }
     setSaving(true);
     try {
       if (name.trim() !== startName.trim()) await updateDisplayName(name.trim());

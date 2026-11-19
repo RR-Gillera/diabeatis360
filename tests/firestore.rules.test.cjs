@@ -35,6 +35,12 @@ const editReading = (db, logId, number, before, after, { record = {}, log = {}, 
   return batch.commit();
 };
 
+// The two times the app writes with every new reading (QA DOC-012, DECISIONS D46): when it was taken (the phone's clock)
+// and when it was saved (the server's clock). Tests that are about something else send them too, so they keep testing
+// what they say.
+const readingTimes = () => ({ logged_at: Timestamp.now(), created_at: serverTimestamp() });
+const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([name]) => name !== key));
+
 (async () => {
   const env = await initializeTestEnvironment({
     projectId: 'demo-diabeatis360',
@@ -239,9 +245,9 @@ const editReading = (db, logId, number, before, after, { record = {}, log = {}, 
   await deny('admin creates another Admins doc', setDoc(doc(a1, 'Admins/a9'), { full_name: 'x' }));
 
   // ---- Glucose_Logs
-  await allow('p1 logs own reading', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 120, context: 'before_meal' }));
-  await deny('p1 logs reading for p2', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p2', reading_mgdl: 120 }));
-  await deny('non-numeric reading', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 'abc' }));
+  await allow('p1 logs own reading', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 120, context: 'before_meal', ...readingTimes() }));
+  await deny('p1 logs reading for p2', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p2', reading_mgdl: 120, ...readingTimes() }));
+  await deny('non-numeric reading', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 'abc', ...readingTimes() }));
   await allow('p1 queries own logs', getDocs(query(collection(p1, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
   await deny('p2 queries p1 logs', getDocs(query(collection(p2, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
   await allow('verified doctor queries patient logs', getDocs(query(collection(d1, 'Glucose_Logs'), where('patient_id', '==', 'p1'))));
@@ -656,7 +662,7 @@ const editReading = (db, logId, number, before, after, { record = {}, log = {}, 
   await deny('D40: ingredients not eaten that are not text are refused', updateDoc(doc(p1, 'Users/p1'), { disliked_ingredients: ['Pork'] }));
   await deny('D25: a new profile cannot be created with an empty allergy list', setDoc(doc(signedIn('pNew').firestore(), 'Users/pNew'), { full_name: 'New', role: 'patient', allergies: '' }));
   for (const [value, ok] of [[20, true], [600, true], [19, false], [601, false], [9999, false], [1.5, false], [120.5, false]]) {
-    await check(`D25: a reading of ${value} mg/dL is ${ok ? 'saved' : 'refused'}`, addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: value, context: 'before_meal' }), ok);
+    await check(`D25: a reading of ${value} mg/dL is ${ok ? 'saved' : 'refused'}`, addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: value, context: 'before_meal', ...readingTimes() }), ok);
   }
   // Honest edit records (D44), so only the value decides these two.
   const g1Now = { reading_mgdl: 115, context: 'before_meal', notes: '' };
@@ -670,10 +676,10 @@ const editReading = (db, logId, number, before, after, { record = {}, log = {}, 
   await allow('D26: a booking an hour from now is allowed', book(p1, 'bk-d26-soon', { n: -1438 }));
 
   // ---- D44: a reading's edit history cannot be skipped, faked, rewritten or erased
-  await allow('D44: p1 logs a reading of 280 (with notes)', setDoc(doc(p1, 'Glucose_Logs/gEdit'), { patient_id: 'p1', reading_mgdl: 280, context: 'after_meal', notes: 'after lunch' }));
+  await allow('D44: p1 logs a reading of 280 (with notes)', setDoc(doc(p1, 'Glucose_Logs/gEdit'), { patient_id: 'p1', reading_mgdl: 280, context: 'after_meal', notes: 'after lunch', ...readingTimes() }));
   const was = { reading_mgdl: 280, context: 'after_meal', notes: 'after lunch' };
   const now = { reading_mgdl: 120, context: 'after_meal', notes: 'after lunch' };
-  await deny('D44: a new reading cannot start with an edit count', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 120, context: 'before_meal', edit_count: 3 }));
+  await deny('D44: a new reading cannot start with an edit count', addDoc(collection(p1, 'Glucose_Logs'), { patient_id: 'p1', reading_mgdl: 120, context: 'before_meal', edit_count: 3, ...readingTimes() }));
   await deny('D44: the record cannot lie about the value before', editReading(p1, 'gEdit', 1, was, now, { record: { previous_reading_mgdl: 120 } }));
   await deny('D44: the record cannot lie about the value after', editReading(p1, 'gEdit', 1, was, now, { record: { reading_mgdl: 280 } }));
   await deny('D44: the record cannot lie about the meal context before', editReading(p1, 'gEdit', 1, was, now, { record: { previous_context: 'before_meal' } }));
@@ -743,6 +749,69 @@ const editReading = (db, logId, number, before, after, { record = {}, log = {}, 
   await deny('D45: another patient cannot read p1\'s alert outcome', getDoc(doc(p2, 'Family_Alerts/logOfP1')));
   await deny('D45: a patient cannot write an alert outcome (only the server can)', setDoc(doc(p1, 'Family_Alerts/fake'), { patient_id: 'p1', status: 'sent' }));
   await deny('D45: a patient cannot change an alert outcome', updateDoc(doc(p1, 'Family_Alerts/logOfP1'), { status: 'failed' }));
+
+  // ---- D46 (QA run 2026-11-16): a consultation fee from 0 to 20,000 (ADM-005), a reading's time at most 5 minutes past
+  // the server's clock (DOC-012), and a birthdate that fits the account (PAT-001)
+  const feeDoctor = (uid, fee) => setDoc(doc(asDoctor(uid), `Providers/${uid}`),
+    { full_name: 'Fee Test', is_verified: false, is_active: true, ...(fee === undefined ? {} : { consultation_fee: fee }) });
+  await deny('ADM-005: a doctor profile cannot be created with a fee of -100', feeDoctor('dFeeNeg', -100));
+  await deny('ADM-005: a doctor profile cannot be created with a fee of -1', feeDoctor('dFeeNeg1', -1));
+  await deny('ADM-005: a doctor profile cannot be created with a fee above 20,000', feeDoctor('dFeeHigh', 20001));
+  await deny('ADM-005: a fee written as text is refused', feeDoctor('dFeeText', '500'));
+  await allow('ADM-005: a doctor profile with a fee of 500', feeDoctor('dFee500', 500));
+  await allow('ADM-005: a doctor profile with a fee of 20,000 (the ceiling)', feeDoctor('dFeeMax', 20000));
+  await allow('ADM-005: a doctor profile with a fee of 0 (not set yet; such a doctor is not listed)', feeDoctor('dFeeZero', 0));
+  await allow('ADM-005: a doctor profile with no fee (a doctor who signs up)', feeDoctor('dFeeNone'));
+  await deny('ADM-005: a doctor cannot change their fee to -100', updateDoc(doc(asDoctor('dFee500'), 'Providers/dFee500'), { consultation_fee: -100 }));
+  await deny('ADM-005: a doctor cannot change their fee to 20,000.01', updateDoc(doc(asDoctor('dFee500'), 'Providers/dFee500'), { consultation_fee: 20000.01 }));
+  await allow('ADM-005: a doctor changes their fee to 750.50', updateDoc(doc(asDoctor('dFee500'), 'Providers/dFee500'), { consultation_fee: 750.5 }));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'Providers/dFeeOld'), { full_name: 'Old Fee', is_verified: true, is_active: true, consultation_fee: -100 }));
+  await allow('ADM-005: a doctor with an old negative fee can still change their city', updateDoc(doc(asDoctor('dFeeOld'), 'Providers/dFeeOld'), { city: 'Cebu' }));
+  await allow('ADM-005: ...and can correct the fee', updateDoc(doc(asDoctor('dFeeOld'), 'Providers/dFeeOld'), { consultation_fee: 500 }));
+  // Add Provider (UT-A006) writes the new doctor's Users and Providers documents in ONE batch, as the new doctor.
+  const addProviderBatch = (uid, fee) => {
+    const db = asDoctor(uid);
+    const batch = writeBatch(db);
+    batch.set(doc(db, `Users/${uid}`), { full_name: 'Added Dr', email: `${uid}@test.com`, role: 'doctor', is_active: true, onboarding_completed: true, created_at: serverTimestamp() });
+    batch.set(doc(db, `Providers/${uid}`), { full_name: 'Added Dr', specialty: 'Endocrinologist', prc_license_number: '0123456', city: 'Cebu', consultation_fee: fee, is_verified: false, is_active: true, created_at: serverTimestamp() });
+    return batch.commit();
+  };
+  await deny('ADM-005: Add Provider with a fee of -100 is refused', addProviderBatch('dAddNeg', -100));
+  await allow('ADM-005: ...and the refused batch leaves no Users document behind', env.withSecurityRulesDisabled(async (ctx) => {
+    if ((await getDoc(doc(ctx.firestore(), 'Users/dAddNeg'))).exists()) throw new Error('a Users document was left behind');
+  }));
+  await allow('ADM-005: Add Provider with a fee of 500', addProviderBatch('dAdd500', 500));
+
+  const minutesFromNow = (n) => Timestamp.fromMillis(Date.now() + n * 60 * 1000);
+  const newReading = (over = {}) => ({ patient_id: 'p1', reading_mgdl: 120, context: 'before_meal', notes: '', ...readingTimes(), ...over });
+  await allow('DOC-012: a reading dated now', addDoc(collection(p1, 'Glucose_Logs'), newReading()));
+  await allow('DOC-012: a phone clock 2 minutes fast is tolerated', addDoc(collection(p1, 'Glucose_Logs'), newReading({ logged_at: minutesFromNow(2) })));
+  await allow('DOC-012: a reading from 3 days ago (kept offline, sent later)', addDoc(collection(p1, 'Glucose_Logs'), newReading({ logged_at: minutesFromNow(-3 * 24 * 60) })));
+  await allow('DOC-012: a reading dated by the server\'s own clock (the app\'s second try for a fast phone clock)', addDoc(collection(p1, 'Glucose_Logs'), newReading({ logged_at: serverTimestamp() })));
+  await deny('DOC-012: a reading dated tomorrow is refused', addDoc(collection(p1, 'Glucose_Logs'), newReading({ logged_at: minutesFromNow(24 * 60) })));
+  await deny('DOC-012: a reading 10 minutes in the future is refused', addDoc(collection(p1, 'Glucose_Logs'), newReading({ logged_at: minutesFromNow(10) })));
+  await deny('DOC-012: a reading with no time is refused', addDoc(collection(p1, 'Glucose_Logs'), without(newReading(), 'logged_at')));
+  await deny('DOC-012: a reading whose time is text is refused', addDoc(collection(p1, 'Glucose_Logs'), newReading({ logged_at: '2026-11-17 10:00' })));
+  await deny('DOC-012: created_at must be the server\'s time, not a backdated one', addDoc(collection(p1, 'Glucose_Logs'), newReading({ created_at: minutesFromNow(-60) })));
+  await deny('DOC-012: created_at cannot be left out', addDoc(collection(p1, 'Glucose_Logs'), without(newReading(), 'created_at')));
+
+  const yearsAgo = (years) => { const date = new Date(); date.setFullYear(date.getFullYear() - years); return Timestamp.fromDate(date); };
+  const januaryFirstThisYear = Timestamp.fromDate(new Date(new Date().getFullYear(), 0, 1));
+  // p1 is an account "for me" (account_type self, set earlier in this file); pMinorApproved is a child's account; p9 has
+  // no account_type, like the accounts made before D16.
+  await allow('PAT-001: an account for me stores a birthdate 40 years ago', updateDoc(doc(p1, 'Users/p1'), { birthdate: yearsAgo(40) }));
+  await allow('PAT-001: an account for me stores a birthdate exactly 18 years ago', updateDoc(doc(p1, 'Users/p1'), { birthdate: yearsAgo(18) }));
+  await deny('PAT-001: an account for me cannot store January 1 of this year (the wheel bug)', updateDoc(doc(p1, 'Users/p1'), { birthdate: januaryFirstThisYear }));
+  await deny('PAT-001: an account for me cannot store a 17-year-old\'s birthdate', updateDoc(doc(p1, 'Users/p1'), { birthdate: yearsAgo(17) }));
+  await allow('PAT-001: a child\'s account stores a 10-year-old\'s birthdate', updateDoc(doc(pMinorApproved, 'Users/pMinorApproved'), { birthdate: yearsAgo(10) }));
+  await deny('PAT-001: a child\'s account cannot store an adult\'s birthdate', updateDoc(doc(pMinorApproved, 'Users/pMinorApproved'), { birthdate: yearsAgo(30) }));
+  await deny('PAT-001: a birthdate in the future is refused', updateDoc(doc(pMinorApproved, 'Users/pMinorApproved'), { birthdate: minutesFromNow(3 * 24 * 60) }));
+  await allow('PAT-001: an account with no account_type counts as for me: 1990 is fine', updateDoc(doc(asDoctor('p9'), 'Users/p9'), { birthdate: Timestamp.fromDate(new Date(1990, 4, 1)) }));
+  await deny('PAT-001: ...and a 2020 birthdate is refused', updateDoc(doc(asDoctor('p9'), 'Users/p9'), { birthdate: Timestamp.fromDate(new Date(2020, 4, 1)) }));
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'Users/pOldBirth'), { full_name: 'Old Birth', role: 'patient', is_active: true, account_type: 'self', birthdate: januaryFirstThisYear }));
+  const pOldBirth = signedIn('pOldBirth').firestore();
+  await allow('PAT-001: a profile with an old wrong birthdate can still change its other fields', updateDoc(doc(pOldBirth, 'Users/pOldBirth'), { diabetes_type: 'Type 2' }));
+  await allow('PAT-001: ...and can correct the birthdate', updateDoc(doc(pOldBirth, 'Users/pOldBirth'), { birthdate: yearsAgo(35) }));
 
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));

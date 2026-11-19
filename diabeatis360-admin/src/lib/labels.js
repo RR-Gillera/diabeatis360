@@ -19,6 +19,14 @@ export const paymentStatusLabels = { unpaid: 'Unpaid', paid: 'Paid', onsite: 'Pa
 
 export const guardianRelationshipLabels = { parent: 'Parent', legal_guardian: 'Legal Guardian', other: 'Other' }
 
+/**
+ * A patient's allergy answer as the admin reads it (QA ADM-009). "None" is an answer ("I don't have food allergies",
+ * DECISIONS.md D25); a blank means the patient never answered, which must not read as "no allergies" on a health record.
+ */
+export function allergyLabel(value) {
+  return String(value ?? '').trim() || 'Not answered'
+}
+
 export const PLATFORM_COMMISSION_RATE = 0.15 // DECISIONS.md D3; the same rate the mobile app and firestore.rules use
 
 /** Commission for a booking: the stored value, or 15% of the fee for older bookings made before it was stored. */

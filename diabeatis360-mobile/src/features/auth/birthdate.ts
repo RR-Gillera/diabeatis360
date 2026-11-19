@@ -1,5 +1,16 @@
 import { Timestamp } from 'firebase/firestore';
 
+import type { BirthdateProblem } from '@/constants/guardian';
+import type { MessageKey } from '@/i18n/en';
+
+/** What to tell the person for each birthdate problem (constants/guardian.ts birthdateProblem, QA PAT-001). Shared by
+ *  the setup birthdate step and Edit Profile, so both say the same thing. */
+export const BIRTHDATE_PROBLEM_TEXT: Record<BirthdateProblem, MessageKey> = {
+  future: 'setup.birth.future',
+  childForSelf: 'setup.birth.childForSelf',
+  adultForChild: 'setup.birth.adultForChild',
+};
+
 const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 
 /**

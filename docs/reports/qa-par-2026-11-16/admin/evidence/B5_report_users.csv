@@ -1,0 +1,6 @@
+﻿"Name","Email","Role","Diabetes type","Joined","Status"
+"Dr. QA Doctor One","qa-doctor-1@test.com","Doctor","","Nov 16, 2026, 12:53 AM","Active"
+"Dr. QA Doctor Three","qa-doctor-3@test.com","Doctor","","Nov 16, 2026, 12:53 AM","Inactive"
+"Dr. QA Doctor Two","qa-doctor-2@test.com","Doctor","","Nov 16, 2026, 12:53 AM","Active"
+"QA Patient One","qa-patient-1@test.com","Patient","Type 2","Nov 16, 2026, 12:53 AM","Active"
+"QA Patient Two","qa-patient-2@test.com","Patient","Type 1","Nov 16, 2026, 12:53 AM","Active"

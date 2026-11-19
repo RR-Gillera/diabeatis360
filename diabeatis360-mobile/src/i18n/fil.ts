@@ -50,6 +50,8 @@ export const fil: Record<MessageKey, string> = {
   'setup.birth.placeholder': 'Piliin ang petsa ng kapanganakan mo',
   'setup.birth.adultForChild': 'Mukhang kaarawan ito ng isang adult, pero para sa batang wala pang 18 ang account na ito. Pakitingnan ulit ang taong pinili mo.',
   'setup.birth.childForSelf': 'Kailangang 18 taong gulang ka o higit pa para magamit ang sariling account. Pakitingnan ulit ang taong pinili mo.',
+  'setup.birth.future': 'Hindi pa dumarating ang petsang iyan. Pakitingnan ulit ang petsang pinili mo.',
+  'setup.birth.saveFailed': 'Hindi na-save ang petsa ng kapanganakan mo. Pakitingnan ang koneksyon mo at subukang muli.',
   'setup.condition.title': 'Alin ang pinakaangkop\nsa kondisyon mo?',
   'setup.condition.subtitle': 'Tutulong ito na iangkop ang pagsubaybay at mga mungkahi para sa kalusugan mo.',
   'setup.allergies.title': 'May allergy ka ba\nsa pagkain?',
@@ -93,6 +95,7 @@ export const fil: Record<MessageKey, string> = {
   'date.day': 'Araw',
   'date.year': 'Taon',
   'date.pickAll': 'Piliin ang buwan, araw at taon',
+  'date.notChosen': 'Hindi pa napipili',
 
   // ---- profile
   'profile.yourName': 'Ang pangalan mo',
@@ -151,6 +154,7 @@ export const fil: Record<MessageKey, string> = {
   'health.edit.allergyRequiredTitle': 'Kailangan ang allergy',
   'health.edit.saveFailed': 'Hindi na-save ang profile ng kalusugan mo. Pakisubukang muli.',
   'health.edit.saveFailedTitle': 'Hindi na-save',
+  'health.edit.birthdateTitle': 'Tingnan ang petsa ng kapanganakan',
   'health.edit.save': 'I-save ang mga pagbabago',
 
   // ---- profile > language
@@ -300,6 +304,10 @@ export const fil: Record<MessageKey, string> = {
   'home.average': 'AVERAGE SA 7 ARAW',
   'home.trendEmpty': 'Magtala pa ng ilang reading para makita ang trend mo.',
   'home.trendEmptyWeek': 'Magtala pa ng ilang reading ngayong linggo para makita ang trend mo.',
+  'chart.legend.average': 'Karaniwan bawat araw',
+  'chart.legend.range': 'Pinakamababa hanggang pinakamataas',
+  'chart.legend.critical': 'Kritikal',
+  'chart.a11y': 'Lingguhang chart ng blood sugar. Ang pinakamababang reading ngayong linggo ay {low} mg/dL at ang pinakamataas ay {high} mg/dL. Mga kritikal na reading: {critical}.',
   'home.exercise': 'EHERSISYO',
   'home.exercise.reminder': 'Paalala sa paglalakad araw-araw',
   'home.exercise.tips': 'Tingnan ang exercise tips',
@@ -1109,6 +1117,12 @@ export const fil: Record<MessageKey, string> = {
   'doctor.patient.disliked': 'Mga hindi kinakaing sangkap',
   'doctor.patient.allergies': 'Mga allergy',
   'doctor.patient.noAllergies': 'Walang idineklara',
+  'doctor.patient.notAnswered': 'Hindi pa sinasagot',
+  'doctor.patient.criticalWeek': 'Kritikal ngayong linggo',
+  'doctor.patient.criticalLine': '{value} mg/dL · {when}',
+  'doctor.patient.criticalMore': '+{count} pa sa history sa ibaba',
+  'doctor.patient.weekRange': 'Ngayong linggo: pinakamababa {low} · pinakamataas {high} mg/dL',
+  'doctor.child.badge': 'Account ng bata · hawak ng magulang o tagapag-alaga',
   'doctor.patient.location': 'Lokasyon',
   'doctor.patient.visible': 'Nakikita mo ito dahil nag-book sa iyo ang pasyenteng ito.',
   'doctor.patient.latest': 'Pinakabago',

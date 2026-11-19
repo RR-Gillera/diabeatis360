@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
@@ -9,6 +9,7 @@ import { useT } from '@/i18n/language-context';
 
 import { authColors } from './auth-ui';
 import { parseBirthdate } from './birthdate';
+import { rowFor, shouldPick, tapAction } from './wheel-rules';
 
 export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const CURRENT_YEAR = new Date().getFullYear();
@@ -45,6 +46,10 @@ function partsFrom(value: string | null | undefined): Parts {
  * identically on iOS, Android and the web build the team tests in — and so it
  * keeps producing the exact "February 4, 2018" string the rest of the app and
  * the Firestore records already use.
+ *
+ * `years` must stay the same while the wheels are shown. A list that changed under a chosen year is how QA PAT-001
+ * happened (the band showed 2008 while 2026 was kept), so the setup screen draws the wheels only once it knows which
+ * years to offer. A year the list does not offer shows no row (wheel-rules.ts rowFor) and counts as not chosen.
  */
 export function BirthdateWheels({ value, onChange, years = YEARS }: { value: string | null; onChange: (formatted: string | null) => void; years?: number[] }) {
   // Month names are shown in the person's language; the value produced stays English ("March 14, 1981"), which is
@@ -69,11 +74,12 @@ export function BirthdateWheels({ value, onChange, years = YEARS }: { value: str
   }, [parts.monthIndex, parts.year]);
 
   // Once any wheel is touched, the wheels still empty count as whatever sits in the gray band (their first item), so
-  // the date produced always matches what the person sees in the highlight.
+  // the date produced always matches what the person sees in the highlight. A year the list does not offer counts as
+  // empty, because its wheel shows the first year (QA PAT-001).
   const filled = (next: Parts) => ({
     monthIndex: next.monthIndex ?? 0,
     day: next.day ?? 1,
-    year: next.year ?? years[0],
+    year: next.year !== null && years.includes(next.year) ? next.year : years[0],
   });
 
   const commit = (next: Parts) => {
@@ -108,9 +114,9 @@ export function BirthdateWheels({ value, onChange, years = YEARS }: { value: str
         {/* The gray band never moves; the three wheels scroll behind it. Whatever lands inside it is the chosen date. */}
         <View pointerEvents="none" style={styles.highlight} />
         <View style={styles.columns}>
-          <Wheel style={styles.monthColumn} label={t('date.month')} items={MONTHS} selectedIndex={parts.monthIndex} onSelect={pickMonth} render={(item) => shownMonths[MONTHS.indexOf(String(item))] ?? String(item)} />
-          <Wheel style={styles.dayColumn} label={t('date.day')} items={dayOptions} selectedIndex={parts.day !== null ? dayOptions.indexOf(parts.day) : null} onSelect={pickDay} render={(item) => String(item)} />
-          <Wheel style={styles.yearColumn} label={t('date.year')} items={years} selectedIndex={parts.year !== null ? years.indexOf(parts.year) : null} onSelect={pickYear} render={(item) => String(item)} />
+          <Wheel style={styles.monthColumn} label={t('date.month')} emptyLabel={t('date.notChosen')} items={MONTHS} selectedIndex={parts.monthIndex} onSelect={pickMonth} render={(item) => shownMonths[MONTHS.indexOf(String(item))] ?? String(item)} />
+          <Wheel style={styles.dayColumn} label={t('date.day')} emptyLabel={t('date.notChosen')} items={dayOptions} selectedIndex={rowFor(dayOptions, parts.day)} onSelect={pickDay} render={(item) => String(item)} />
+          <Wheel style={styles.yearColumn} label={t('date.year')} emptyLabel={t('date.notChosen')} items={years} selectedIndex={rowFor(years, parts.year)} onSelect={pickYear} render={(item) => String(item)} />
         </View>
       </View>
     </View>
@@ -132,9 +138,13 @@ const PAD_ROWS = (VISIBLE_ROWS - 1) / 2;
  *   useNativeDriver keeps this on the native thread, so it stays smooth while scrolling.
  * - The row is chosen a moment after scrolling stops (a short timer after the last scroll event) rather than from
  *   momentum events alone, because those fire differently on iOS, Android and the web build.
+ * - Only the person chooses (QA PAT-001, wheel-rules.ts): until a finger, a mouse wheel, a tap or a screen-reader step
+ *   moves this wheel, a scroll event is not a choice, so the date never fills in by itself.
  */
-function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
+function Wheel<T>({ label, emptyLabel, items, selectedIndex, onSelect, render, style }: {
   label: string;
+  /** What a screen reader says while nothing is chosen on this wheel (it used to say "undefined"). */
+  emptyLabel: string;
   items: T[];
   selectedIndex: number | null;
   onSelect: (index: number) => void;
@@ -145,6 +155,8 @@ function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
   const [scrollY] = useState(() => new Animated.Value((selectedIndex ?? 0) * ROW_HEIGHT));
   const centeredIndex = useRef(selectedIndex ?? 0);
   const dragging = useRef(false);
+  /** Whether the person has moved this wheel yet (a finger, a mouse wheel, a tap or a screen-reader step). */
+  const touched = useRef(false);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestOnSelect = useRef(onSelect);
   useEffect(() => { latestOnSelect.current = onSelect; });
@@ -165,7 +177,7 @@ function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
     const index = Math.max(0, Math.min(items.length - 1, Math.round(offsetY / ROW_HEIGHT)));
     // Nudge it into place if the scroll stopped between two rows.
     if (Math.abs(offsetY - index * ROW_HEIGHT) > 1) scrollRef.current?.scrollTo({ y: index * ROW_HEIGHT, animated: true });
-    if (index !== centeredIndex.current || selectedIndex === null) {
+    if (shouldPick(touched.current, index, centeredIndex.current, selectedIndex)) {
       centeredIndex.current = index;
       latestOnSelect.current(index);
     }
@@ -184,8 +196,23 @@ function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
     return () => scrollY.removeListener(id);
   });
 
-  const scrollToIndex = (index: number) => {
-    scrollRef.current?.scrollTo({ y: Math.max(0, Math.min(items.length - 1, index)) * ROW_HEIGHT, animated: true });
+  // The person's own input marks the wheel as touched: a finger on it (phone and web), a drag (phone), a mouse wheel
+  // (web: react-native-web never sends onScrollBeginDrag, and onWheel is a web-only prop, hence the plain object), a tap
+  // on a row or a screen-reader step (goTo below).
+  const markTouched = () => { touched.current = true; };
+  const webWheel: object = Platform.OS === 'web' ? { onWheel: markTouched } : {};
+
+  // A tap on a row, or a screen-reader step: scroll there, or pick the row already in the band at once (the wheel will
+  // not move, so no scroll event would come; tapping the highlighted row used to do nothing).
+  const goTo = (index: number) => {
+    markTouched();
+    const row = Math.max(0, Math.min(items.length - 1, index));
+    const action = tapAction(row, centeredIndex.current, selectedIndex);
+    if (action === 'scroll') scrollRef.current?.scrollTo({ y: row * ROW_HEIGHT, animated: true });
+    else if (action === 'pick') {
+      centeredIndex.current = row;
+      latestOnSelect.current(row);
+    }
   };
 
   return (
@@ -194,14 +221,16 @@ function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel={label}
-      accessibilityValue={{ text: selectedIndex !== null ? render(items[selectedIndex]) : undefined }}
+      accessibilityValue={{ text: selectedIndex !== null ? render(items[selectedIndex]) : emptyLabel }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-      onAccessibilityAction={(event) => scrollToIndex((selectedIndex ?? 0) + (event.nativeEvent.actionName === 'increment' ? 1 : -1))}
+      onAccessibilityAction={(event) => goTo((selectedIndex ?? centeredIndex.current) + (event.nativeEvent.actionName === 'increment' ? 1 : -1))}
     >
       {/* nestedScrollEnabled: these wheels sit inside a scrolling screen. Without it, Android gives every drag to the
           screen as soon as the screen itself can scroll, and the wheel seems stuck (D41). */}
       <Animated.ScrollView
+        {...webWheel}
         ref={scrollRef}
+        onTouchStart={markTouched}
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}
         snapToInterval={ROW_HEIGHT}
@@ -210,7 +239,7 @@ function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
         contentContainerStyle={styles.wheelContent}
         scrollEventThrottle={16}
         onScroll={onScroll}
-        onScrollBeginDrag={() => { dragging.current = true; }}
+        onScrollBeginDrag={() => { dragging.current = true; markTouched(); }}
         onScrollEndDrag={(event) => { dragging.current = false; scheduleSettle(event.nativeEvent.contentOffset.y); }}
       >
         {items.map((item, index) => {
@@ -220,7 +249,7 @@ function Wheel<T>({ label, items, selectedIndex, onSelect, render, style }: {
           const scale = scrollY.interpolate({ inputRange, outputRange: [0.8, 0.9, 1.15, 0.9, 0.8], extrapolate: 'clamp' });
           const rotateX = scrollY.interpolate({ inputRange, outputRange: ['-50deg', '-25deg', '0deg', '25deg', '50deg'], extrapolate: 'clamp' });
           return (
-            <Pressable key={index} onPress={() => scrollToIndex(index)} style={styles.row}>
+            <Pressable key={index} onPress={() => goTo(index)} style={styles.row}>
               <Animated.Text numberOfLines={1} style={[styles.wheelText, { opacity, transform: [{ perspective: 600 }, { rotateX }, { scale }] }]}>
                 {render(item)}
               </Animated.Text>

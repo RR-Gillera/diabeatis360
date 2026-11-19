@@ -99,6 +99,22 @@ export function EmptyState({ icon, iconAndroid, title, detail }: { icon: SFSymbo
   );
 }
 
+// A child's account (D16, QA DOC-013): the doctor is told before chat or video that a parent or guardian runs this
+// account for a child. It comes from Users.account_type == 'minor', which a booked doctor can already read. The
+// guardian's own name is not shown yet: it is in Guardian_Verifications, which a doctor cannot read (team decision).
+export function ChildAccountBadge({ align = 'flex-start' }: { align?: 'flex-start' | 'center' }) {
+  const { t } = useT();
+  return (
+    <View accessible accessibilityLabel={t('doctor.child.badge')} style={[styles.childBadge, { alignSelf: align }]}>
+      <SymbolView name={{ ios: 'figure.and.child.holdinghands', android: 'family_restroom', web: 'family_restroom' }} size={15} tintColor={CHILD_BLUE} />
+      <Text style={styles.childBadgeText}>{t('doctor.child.badge')}</Text>
+    </View>
+  );
+}
+
+/** Blue-700: 6.7:1 on the badge's light blue (WCAG AA, D37). */
+const CHILD_BLUE = '#1D4ED8';
+
 export const doctorStyles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { padding: 24, paddingBottom: 140 },
@@ -128,4 +144,6 @@ const styles = StyleSheet.create({
   emptyIcon: { alignItems: 'center', backgroundColor: homeColors.borderSoft, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
   emptyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700', marginTop: 4 },
   emptyDetail: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, maxWidth: 260, textAlign: 'center' },
+  childBadge: { alignItems: 'center', backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  childBadgeText: { color: CHILD_BLUE, flexShrink: 1, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '800' },
 });

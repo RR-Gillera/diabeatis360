@@ -23,3 +23,6 @@ functions/.env.*
 docs/reports/qa-*/**/video/
 docs/reports/qa-*/**/*.mp4
 docs/reports/qa-*/**/*.mkv
+
+# Local QA tooling (Playwright for QA runs); not part of either app
+qa-tools/

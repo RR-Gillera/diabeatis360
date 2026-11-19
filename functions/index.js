@@ -36,10 +36,12 @@ function requireUser(request) {
   return request.auth.uid
 }
 
-// GEMINI_MODEL and GEMINI_BASE_URL are optional overrides (a newer model, or a fake server in tests).
+// GEMINI_MODEL, GEMINI_FALLBACK_MODEL and GEMINI_BASE_URL are optional overrides (a newer model, a backup model for
+// when the main one is busy, or a fake server in tests).
 const askGemini = (args) => callGemini({
   apiKey: geminiKey.value() || process.env.GEMINI_API_KEY,
   model: process.env.GEMINI_MODEL,
+  fallbackModel: process.env.GEMINI_FALLBACK_MODEL,
   baseUrl: process.env.GEMINI_BASE_URL,
   ...args,
 })

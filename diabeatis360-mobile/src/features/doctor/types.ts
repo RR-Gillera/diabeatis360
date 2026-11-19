@@ -42,6 +42,9 @@ export type PatientProfile = {
   dislikedIngredients: string;
   location: string;
   languagePreference: string;
+  /** A child's account, run by a parent or guardian (Users.account_type == 'minor', D16). Shown on Request Details and
+   *  the patient record (QA DOC-013). */
+  isMinor: boolean;
 };
 
 // One row in the doctor's Patients tab — the patient plus a summary of their

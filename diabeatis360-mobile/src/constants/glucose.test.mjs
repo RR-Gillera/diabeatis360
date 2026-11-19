@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { checkReading, glucoseDirection, interpretGlucose, READING_LIMITS } from './glucose.ts';
+import { checkReading, glucoseDirection, interpretGlucose, isFutureReading, READING_CLOCK_SKEW_MS, READING_LIMITS } from './glucose.ts';
 
 test('critical low: below 54, both contexts', () => {
   for (const context of ['before_meal', 'after_meal']) {
@@ -105,4 +105,15 @@ test('Type 1, Type 2 and a type not stated keep the D4 targets (D40)', () => {
     assert.equal(interpretGlucose(179, 'after_meal', type), 'normal');
     assert.equal(interpretGlucose(180, 'after_meal', type), 'high');
   }
+});
+
+test('reading time (QA DOC-012): up to 5 minutes ahead is a clock running fast; later is refused', () => {
+  const now = new Date(2026, 10, 18, 9, 0);
+  const minutes = (count) => new Date(now.getTime() + count * 60 * 1000);
+  assert.equal(READING_CLOCK_SKEW_MS, 5 * 60 * 1000, 'firestore.rules says 5 minutes too');
+  assert.equal(isFutureReading(now, now), false);
+  assert.equal(isFutureReading(minutes(5), now), false);
+  assert.equal(isFutureReading(minutes(-3 * 24 * 60), now), false, 'an older reading sent later is fine');
+  assert.equal(isFutureReading(minutes(6), now), true);
+  assert.equal(isFutureReading(minutes(24 * 60), now), true, 'the QA case: a reading dated tomorrow');
 });

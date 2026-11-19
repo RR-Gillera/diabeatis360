@@ -13,7 +13,7 @@ import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/bo
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { ageFrom } from '@/features/doctor/doctor-stats';
-import { DoctorHeader, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
+import { ChildAccountBadge, DoctorHeader, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import type { PatientProfile } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -76,6 +76,8 @@ export default function RequestDetailsScreen() {
               <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View>
               <Text style={styles.name}>{name}</Text>
               <Text style={styles.age}>{age !== null ? t('doctor.request.age', { age }) : t('doctor.request.noAge')}</Text>
+              {/* QA DOC-013: the doctor knows before accepting that a parent or guardian runs this child's account (D16). */}
+              {patient?.isMinor ? <ChildAccountBadge align="center" /> : null}
               <View style={styles.divider} />
               <View style={styles.grid}>
                 <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatApptDate(booking.scheduledAt, language) : '—'}</Text></View>

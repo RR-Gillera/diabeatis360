@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import DataTable from '../components/DataTable'
 import { Button, Card, ConfirmDialog, Modal, Notice, PageHeader, PageTabs, SearchInput, SelectField, StatusBadge, StatusToggle, TextField } from '../components/ui'
+import { feeProblem, MAX_CONSULTATION_FEE } from '../lib/fee'
 import { formatDate, formatPeso } from '../lib/format'
 import { useCollection } from '../lib/useCollection'
 import { notifyDoctorDecision, rejectDoctor, setDoctorActive, subscribeToDoctors, verifyDoctor } from '../services/doctors'
@@ -86,8 +87,14 @@ export default function ProvidersPage() {
 
   const onAddProvider = async (event) => {
     event.preventDefault()
-    if (!form.fullName.trim() || !form.email.trim() || !form.prcLicenseNumber.trim() || !form.city.trim() || !Number(form.consultationFee)) {
+    if (!form.fullName.trim() || !form.email.trim() || !form.prcLicenseNumber.trim() || !form.city.trim() || !String(form.consultationFee).trim()) {
       setError('Please fill in all required fields.')
+      return
+    }
+    // QA ADM-005: -100 used to pass (`!Number(fee)` only refused 0 and blank). Checked before anything is created.
+    const feeError = feeProblem(form.consultationFee)
+    if (feeError) {
+      setError(feeError)
       return
     }
     await runAction(async () => {
@@ -203,7 +210,7 @@ export default function ProvidersPage() {
           <TextField label="PRC license number" value={form.prcLicenseNumber} onChange={(e) => setForm({ ...form, prcLicenseNumber: e.target.value })} />
           <div className="grid grid-cols-2 gap-4">
             <TextField label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            <TextField label="Consultation fee (₱)" type="number" min="0" value={form.consultationFee} onChange={(e) => setForm({ ...form, consultationFee: e.target.value })} />
+            <TextField label="Consultation fee (₱)" type="number" min="1" max={MAX_CONSULTATION_FEE} step="0.01" value={form.consultationFee} onChange={(e) => setForm({ ...form, consultationFee: e.target.value })} />
           </div>
           {error ? <Notice>{error}</Notice> : null}
           <Card className="!bg-gray-50 !p-4 !shadow-none">

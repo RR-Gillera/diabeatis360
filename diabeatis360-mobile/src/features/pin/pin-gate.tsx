@@ -7,7 +7,7 @@ import { hasCompletedOnboarding } from '@/features/auth/onboarding';
 import { resetTo } from '@/lib/navigation';
 
 import { shouldLockAfter } from './pin-rules';
-import { hasPin, pinSupported } from './pin-service';
+import { clearPin, hasPin, pinSupported } from './pin-service';
 import { PinLock, PinSetup } from './pin-ui';
 
 type Mode = 'none' | 'lock' | 'setup';
@@ -76,8 +76,13 @@ export function PinGate() {
 
   if (mode === 'none' || !uid) return null;
 
-  // Too many wrong tries, or "Forgot PIN?": the saved PIN is cleared by signOut, so the next login makes a new one.
-  const logInAgain = () => { setMode('none'); signOut(); resetTo(router, '/'); };
+  // Too many wrong tries, or "Forgot PIN?": the saved PIN is deleted first (logging out alone keeps it), so the next
+  // login makes a new one. After five wrong tries verifyPin has already deleted it; deleting again is harmless.
+  const logInAgain = () => {
+    const forUid = uid;
+    setMode('none');
+    void clearPin(forUid).finally(() => { signOut(); resetTo(router, '/'); });
+  };
 
   return (
     <View accessibilityViewIsModal style={styles.cover}>

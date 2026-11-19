@@ -1,0 +1,3 @@
+﻿"Transaction ID","Patient","Doctor","Consultation date","Booking status","Payment status","Fee (PHP)","Commission 15% (PHP)"
+"#SRSK-202611180200","QA Patient One","Dr. QA Doctor One","Nov 18, 2026, 10:00 AM","Declined","Declined","500.00","75.00"
+"#SRSK-202611170200","QA Patient One","Dr. QA Doctor One","Nov 17, 2026, 10:00 AM","Completed","Paid","500.00","75.00"
