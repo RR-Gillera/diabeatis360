@@ -12,10 +12,14 @@ export type DoctorProfile = {
   email: string;
   specialty: string;
   prcLicenseNumber: string;
+  /** Providers.license_expiry, typed in doctor setup or Edit Profile; null when not given. */
+  licenseExpiry: Date | null;
   city: string;
   consultationFee: number;
   isVerified: boolean;
   isActive: boolean;
+  /** When an admin last verified or rejected the credentials (Providers.reviewed_at); null before any review. */
+  reviewedAt: Date | null;
   /** Set by an admin's Reject action (admin panel); shown on the pending-verification screen so the doctor
    * knows what to fix before resubmitting. Cleared back to '' once the admin verifies. */
   rejectionReason: string;

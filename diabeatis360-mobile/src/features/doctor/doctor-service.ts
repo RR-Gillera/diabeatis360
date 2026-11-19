@@ -1,9 +1,10 @@
-import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, where } from 'firebase/firestore';
+import { collection, doc, getDoc, onSnapshot, query, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
 import { normalizeDiabetesType, toAvailabilityMode, type AvailabilityMode } from '@/constants/enums';
 import { feeProblem, MAX_CONSULTATION_FEE } from '@/constants/fees';
 import { parseBirthdate } from '@/features/auth/birthdate';
+import { normalizePhilippineMobile } from '@/features/family/phone';
 
 import { weekForStore, weekFromStored, weekProblem, type WeeklyHours } from './availability';
 import type { DoctorProfile, PatientProfile, PatientSummary } from './types';
@@ -26,10 +27,12 @@ export function subscribeToDoctorProfile(
         email: String(data.email ?? ''),
         specialty: String(data.specialty ?? ''),
         prcLicenseNumber: String(data.prc_license_number ?? ''),
+        licenseExpiry: parseBirthdate(data.license_expiry),
         city: String(data.city ?? ''),
         consultationFee: Number(data.consultation_fee ?? 0),
         isVerified: Boolean(data.is_verified),
         isActive: data.is_active !== false,
+        reviewedAt: (data.reviewed_at as Timestamp | undefined)?.toDate?.() ?? null,
         rejectionReason: String(data.rejection_reason ?? ''),
         availabilityMode: toAvailabilityMode(data.availability_mode),
         availableDays: Array.isArray(data.available_days) ? data.available_days.map(Number) : [],
@@ -46,7 +49,7 @@ export function subscribeToDoctorProfile(
 // write only their own fields, and neither should clobber the other's.
 export async function updateDoctorProfile(
   providerId: string,
-  fields: Partial<{ fullName: string; email: string; specialty: string; prcLicenseNumber: string; city: string; consultationFee: number }>,
+  fields: Partial<{ fullName: string; email: string; specialty: string; prcLicenseNumber: string; licenseExpiry: Date; city: string; consultationFee: number }>,
 ) {
   // The fee rule is checked here too (QA ADM-005), so no screen can skip it: 0 ("not set yet") or above ₱0 up to the
   // ceiling. The screens show their own message first; firestore.rules refuse anything outside 0–20,000 as well.
@@ -58,9 +61,25 @@ export async function updateDoctorProfile(
   if (fields.email !== undefined) record.email = fields.email.trim();
   if (fields.specialty !== undefined) record.specialty = fields.specialty.trim();
   if (fields.prcLicenseNumber !== undefined) record.prc_license_number = fields.prcLicenseNumber.trim();
+  if (fields.licenseExpiry !== undefined) record.license_expiry = Timestamp.fromDate(fields.licenseExpiry);
   if (fields.city !== undefined) record.city = fields.city.trim();
   if (fields.consultationFee !== undefined) record.consultation_fee = fields.consultationFee;
   await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
+}
+
+// The doctor's mobile number (My Profile, DECISIONS.md D49). It is kept on the doctor's own Users document, NOT on
+// Providers: every signed-in patient can read Providers (Find a Doctor), but only the doctor and admins read Users.
+
+/** The saved number as +639XXXXXXXXX, or '' when none is saved. */
+export function subscribeToDoctorPhone(uid: string, onChange: (phone: string) => void, onError: (error: Error) => void) {
+  return onSnapshot(doc(db, 'Users', uid), (snapshot) => onChange(String(snapshot.data()?.phone_number ?? '')), onError);
+}
+
+/** Saves the number in the one stored form (+639XXXXXXXXX), or clears it with ''. firestore.rules checks the form. */
+export async function saveDoctorPhone(uid: string, typed: string) {
+  const phone = typed.trim() ? normalizePhilippineMobile(typed) : '';
+  if (phone === null) throw new Error('Not a Philippine mobile number.');
+  await updateDoc(doc(db, 'Users', uid), { phone_number: phone });
 }
 
 // Saves how the doctor is available (Manage Schedule, DECISIONS.md D43 and D48). Which days and times patients are

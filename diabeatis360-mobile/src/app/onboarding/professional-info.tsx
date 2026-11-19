@@ -11,23 +11,12 @@ import { useAuth } from '@/features/auth/auth-context';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
 import { birthdateToTimestamp, parseBirthdate } from '@/features/auth/birthdate';
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
+import { SPECIALIZATIONS } from '@/features/doctor/doctor-profile';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { Brand } from '@/constants/theme';
 import { db } from '@/firebase';
 import { useT } from '@/i18n/language-context';
 import { resetTo } from '@/lib/navigation';
-
-// Kept in step with the specialty filter pills on the patient's Find a Doctor
-// screen — a specialty picked here that isn't in that list would make the
-// doctor unfindable under any filter.
-const SPECIALIZATIONS = [
-  'Endocrinologist',
-  'Diabetologist',
-  'Nutritionist',
-  'Internal Medicine',
-  'Family Medicine',
-  'General Practitioner',
-];
 
 export default function ProfessionalInfoScreen() {
   const router = useRouter();

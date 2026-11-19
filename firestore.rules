@@ -231,6 +231,12 @@ service cloud.firestore {
                 ? data.birthdate > request.time - duration.value(6576, 'd')
                 : data.birthdate <= request.time - duration.value(6573, 'd'));
       }
+      // A doctor's mobile number (My Profile, D49): '' (none) or the one stored form +639XXXXXXXXX. On Users, not
+      // Providers, so patients never read it.
+      function okPhone(data, keys) {
+        return !keys.hasAny(['phone_number'])
+          || (data.phone_number is string && (data.phone_number == '' || data.phone_number.matches('^[+]639[0-9]{9}$')));
+      }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.
       allow read: if isUser(userId) || isAdmin() || canSeePatient(userId);
@@ -238,7 +244,8 @@ service cloud.firestore {
       // if present, must be 'self' or 'minor' — anything else is rejected outright, not silently ignored.
       allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
                     && request.resource.data.get('account_type', 'self') in ['self', 'minor']
-                    && okHealth(request.resource.data, request.resource.data.keys());
+                    && okHealth(request.resource.data, request.resource.data.keys())
+                    && okPhone(request.resource.data, request.resource.data.keys());
       // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
       // account_type (D16) is set once — the Users doc already exists by the time onboarding chooses "For me" /
       // "For my child" (it is created earlier, at email verification), so this has to be an update, not a
@@ -247,6 +254,7 @@ service cloud.firestore {
       allow update: if isAdmin() && changedKeys().hasOnly(['is_active'])
                     || (isUser(userId) && !changedKeys().hasAny(['is_active'])
                         && okHealth(request.resource.data, changedKeys())
+                        && okPhone(request.resource.data, changedKeys())
                         && (!changedKeys().hasAny(['account_type'])
                             || (!('account_type' in resource.data) && request.resource.data.account_type in ['self', 'minor'])));
       // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
@@ -484,6 +492,25 @@ service cloud.firestore {
     match /Wallet_Transactions/{transactionId} {
       allow read: if signedIn() && (resource.data.provider_id == request.auth.uid || isAdmin());
       allow write: if false;
+    }
+    // Where the doctor's withdrawals go (D47, "Payout account" on My Wallet). The DOCTOR writes it, since it moves no money:
+    // the server only reads it to name the account on each withdrawal. Only the bank's name (from a fixed list, kept in
+    // step with PAYOUT_BANKS in diabeatis360-mobile/src/features/wallet/payout.ts) or GCash, the holder's name and the
+    // LAST 4 DIGITS are allowed, so a full account number can never be stored here. Patients cannot read it.
+    match /Payout_Accounts/{providerId} {
+      allow read: if isUser(providerId) || isAdmin();
+      allow create, update: if isUser(providerId)
+        && exists(/databases/$(database)/documents/Providers/$(providerId))
+        && request.resource.data.keys().hasOnly(['kind', 'provider_name', 'account_name', 'last4', 'updated_at'])
+        && request.resource.data.keys().hasAll(['kind', 'provider_name', 'account_name', 'last4', 'updated_at'])
+        && ((request.resource.data.kind == 'gcash' && request.resource.data.provider_name == 'GCash')
+            || (request.resource.data.kind == 'bank'
+                && request.resource.data.provider_name in ['BDO', 'BPI', 'Metrobank', 'Land Bank', 'UnionBank', 'Security Bank', 'PNB', 'RCBC', 'China Bank']))
+        && request.resource.data.account_name is string
+        && request.resource.data.account_name.size() >= 2 && request.resource.data.account_name.size() <= 80
+        && request.resource.data.last4 is string && request.resource.data.last4.matches('^[0-9]{4}$')
+        && request.resource.data.updated_at == request.time;
+      allow delete: if false;
     }
 
     // ------------------------------------------------------------------ booked time slots (DECISIONS.md D22)

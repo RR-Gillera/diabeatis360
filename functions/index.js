@@ -87,4 +87,4 @@ exports.settleWallet = onCall(walletOptions, (request) =>
 exports.topUpWallet = onCall(walletOptions, (request) =>
   topUpWallet({ db: getFirestore(), uid: requireUser(request), amount: request.data && request.data.amount, method: request.data && request.data.method }))
 exports.withdrawFromWallet = onCall(walletOptions, (request) =>
-  withdrawFromWallet({ db: getFirestore(), uid: requireUser(request), amount: request.data && request.data.amount, method: request.data && request.data.method }))
+  withdrawFromWallet({ db: getFirestore(), uid: requireUser(request), amount: request.data && request.data.amount }))

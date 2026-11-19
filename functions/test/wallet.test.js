@@ -18,7 +18,7 @@ test.before(() => {
 })
 
 async function reset() {
-  for (const name of ['Wallets', 'Wallet_Transactions', 'Bookings']) {
+  for (const name of ['Wallets', 'Wallet_Transactions', 'Bookings', 'Payout_Accounts']) {
     const all = await db.collection(name).get()
     await Promise.all(all.docs.map((document) => document.ref.delete()))
   }
@@ -66,16 +66,21 @@ test('a top-up brings a negative wallet back and unblocks the doctor; a withdraw
   await booking('bk2', { payment_status: 'onsite' })
   await settleBookings({ db, uid: 'doc1' })
   assert.equal(await blocked(), true)
-  assert.equal(await code(withdrawFromWallet({ db, uid: 'doc1', amount: 10, method: 'GCash' })), 'failed-precondition')
+  assert.equal(await code(withdrawFromWallet({ db, uid: 'doc1', amount: 10 })), 'failed-precondition')
 
   assert.deepEqual(await topUpWallet({ db, uid: 'doc1', amount: 75, method: 'GCash' }), { balance: 0 })
   assert.equal(await blocked(), false) // exactly 0 can be booked again
   await topUpWallet({ db, uid: 'doc1', amount: 100.5, method: 'Credit / Debit Card' })
-  assert.equal(await code(withdrawFromWallet({ db, uid: 'doc1', amount: 100.51, method: 'GCash' })), 'failed-precondition')
-  assert.deepEqual(await withdrawFromWallet({ db, uid: 'doc1', amount: 100.5, method: 'Credit / Debit Card' }), { balance: 0 })
+  // Money is there, but no payout account is saved yet: there is nowhere to send it.
+  assert.equal(await code(withdrawFromWallet({ db, uid: 'doc1', amount: 50 })), 'failed-precondition')
+  await db.doc('Payout_Accounts/doc1').set({ kind: 'bank', provider_name: 'BDO', account_name: 'Jose Santos', last4: '4821' })
+  assert.equal(await code(withdrawFromWallet({ db, uid: 'doc1', amount: 100.51 })), 'failed-precondition')
+  assert.deepEqual(await withdrawFromWallet({ db, uid: 'doc1', amount: 100.5 }), { balance: 0 })
 
   const rows = (await db.collection('Wallet_Transactions').where('provider_id', '==', 'doc1').get()).docs.map((d) => d.data())
   assert.deepEqual(rows.map((row) => `${row.type}:${row.amount}`).sort(), ['commission:-75', 'topup:100.5', 'topup:75', 'withdrawal:-100.5'])
+  // The withdrawal names the account it went to, never more than the last 4 digits.
+  assert.equal(rows.find((row) => row.type === 'withdrawal').method, 'BDO •••• 4821')
 })
 
 test('wrong amounts, methods and people are refused', { skip }, async () => {
@@ -87,7 +92,7 @@ test('wrong amounts, methods and people are refused', { skip }, async () => {
   assert.equal(await code(topUpWallet({ db, uid: 'doc1', amount: 100, method: 'Maya' })), 'invalid-argument')
   // A patient has no wallet.
   assert.equal(await code(topUpWallet({ db, uid: 'pat1', amount: 100, method: 'GCash' })), 'permission-denied')
-  assert.equal(await code(withdrawFromWallet({ db, uid: 'pat1', amount: 100, method: 'GCash' })), 'permission-denied')
+  assert.equal(await code(withdrawFromWallet({ db, uid: 'pat1', amount: 100 })), 'permission-denied')
   assert.equal(await code(settleBookings({ db, uid: 'pat1' })), 'permission-denied')
   // Only the booking's own patient or doctor can settle it.
   await booking('bk5', { payment_status: 'paid' })

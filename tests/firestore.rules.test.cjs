@@ -825,6 +825,29 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await deny('D47: the doctor cannot add a transaction', addDoc(collection(dWallet, 'Wallet_Transactions'), { provider_id: 'dWallet', type: 'topup', amount: 1000 }));
   await deny('D47: the doctor cannot unblock themselves on their profile', updateDoc(doc(dWallet, 'Providers/dWallet'), { wallet_blocked: false }));
   await allow('D47: ...but can still edit the rest of their profile', updateDoc(doc(dWallet, 'Providers/dWallet'), { city: 'Cebu City' }));
+  // The payout account (D47): the doctor saves it; only a known bank or GCash, a name and the last 4 digits.
+  const payout = (fields = {}) => ({ kind: 'bank', provider_name: 'BDO', account_name: 'Dr Wallet', last4: '4821', updated_at: serverTimestamp(), ...fields });
+  await allow('D47: the doctor saves a bank payout account', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout()));
+  await allow('D47: ...and can change it to GCash', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ kind: 'gcash', provider_name: 'GCash', last4: '4567' })));
+  await deny('D47: a full account number cannot be stored', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ last4: '001234564821' })));
+  await deny('D47: no extra fields (e.g. account_number)', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ account_number: '001234564821' })));
+  await deny('D47: an unknown bank is refused', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ provider_name: 'Fake Bank' })));
+  await deny('D47: GCash must be kind gcash', setDoc(doc(dWallet, 'Payout_Accounts/dWallet'), payout({ provider_name: 'GCash' })));
+  await deny('D47: a patient cannot create a payout account', setDoc(doc(p1, 'Payout_Accounts/p1'), payout()));
+  await deny('D47: nobody saves an account for another doctor', setDoc(doc(d1, 'Payout_Accounts/dWallet'), payout()));
+  await allow('D47: the doctor reads their payout account', getDoc(doc(dWallet, 'Payout_Accounts/dWallet')));
+  await allow('D47: an admin reads a payout account', getDoc(doc(a1, 'Payout_Accounts/dWallet')));
+  await deny('D47: a patient cannot read a payout account', getDoc(doc(p1, 'Payout_Accounts/dWallet')));
+
+  // ---- the doctor's mobile number on their own Users doc (D49)
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'Users/dWallet'), { full_name: 'Dr Wallet', role: 'doctor', onboarding_completed: true });
+  });
+  await allow('D49: the doctor saves a mobile number', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '+639171234567' }));
+  await allow('D49: ...and can clear it', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '' }));
+  await deny('D49: a number in another form is refused', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '0917 123 4567' }));
+  await deny('D49: a landline or short number is refused', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '+63321234567' }));
+  await deny('D49: a patient cannot read the doctor\'s number', getDoc(doc(p1, 'Users/dWallet')));
 
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));

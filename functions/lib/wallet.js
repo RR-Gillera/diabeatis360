@@ -8,6 +8,9 @@
 //                                  type: earning | commission | topup | withdrawal; amount is + (in) or - (out)
 //   Providers/{doctorUid}.wallet_blocked   true while the balance is below 0, so Find a Doctor can hide the doctor
 //                                          (patients cannot read Wallets). firestore.rules also refuses the booking.
+//   Payout_Accounts/{doctorUid}    { kind, provider_name, account_name, last4, updated_at }   written by the DOCTOR
+//                                  (firestore.rules checks it); only read here, so a withdrawal names the account it
+//                                  went to ("BDO •••• 4821"). Only the last 4 digits of the number are ever stored.
 //
 // When a booking is COMPLETED it is settled once:
 //   paid online (demo)  -> + fee (the money came through the app) and - platform_commission
@@ -111,24 +114,36 @@ async function settleBookings({ db, uid, bookingId }) {
   return { settled, balance: pesos(wallet.exists ? wallet.data().balance || 0 : 0) }
 }
 
-// A top-up adds money; a withdrawal takes it out and may never take the balance below 0.
+// "BDO •••• 4821", the same text the app shows (diabeatis360-mobile/src/features/wallet/payout.ts payoutLabel).
+const payoutLabel = (account) => `${String(account.provider_name)} •••• ${String(account.last4)}`
+
+// A top-up adds money (method: GCash or card). A withdrawal takes it out to the doctor's saved payout account and may
+// never take the balance below 0; with no saved account there is nowhere to send it, so it is refused.
 async function moveMoney({ db, uid, type, amount, method }) {
   await requireDoctor(db, uid)
   const value = checkAmount(amount)
-  checkMethod(method)
+  if (type === 'topup') checkMethod(method)
   return db.runTransaction(async (tx) => {
     const walletRef = db.doc(`Wallets/${uid}`)
-    const walletSnap = await tx.get(walletRef)
+    const [walletSnap, payoutSnap] = await Promise.all([
+      tx.get(walletRef),
+      type === 'withdrawal' ? tx.get(db.doc(`Payout_Accounts/${uid}`)) : Promise.resolve(null),
+    ])
     const current = pesos(walletSnap.exists ? walletSnap.data().balance || 0 : 0)
-    if (type === 'withdrawal' && value > current) {
-      throw new HttpsError('failed-precondition', current > 0 ? `You can withdraw at most ₱${current.toFixed(2)}.` : 'There is nothing to withdraw yet.')
+    let label = method
+    if (type === 'withdrawal') {
+      if (value > current) {
+        throw new HttpsError('failed-precondition', current > 0 ? `You can withdraw at most ₱${current.toFixed(2)}.` : 'There is nothing to withdraw yet.')
+      }
+      if (!payoutSnap || !payoutSnap.exists) throw new HttpsError('failed-precondition', 'Add a payout account before you withdraw.')
+      label = payoutLabel(payoutSnap.data())
     }
     const balance = pesos(type === 'topup' ? current + value : current - value)
     tx.set(db.collection('Wallet_Transactions').doc(), {
       provider_id: uid,
       type,
       amount: type === 'topup' ? value : -value,
-      method,
+      method: label,
       booking_id: null,
       balance_after: balance,
       created_at: FieldValue.serverTimestamp(),
@@ -139,6 +154,6 @@ async function moveMoney({ db, uid, type, amount, method }) {
 }
 
 const topUpWallet = ({ db, uid, amount, method }) => moveMoney({ db, uid, type: 'topup', amount, method })
-const withdrawFromWallet = ({ db, uid, amount, method }) => moveMoney({ db, uid, type: 'withdrawal', amount, method })
+const withdrawFromWallet = ({ db, uid, amount }) => moveMoney({ db, uid, type: 'withdrawal', amount })
 
 module.exports = { settleBookings, topUpWallet, withdrawFromWallet, WALLET_METHODS, MAX_AMOUNT }

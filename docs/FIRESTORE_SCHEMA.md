@@ -6,7 +6,7 @@ intent. Names below are lowercase for readability. If this file and seed.cjs dis
 ## Existing collections (16, from the manuscript data dictionary, already seeded)
 | Collection | Doc ID | Key fields |
 |---|---|---|
-| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, disliked_ingredients (D40), diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), created_at, is_active |
+| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, disliked_ingredients (D40), diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), phone_number (D49: doctors only, optional, `''` or `+639XXXXXXXXX`, checked by the rules; on Users so patients cannot read it), created_at, is_active |
 | guardian_verifications | **the child's own Auth UID** (D16: one per pediatric account, not auto — matches the manuscript's "Minor's Own User ID") | user_id, guardian_full_name, guardian_id_photo_url (Firebase Storage download URL), relationship_to_minor (`parent`/`legal_guardian`/`other`), verification_status (`pending`/`approved`/`rejected`), reviewed_by, reviewed_at, rejection_reason, submitted_at |
 | providers | Auth UID | email, full_name, specialty, prc_license_number, city, consultation_fee (number), is_verified, verified_by, created_at, is_active |
 | admins | Auth UID | email, full_name, role (`super_admin`/`admin`), last_login, created_at |
@@ -116,6 +116,15 @@ A change to `reading_mgdl`, `context` or `notes` is refused unless the same writ
 | Emergency_Contacts | the patient's Auth UID | user_id, contacts (list of at most 2 maps: name (1–60 chars), relationship (optional, ≤ 30), phone (`+639XXXXXXXXX`), no repeated number), updated_at (server time) | the patient only (not doctors, not admins; the server reads it with its own access) | The family members texted when the patient logs a critical reading. An empty list turns the alerts off. Kept off `Users` because a booked doctor can read `Users`. |
 | Family_Alerts | the reading's id (`Glucose_Logs` doc id) | patient_id, log_id, day (Manila date, `2026-11-13`), status (`sending` / `sent` / `failed` / `no-contacts` / `limit`), contacts_count, created_at, sent_at | the patient it belongs to (a missing one may be read, so the result screen can wait for it) | Written **only by the server**, once per reading (so a reading never texts twice). Counts toward the per-patient (3 a day) and whole-project daily limits. Holds no phone number and no message text. |
 No index is needed: the server's daily count queries `Family_Alerts where day ==` only.
+
+## The doctor's wallet — `Wallets`, `Wallet_Transactions`, `Payout_Accounts` (DECISIONS.md D47, 2026-11-19)
+| Collection | Doc ID | Fields | Who reads | Meaning |
+|---|---|---|---|---|
+| Wallets | the doctor's Auth UID | balance (number, pesos, may be below 0), updated_at | the doctor, admins | Written **only by the server** (`functions/lib/wallet.js`). Below 0 = commission owed on on-site consultations. |
+| Wallet_Transactions | `<bookingId>_earning` / `<bookingId>_commission` for a consultation; an auto id for a top-up or withdrawal | provider_id, type (`earning` / `commission` / `topup` / `withdrawal`), amount (+ in, − out), method (patient's payment method, top-up method, or "BDO •••• 4821" for a withdrawal), booking_id (null for top-up/withdrawal), balance_after, created_at | the doctor, admins | Written **only by the server**; the fixed consultation ids make settling safe to repeat. |
+| Payout_Accounts | the doctor's Auth UID | kind (`bank` / `gcash`), provider_name (a bank from the fixed list, or "GCash"), account_name (2–80 chars), last4 (exactly 4 digits), updated_at (server time) | the doctor, admins (not patients) | Where withdrawals go. Written by the **doctor**; the rules check every field, so only the last 4 digits of a number can be stored. |
+
+Also on `Providers`: `wallet_blocked` (boolean, server-written; true while the wallet is below 0, so Find a Doctor hides the doctor and the rules refuse new bookings). No index is needed: the app reads `Wallet_Transactions where provider_id ==` and sorts on the phone.
 
 ## Indexes you'll likely need
 - glucose_logs: `user_id ==` + `logged_at desc`

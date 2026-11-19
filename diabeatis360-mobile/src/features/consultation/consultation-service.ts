@@ -3,6 +3,7 @@ import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, se
 import { db } from '@/firebase';
 import type { ConsultationStatus } from '@/constants/enums';
 import { createNotification } from '@/features/notifications/notification-service';
+import { settleWallet } from '@/features/wallet/wallet-service';
 
 import type { TrendPoint } from './glucose-trend';
 
@@ -189,6 +190,10 @@ export async function endConsultation(bookingId: string, notes: ConsultationNote
     batch.set(doc(db, 'Consultation_Notes', bookingId), noteRecord(bookingId, String(data.patient_id ?? ''), String(data.provider_id ?? ''), notes));
   }
   await batch.commit();
+
+  // The booking is now completed, so the server settles it into the doctor's wallet (D47): the fee if paid online, minus
+  // the 15% commission. It never throws and is safe to repeat; if it fails, the wallet screen catches up when opened.
+  void settleWallet(bookingId);
 
   // Tell the other party. Failing to notify must never undo the end itself.
   try {
