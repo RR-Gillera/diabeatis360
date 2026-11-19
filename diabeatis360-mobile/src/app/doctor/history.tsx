@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
@@ -61,16 +61,16 @@ export default function DoctorHistoryScreen() {
 
 const styles = StyleSheet.create({
   scroll: { gap: 12, padding: 24, paddingBottom: 140, paddingTop: 16 },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
-  subtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, marginBottom: 6, marginTop: -6 },
+  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24 },
+  subtitle: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, marginBottom: 6, marginTop: -6 },
   empty: { alignItems: 'center', gap: 10, paddingHorizontal: 24, paddingTop: 120 },
   emptyCircle: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 60, height: 120, justifyContent: 'center', marginBottom: 10, width: 120 },
-  emptyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  emptyText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  emptyTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 20, textAlign: 'center' },
+  emptyText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   card: { alignItems: 'center', flexDirection: 'row', gap: 14 },
   avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
-  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 16 },
   copy: { flex: 1 },
-  name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
-  meta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 3 },
+  name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 16 },
+  meta: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 3 },
 });

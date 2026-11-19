@@ -1,10 +1,14 @@
+import { useEffect, useState } from 'react';
 import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
+import { useAuth } from '@/features/auth/auth-context';
 import { homeColors } from '@/features/home/home-ui';
+import { subscribeToNotifications } from '@/features/notifications/notification-service';
 import type { BookingStatus } from '@/features/booking/types';
+import { useTabBarBottomPadding } from '@/components/ui/system-bars';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
 
@@ -19,30 +23,50 @@ export const statusStyle: Record<BookingStatus, { color: string; background: str
 
 type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
 
-// The five tabs of the doctor frames (Dashboard, D-05, D-11; DECISIONS D24). The patients list stays reachable from the
-// dashboard's "My Patients" and from the History cards.
+// The five tabs of the doctor frames (Dashboard 2026-11-19, D-05, D-11; DECISIONS D24): Home, Requests, History,
+// Notifications, Profile, with the frame's icons. The patients list stays reachable from the dashboard's "My Patients" and from the
+// History cards.
 const navItems = [
   { key: 'home', labelKey: 'nav.home', href: '/doctor', icon: 'house.fill', iconAndroid: 'home' },
-  { key: 'requests', labelKey: 'doctor.nav.requests', href: '/doctor/appointments', icon: 'tray.fill', iconAndroid: 'inbox' },
-  { key: 'history', labelKey: 'doctor.nav.history', href: '/doctor/history' as Href, icon: 'clock.arrow.circlepath', iconAndroid: 'history' },
-  { key: 'notifications', labelKey: 'notif.title', href: '/doctor/notifications', icon: 'bell.fill', iconAndroid: 'notifications' },
+  { key: 'requests', labelKey: 'doctor.nav.requests', href: '/doctor/appointments', icon: 'doc.fill.badge.plus', iconAndroid: 'note_add' },
+  { key: 'history', labelKey: 'doctor.nav.history', href: '/doctor/history' as Href, icon: 'chart.bar.fill', iconAndroid: 'bar_chart' },
+  { key: 'notifications', labelKey: 'doctor.nav.inbox', href: '/doctor/notifications', icon: 'bell.fill', iconAndroid: 'notifications' },
   { key: 'profile', labelKey: 'nav.profile', href: '/doctor/profile', icon: 'person.fill', iconAndroid: 'person' },
 ] as const satisfies { key: DoctorTab; labelKey: MessageKey; href: Href; icon: string; iconAndroid: string }[];
 
-// Doctor-side tab bar. Same visual language as the patient BottomNav, minus the
-// raised center camera action — nutrition scanning is a patient-only module.
+// Doctor-side tab bar: the frame's white bar with rounded top corners, floating over the screen. Same idea as the
+// patient BottomNav, minus the raised center camera action — nutrition scanning is a patient-only module.
 export function DoctorBottomNav({ active }: { active: DoctorTab }) {
   const router = useRouter();
   const { t } = useT();
+  const { uid } = useAuth();
+  // Taller when the phone shows the 3-button bar, so the tabs sit above it (constants/system-bars.ts).
+  const navBottom = useTabBarBottomPadding();
+  // The red dot on Inbox: any Notifications doc this doctor has not opened yet (chat, credential review, critical reading).
+  const [hasUnread, setHasUnread] = useState(false);
+  useEffect(() => {
+    if (!uid) return;
+    return subscribeToNotifications(uid, (entries) => setHasUnread(entries.some((entry) => !entry.isRead)), () => setHasUnread(false));
+  }, [uid]);
   return (
-    <View style={styles.nav}>
+    <View style={[styles.nav, { paddingBottom: navBottom }]}>
       {navItems.map((item) => {
         const color = item.key === active ? homeColors.green : homeColors.textMuted;
+        const dot = item.key === 'notifications' && hasUnread;
         // dismissTo rather than push, for the same reason as the patient nav:
         // switching tabs should move between them, not stack another copy.
         return (
-          <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: item.key === active }} accessibilityLabel={t(item.labelKey)} onPress={() => router.dismissTo(item.href)} style={styles.navItem}>
-            <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={20} tintColor={color} />
+          <Pressable
+            key={item.key}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: item.key === active }}
+            accessibilityLabel={dot ? `${t(item.labelKey)}, ${t('doctor.nav.unread')}` : t(item.labelKey)}
+            onPress={() => router.dismissTo(item.href)}
+            style={styles.navItem}>
+            <View>
+              <SymbolView name={{ ios: item.icon, android: item.iconAndroid, web: item.iconAndroid }} size={22} tintColor={color} />
+              {dot ? <View style={styles.navDot} /> : null}
+            </View>
             <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={[styles.navLabel, { color }]}>{t(item.labelKey)}</Text>
           </Pressable>
         );
@@ -51,8 +75,8 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
   );
 }
 
-export function DoctorHeader({ title, subtitle, onBack, badgeCount }: { title: string; subtitle?: string; onBack?: () => void; badgeCount?: number }) {
-  const router = useRouter();
+// No bell here: the tab bar's Notifications tab (with its red dot) is the one way in, so the header does not repeat it.
+export function DoctorHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack?: () => void }) {
   const { t } = useT();
   return (
     <View style={styles.header}>
@@ -67,10 +91,6 @@ export function DoctorHeader({ title, subtitle, onBack, badgeCount }: { title: s
           {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={t('notif.title')} style={styles.bellButton} onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}>
-        <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
-        {badgeCount ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{badgeCount > 9 ? '9+' : badgeCount}</Text></View> : null}
-      </Pressable>
     </View>
   );
 }
@@ -119,31 +139,29 @@ export const doctorStyles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { padding: 24, paddingBottom: 140 },
   card: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 24, borderWidth: 1, padding: 20, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
-  sectionTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
-  label: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  value: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700' },
-  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13 },
+  sectionTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
+  label: { color: homeColors.textFaint, fontFamily: Brand.font.extraBold, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase' },
+  value: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15 },
+  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13 },
 });
 
 const styles = StyleSheet.create({
-  nav: { alignItems: 'center', backgroundColor: homeColors.card, borderTopColor: homeColors.borderSoft, borderTopWidth: 1, bottom: 0, flexDirection: 'row', justifyContent: 'space-around', left: 0, paddingBottom: 24, paddingTop: 10, position: 'absolute', right: 0 },
+  nav: { alignItems: 'center', backgroundColor: homeColors.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, bottom: 0, elevation: 12, flexDirection: 'row', justifyContent: 'space-around', left: 0, paddingBottom: 24, paddingTop: 14, position: 'absolute', right: 0, shadowColor: '#000', shadowOffset: { height: -4, width: 0 }, shadowOpacity: 0.06, shadowRadius: 12 },
   navItem: { alignItems: 'center', gap: 4, minWidth: 56 },
-  navLabel: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  navLabel: { fontFamily: Brand.font.bold, fontSize: 11 },
+  navDot: { backgroundColor: homeColors.red, borderColor: homeColors.card, borderRadius: 5, borderWidth: 1.5, height: 10, position: 'absolute', right: -2, top: -1, width: 10 },
   header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 24, paddingHorizontal: 24, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   headerLeft: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14 },
   backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },
-  headerTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900' },
-  headerSubtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500', marginTop: 2 },
-  bellButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.border, borderRadius: 22, borderWidth: 1, height: 44, justifyContent: 'center', width: 44 },
-  bellDot: { alignItems: 'center', backgroundColor: homeColors.red, borderColor: '#FFF', borderRadius: 9, borderWidth: 2, height: 18, justifyContent: 'center', minWidth: 18, paddingHorizontal: 3, position: 'absolute', right: 4, top: 4 },
-  bellDotText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 9, fontWeight: '800' },
+  headerTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24 },
+  headerSubtitle: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14, marginTop: 2 },
   pill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  pillText: { fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  pillText: { fontFamily: Brand.font.extraBold, fontSize: 11, textTransform: 'uppercase' },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 40 },
   emptyIcon: { alignItems: 'center', backgroundColor: homeColors.borderSoft, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  emptyTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700', marginTop: 4 },
-  emptyDetail: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13, lineHeight: 20, maxWidth: 260, textAlign: 'center' },
+  emptyTitle: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15, marginTop: 4 },
+  emptyDetail: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 20, maxWidth: 260, textAlign: 'center' },
   childBadge: { alignItems: 'center', backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 6, paddingHorizontal: 10, paddingVertical: 6 },
-  childBadgeText: { color: CHILD_BLUE, flexShrink: 1, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '800' },
+  childBadgeText: { color: CHILD_BLUE, flexShrink: 1, fontFamily: Brand.font.extraBold, fontSize: 12 },
 });

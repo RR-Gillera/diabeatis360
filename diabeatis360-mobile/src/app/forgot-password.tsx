@@ -11,6 +11,7 @@ import { RESET_RESEND_SECONDS, errorCode, formatCountdown, maskEmail } from '@/f
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
+import { Brand } from '@/constants/theme';
 
 // "Reset your password" (Figma P-01, doctors D-01) and, once the email has gone out, "Check your email" (P-02, D-02).
 // Login's "Forgot password?" opens this screen with whatever was typed in its email field.
@@ -90,16 +91,16 @@ function resetErrorKey(code: string | undefined): MessageKey {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 1, padding: 24, paddingTop: 24 },
-  title: { color: authColors.navy, fontSize: 28, fontWeight: '900', marginTop: 28 },
-  subtitle: { color: authColors.muted, fontSize: 15, lineHeight: 23, marginTop: 12 },
+  title: { color: authColors.navy, fontSize: 28, fontFamily: Brand.font.extraBold, marginTop: 28 },
+  subtitle: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 23, marginTop: 12 },
   form: { gap: 20, marginTop: 28 },
-  error: { color: '#D9364F', fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   sentScreen: { padding: 24, paddingBottom: 32 },
   sentBody: { alignItems: 'center', flex: 1, gap: 10, justifyContent: 'center' },
   check: { alignItems: 'center', backgroundColor: authColors.green, borderRadius: 52, height: 104, justifyContent: 'center', marginBottom: 14, width: 104 },
-  sentTitle: { color: authColors.navy, fontSize: 28, fontWeight: '900' },
-  sentText: { color: authColors.muted, fontSize: 15, lineHeight: 21, textAlign: 'center' },
-  hint: { color: authColors.muted, fontSize: 13, marginTop: 6, textAlign: 'center' },
-  resend: { color: authColors.muted, fontSize: 14, marginTop: 18, textAlign: 'center' },
-  resendReady: { color: authColors.green, fontWeight: '800' },
+  sentTitle: { color: authColors.navy, fontSize: 28, fontFamily: Brand.font.extraBold },
+  sentText: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 21, textAlign: 'center' },
+  hint: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 13, marginTop: 6, textAlign: 'center' },
+  resend: { color: authColors.muted, fontFamily: Brand.font.regular, fontSize: 14, marginTop: 18, textAlign: 'center' },
+  resendReady: { color: authColors.green, fontFamily: Brand.font.extraBold },
 });

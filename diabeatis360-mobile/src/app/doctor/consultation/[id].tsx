@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
@@ -169,28 +169,28 @@ const styles = StyleSheet.create({
   scroll: { gap: 16, padding: 24, paddingBottom: 60 },
   card: { alignItems: 'center', gap: 8 },
   avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 22, height: 80, justifyContent: 'center', width: 80 },
-  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 26, fontWeight: '800' },
-  name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 20, fontWeight: '900' },
+  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 26 },
+  name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 20 },
   pill: { backgroundColor: homeColors.greenTint, borderColor: 'rgba(98, 156, 44, 0.35)', borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 4 },
-  pillText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  pillText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 11, letterSpacing: 0.6 },
   divider: { alignSelf: 'stretch', backgroundColor: homeColors.border, height: 1, marginVertical: 10 },
   grid: { alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   cell: { gap: 4, width: '50%' },
-  label: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
-  value: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  label: { color: homeColors.textFaint, fontFamily: Brand.font.bold, fontSize: 11, letterSpacing: 0.6 },
+  value: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 15 },
   notesCard: { gap: 12 },
   extra: { gap: 4 },
-  edit: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
-  notesTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13, fontWeight: '800', letterSpacing: 0.6 },
+  edit: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 14 },
+  notesTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 13, letterSpacing: 0.6 },
   notesBox: { backgroundColor: '#F5F7F9', borderRadius: 14, padding: 14 },
-  notesText: { color: '#475569', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21 },
-  notesEmpty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 14, fontStyle: 'italic', lineHeight: 21 },
-  input: { backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 14, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, minHeight: 110, padding: 14, textAlignVertical: 'top' },
-  success: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 13, fontWeight: '700' },
+  notesText: { color: '#475569', fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 21 },
+  notesEmpty: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 14, fontStyle: 'italic', lineHeight: 21 },
+  input: { backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 14, borderWidth: 1, color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 14, minHeight: 110, padding: 14, textAlignVertical: 'top' },
+  success: { color: homeColors.green, fontFamily: Brand.font.bold, fontSize: 13 },
   save: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 999, justifyContent: 'center', minHeight: 52 },
-  saveText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  saveText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 16 },
   disabled: { opacity: 0.5 },
   links: { flexDirection: 'row', gap: 12 },
   linkButton: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 14, borderWidth: 1.5, flex: 1, justifyContent: 'center', minHeight: 46 },
-  linkText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
+  linkText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 14 },
 });

@@ -1,6 +1,6 @@
 import type { AvailabilityMode } from '@/constants/enums';
 
-import type { TimeRange } from './time-slots';
+import type { WeeklyHours } from './availability';
 
 // The doctor's own bookable profile (Providers doc, ID == Auth UID), plus the
 // availability fields that back the "Manage Schedule" module. Availability is
@@ -12,10 +12,14 @@ export type DoctorProfile = {
   email: string;
   specialty: string;
   prcLicenseNumber: string;
+  /** Providers.license_expiry, typed in doctor setup or Edit Profile; null when not given. */
+  licenseExpiry: Date | null;
   city: string;
   consultationFee: number;
   isVerified: boolean;
   isActive: boolean;
+  /** When an admin last verified or rejected the credentials (Providers.reviewed_at); null before any review. */
+  reviewedAt: Date | null;
   /** Set by an admin's Reject action (admin panel); shown on the pending-verification screen so the doctor
    * knows what to fix before resubmitting. Cleared back to '' once the admin verifies. */
   rejectionReason: string;
@@ -23,8 +27,11 @@ export type DoctorProfile = {
   availabilityMode: AvailabilityMode;
   /** Weekday indexes the doctor works, Mon=0 … Sun=6. Empty means "not set yet". */
   availableDays: number[];
-  /** Free-form availability windows, e.g. 7:00 PM - 9:00 PM. Empty means "not set yet". */
-  availableRanges: TimeRange[];
+  /** Each weekday's own time slots (Providers.weekly_hours, D48), Monday first. For a doctor saved before D48, every
+   *  day holds the old shared available_ranges. A day with no slots means "not set yet". */
+  weeklyHours: WeeklyHours;
+  /** The doctor's wallet is below ₱0 (Providers.wallet_blocked, written only by the server, D47): patients cannot book them. */
+  walletBlocked: boolean;
 };
 
 // A patient as the doctor sees them: identity from the Users doc plus the

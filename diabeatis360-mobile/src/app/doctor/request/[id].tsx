@@ -5,13 +5,14 @@ import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { bookingReference } from '@/features/booking/booking-reference';
 import { DECLINE_REASON_LIMIT, subscribeToBooking, updateBookingStatus } from '@/features/booking/booking-service';
 import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
+import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { ageFrom } from '@/features/doctor/doctor-stats';
 import { ChildAccountBadge, DoctorHeader, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import type { PatientProfile } from '@/features/doctor/types';
@@ -22,7 +23,8 @@ import { useT } from '@/i18n/language-context';
 // Request Details (doctor Figma frames "Request Details" and "if declined (modal)", DECISIONS D24): who is asking, when, and
 // Accept / Decline. The patient's profile is readable because booking shared it with this doctor (Care_Links, D22). The
 // patient's own words ("concern") come from the booking, and a decline can carry a reason the patient sees (D24).
-// Medical-record files are not built: they need Storage (Blaze, D18).
+// "Medical Records" opens the patient's health profile and readings. The frame's "3 documents attached" would be uploaded
+// files, which need Storage (Blaze, D18), so the card counts the blood sugar readings shared with this doctor instead.
 export default function RequestDetailsScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/doctor/appointments');
@@ -35,6 +37,7 @@ export default function RequestDetailsScreen() {
   const [working, setWorking] = useState<'accept' | 'decline' | null>(null);
   const [error, setError] = useState('');
   const [loadFailed, setLoadFailed] = useState(false);
+  const [readingCount, setReadingCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -44,6 +47,10 @@ export default function RequestDetailsScreen() {
   useEffect(() => {
     if (!patientId) return;
     return subscribeToPatientProfile(patientId, setPatient, () => {});
+  }, [patientId]);
+  useEffect(() => {
+    if (!patientId) return;
+    return subscribeToGlucoseHistory(patientId, (entries) => setReadingCount(entries.length), () => setReadingCount(null));
   }, [patientId]);
 
   const decide = async (status: 'confirmed' | 'declined') => {
@@ -73,7 +80,7 @@ export default function RequestDetailsScreen() {
         {booking ? (
           <>
             <View style={[doctorStyles.card, styles.card]}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View>
+              <View style={styles.avatarRing}><View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View></View>
               <Text style={styles.name}>{name}</Text>
               <Text style={styles.age}>{age !== null ? t('doctor.request.age', { age }) : t('doctor.request.noAge')}</Text>
               {/* QA DOC-013: the doctor knows before accepting that a parent or guardian runs this child's account (D16). */}
@@ -102,10 +109,12 @@ export default function RequestDetailsScreen() {
             </View>
 
             <Pressable accessibilityRole="button" style={[doctorStyles.card, styles.link]} onPress={() => router.push({ pathname: '/doctor/patient/[id]', params: { id: booking.patientId } })}>
-              <View style={styles.linkIcon}><SymbolView name={{ ios: 'heart.text.square.fill', android: 'monitor_heart', web: 'monitor_heart' }} size={18} tintColor={homeColors.green} /></View>
+              <View style={styles.linkIcon}><SymbolView name={{ ios: 'doc.badge.plus', android: 'note_add', web: 'note_add' }} size={18} tintColor="#3B82F6" /></View>
               <View style={styles.linkCopy}>
-                <Text style={styles.linkTitle}>{t('doctor.request.healthLink')}</Text>
-                <Text style={styles.linkText}>{t('doctor.request.shared')}</Text>
+                <Text style={styles.linkTitle}>{t('doctor.request.records')}</Text>
+                <Text style={styles.linkText}>
+                  {readingCount === null ? ' ' : readingCount === 0 ? t('doctor.request.recordsNone') : readingCount === 1 ? t('doctor.request.recordsOne') : t('doctor.request.recordsMany', { count: readingCount })}
+                </Text>
               </View>
               <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={16} tintColor={homeColors.textFaint} />
             </Pressable>
@@ -161,42 +170,44 @@ export default function RequestDetailsScreen() {
 const styles = StyleSheet.create({
   scroll: { gap: 16, padding: 24, paddingBottom: 60 },
   card: { alignItems: 'center', gap: 6 },
-  avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 24, height: 88, justifyContent: 'center', width: 88 },
-  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 30, fontWeight: '800' },
-  name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 24, fontWeight: '900', marginTop: 8 },
-  age: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14 },
+  // The frame's photo sits in a soft green ring; the app shows initials (there is no photo field).
+  avatarRing: { borderColor: 'rgba(98, 156, 44, 0.18)', borderRadius: 30, borderWidth: 4, padding: 0 },
+  avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 26, height: 88, justifyContent: 'center', width: 88 },
+  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 30 },
+  name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24, marginTop: 8 },
+  age: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14 },
   divider: { alignSelf: 'stretch', backgroundColor: homeColors.border, height: 1, marginVertical: 12 },
   grid: { alignSelf: 'stretch', flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
   cell: { gap: 4, width: '50%' },
-  label: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700', letterSpacing: 0.6 },
-  value: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
+  label: { color: homeColors.textFaint, fontFamily: Brand.font.bold, fontSize: 11, letterSpacing: 0.6 },
+  value: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 17 },
   green: { color: homeColors.green },
   statusRow: { alignItems: 'center', alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  reference: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, fontWeight: '600' },
+  reference: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 12 },
   concernCard: { gap: 12 },
-  concernTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 13, fontWeight: '800', letterSpacing: 0.6 },
+  concernTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 13, letterSpacing: 0.6 },
   concernBox: { backgroundColor: '#F5F7F9', borderRadius: 14, padding: 14 },
-  concernText: { color: '#475569', fontFamily: Fonts.sans, fontSize: 15, fontStyle: 'italic', lineHeight: 22 },
-  concernNone: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 14 },
-  reason: { alignSelf: 'stretch', backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 14, borderWidth: 1, color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' },
-  reasonHint: { alignSelf: 'stretch', color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 12 },
+  concernText: { color: '#475569', fontFamily: Brand.font.regular, fontSize: 15, fontStyle: 'italic', lineHeight: 22 },
+  concernNone: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 14 },
+  reason: { alignSelf: 'stretch', backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 14, borderWidth: 1, color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 14, minHeight: 90, padding: 14, textAlignVertical: 'top' },
+  reasonHint: { alignSelf: 'stretch', color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12 },
   link: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  linkIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  linkIcon: { alignItems: 'center', backgroundColor: homeColors.blueTint, borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   linkCopy: { flex: 1 },
-  linkTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
-  linkText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 2 },
+  linkTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 15 },
+  linkText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
   accept: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 999, justifyContent: 'center', minHeight: 56 },
-  acceptText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  acceptText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 16 },
   decline: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.border, borderRadius: 999, borderWidth: 1, justifyContent: 'center', minHeight: 56 },
-  declineText: { color: '#EF4444', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  declineText: { color: '#EF4444', fontFamily: Brand.font.extraBold, fontSize: 16 },
   disabled: { opacity: 0.6 },
-  decided: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, textAlign: 'center' },
+  decided: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, textAlign: 'center' },
   overlay: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 32 },
   dialog: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 32, gap: 12, maxWidth: 360, padding: 24, width: '100%' },
-  dialogTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 20, fontWeight: '900' },
-  dialogText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  dialogTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 20 },
+  dialogText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   dialogConfirm: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#B91C1C', borderRadius: 999, justifyContent: 'center', marginTop: 6, minHeight: 52 },
-  dialogConfirmText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  dialogConfirmText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 16 },
   dialogCancel: { alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center', minHeight: 44 },
-  dialogCancelText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '700' },
+  dialogCancelText: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15 },
 });

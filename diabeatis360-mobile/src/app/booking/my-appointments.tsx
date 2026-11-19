@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
-import { Fonts } from '@/constants/theme';
+import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { APPOINTMENT_TABS, initialsOf, tabFor, type AppointmentTab } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
@@ -118,35 +118,35 @@ export default function MyAppointmentsScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  title: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 26, fontWeight: '900', paddingHorizontal: 24, paddingTop: 16 },
+  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 26, paddingHorizontal: 24, paddingTop: 16 },
   tabsScroll: { flexGrow: 0, marginTop: 14 },
   tabs: { gap: 8, paddingHorizontal: 24 },
   tab: { backgroundColor: '#FFFFFF', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
   tabActive: { backgroundColor: 'rgba(220, 242, 169, 0.9)' },
-  tabText: { color: '#64748B', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '700' },
+  tabText: { color: '#64748B', fontFamily: Brand.font.bold, fontSize: 14 },
   tabTextActive: { color: homeColors.green },
   scroll: { gap: 14, padding: 24, paddingBottom: 140 },
-  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 13 },
+  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13 },
   loader: { marginTop: 30 },
-  empty: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, marginTop: 30, textAlign: 'center' },
+  empty: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, marginTop: 30, textAlign: 'center' },
   card: { backgroundColor: homeColors.card, borderRadius: 28, gap: 14, padding: 16, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.06, shadowRadius: 8 },
   details: { gap: 14 },
   reason: { backgroundColor: '#FBE6E9', borderRadius: 14, gap: 2, padding: 12 },
-  reasonLabel: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 12, fontWeight: '800' },
-  reasonText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
+  reasonLabel: { color: '#D9364F', fontFamily: Brand.font.extraBold, fontSize: 12 },
+  reasonText: { color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20 },
   top: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
-  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
   who: { flex: 1 },
-  name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
-  specialty: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 13 },
+  name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 16 },
+  specialty: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13 },
   pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  pillText: { fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700' },
+  pillText: { fontFamily: Brand.font.bold, fontSize: 11 },
   when: { flexDirection: 'row', gap: 18 },
   whenItem: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  whenText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '500' },
+  whenText: { color: '#0F172A', fontFamily: Brand.font.medium, fontSize: 14 },
   filled: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, height: 44, justifyContent: 'center' },
-  filledText: { color: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  filledText: { color: '#FFFFFF', fontFamily: Brand.font.extraBold, fontSize: 15 },
   outline: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 14, borderWidth: 1.5, height: 44, justifyContent: 'center' },
-  outlineText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  outlineText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
 });
