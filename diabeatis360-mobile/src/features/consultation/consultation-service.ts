@@ -3,9 +3,6 @@ import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, se
 import { db } from '@/firebase';
 import type { ConsultationStatus } from '@/constants/enums';
 import { createNotification } from '@/features/notifications/notification-service';
-import { settleWallet } from '@/features/wallet/wallet-service';
-
-import type { TrendPoint } from './glucose-trend';
 
 export type { ConsultationStatus };
 
@@ -18,8 +15,6 @@ export type ChatMessage = {
   senderRole: SenderRole;
   text: string;
   sentAt: Date | null;
-  /** A shared blood sugar trend (frame "Consultation Chat"), shown as a small chart under the text; null for plain text. */
-  trend: TrendPoint[] | null;
 };
 
 /** What the doctor writes when ending (Figma D-07, DECISIONS D24): Diagnosis notes (stored as "summary"), Advice, Follow-up. */
@@ -39,9 +34,7 @@ export type ConsultationState = ConsultationNotes & {
 // Consultation state (active/ended) lives on the Bookings doc itself, since the booking IS the consultation. The
 // doctor's WRITTEN summary is its own document, Consultation_Notes/{bookingId} (DECISIONS.md D22): it used to sit on the
 // booking, which many people could read; now only the two people on that booking can.
-// A message may carry a blood sugar trend (`trend`: up to 7 { day, average_mgdl } points, firestore.rules). It is a
-// copy of the patient's daily averages at the moment it was shared, so the chat record stays the same later.
-export async function sendMessage(bookingId: string, senderId: string, senderRole: SenderRole, text: string, trend?: TrendPoint[]) {
+export async function sendMessage(bookingId: string, senderId: string, senderRole: SenderRole, text: string) {
   const trimmed = text.trim();
   if (!trimmed) return;
   await addDoc(collection(db, 'Messages'), {
@@ -50,7 +43,6 @@ export async function sendMessage(bookingId: string, senderId: string, senderRol
     sender_role: senderRole,
     message: trimmed,
     sent_at: serverTimestamp(),
-    ...(trend ? { trend: trend.map((point) => ({ day: Timestamp.fromDate(point.day), average_mgdl: point.averageMgdl })) } : {}),
   });
   // First message opens the consultation, so neither side has to press "start".
   await setDoc(doc(db, 'Bookings', bookingId), { consultation_status: 'active' }, { merge: true });
@@ -96,7 +88,6 @@ export function subscribeToMessages(
             senderRole: (data.sender_role === 'doctor' ? 'doctor' : 'patient') as SenderRole,
             text: String(data.message ?? ''),
             sentAt: (data.sent_at as Timestamp | undefined)?.toDate?.() ?? null,
-            trend: readTrend(data.trend),
           };
         })
         // Messages still awaiting their server timestamp sort to the end, which
@@ -106,14 +97,6 @@ export function subscribeToMessages(
     },
     (error) => onError(error),
   );
-}
-
-function readTrend(value: unknown): TrendPoint[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null;
-  return value.map((point) => ({
-    day: (point?.day as Timestamp | undefined)?.toDate?.() ?? new Date(0),
-    averageMgdl: typeof point?.average_mgdl === 'number' ? point.average_mgdl : null,
-  }));
 }
 
 // The consultation's state comes from two documents: the booking (active / ended and when) and the doctor's written
@@ -190,10 +173,6 @@ export async function endConsultation(bookingId: string, notes: ConsultationNote
     batch.set(doc(db, 'Consultation_Notes', bookingId), noteRecord(bookingId, String(data.patient_id ?? ''), String(data.provider_id ?? ''), notes));
   }
   await batch.commit();
-
-  // The booking is now completed, so the server settles it into the doctor's wallet (D47): the fee if paid online, minus
-  // the 15% commission. It never throws and is safe to repeat; if it fails, the wallet screen catches up when opened.
-  void settleWallet(bookingId);
 
   // Tell the other party. Failing to notify must never undo the end itself.
   try {

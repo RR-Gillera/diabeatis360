@@ -19,8 +19,6 @@ export type Provider = {
   profileComplete: boolean;
   /** 'always' when the doctor is open every day at any time (D43); shown as a chip on the Find a Doctor card. */
   availabilityMode: AvailabilityMode;
-  /** The doctor's wallet is below ₱0 (D47): hidden from Find a Doctor until they top up. */
-  walletBlocked: boolean;
 };
 
 export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';

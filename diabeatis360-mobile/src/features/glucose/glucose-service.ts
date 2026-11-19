@@ -214,16 +214,3 @@ export function subscribeToGlucoseHistory(
     (error) => onError(error),
   );
 }
-
-/**
- * One read of a patient's readings: only the amount and when it was taken. Used to share a blood sugar trend in the
- * consultation chat. The patient can read their own, and the doctor they booked can too (Care_Links, D22). Same
- * single-equality query as subscribeToGlucoseHistory.
- */
-export async function fetchGlucoseReadings(patientId: string) {
-  const snapshot = await getDocs(query(collection(db, 'Glucose_Logs'), where('patient_id', '==', patientId)));
-  return snapshot.docs.map((document) => {
-    const data = document.data();
-    return { readingMgdl: Number(data.reading_mgdl ?? 0), loggedAt: (data.logged_at as Timestamp | undefined)?.toDate() ?? null };
-  });
-}

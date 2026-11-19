@@ -5,17 +5,13 @@ import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { SymbolView } from 'expo-symbols';
 
 import { MoreMenu } from '@/components/ui/more-menu';
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
 import { endConsultation, saveConsultationNotes, sendMessage, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
 import { DoctorNotesForm } from '@/features/consultation/doctor-notes-form';
-import { dailyTrend, hasTrend, type TrendPoint } from '@/features/consultation/glucose-trend';
-import { TrendChart } from '@/features/consultation/trend-chart';
-import { manilaWallClock } from '@/features/booking/manila-time';
-import { fetchGlucoseReadings } from '@/features/glucose/glucose-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { homeColors } from '@/features/home/home-ui';
 import { markConversationNotificationsRead } from '@/features/notifications/notification-service';
@@ -38,12 +34,6 @@ function dayLabel(date: Date | null, language: Language) {
   return shortDay(date, language).toUpperCase();
 }
 
-/** Quick emoji for the smiley button in the message box (frame "Consultation Chat"); the phone keyboard has the rest. */
-const QUICK_EMOJI = ['👍', '🙂', '😊', '🙏', '❤️', '👋', '👌', '💪'];
-
-// Consultation Chat (frames P-23 / "Consultation Chat"): the two people on a confirmed booking write to each other. The
-// "+" button shares the patient's blood sugar trend for the last 3 days as a small chart inside a message
-// (features/consultation/glucose-trend.ts); it is a copy of the daily averages at that moment, never advice.
 export default function ConsultationScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -64,9 +54,6 @@ export default function ConsultationScreen() {
   const [notesForm, setNotesForm] = useState<'end' | 'later' | null>(null);
   const [ending, setEnding] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
-  const [attachOpen, setAttachOpen] = useState(false);
-  const [emojiOpen, setEmojiOpen] = useState(false);
-  const [sharing, setSharing] = useState(false);
   // React Native 0.88 (SDK 58): a ref holds the ScrollView instance type, not the component type.
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const goBack = useSafeBack(isDoctor ? '/doctor/appointments' : '/profile');
@@ -108,30 +95,6 @@ export default function ConsultationScreen() {
       setSending(false);
     }
   };
-
-  // Shares the patient's daily averages for the last 3 days. Whatever is typed in the box goes with it as the message;
-  // an empty box sends a plain sentence that says what the chart is.
-  const shareTrend = async () => {
-    setAttachOpen(false);
-    if (!id || !uid || !booking?.patientId || sharing) return;
-    setSharing(true);
-    setError('');
-    try {
-      const points = dailyTrend(await fetchGlucoseReadings(booking.patientId));
-      if (!hasTrend(points)) { setError(t('chat.trendEmpty')); return; }
-      const typed = draft.trim();
-      await sendMessage(id, uid, isDoctor ? 'doctor' : 'patient', typed || t('chat.trendMessage'), points);
-      if (typed) setDraft('');
-    } catch {
-      setError(t('chat.trendFailed'));
-    } finally {
-      setSharing(false);
-    }
-  };
-
-  const trendLabel = (points: TrendPoint[]) => t('chat.trendLabel', {
-    points: points.map((point) => `${shortDay(manilaWallClock(point.day), language)} ${point.averageMgdl !== null ? `${point.averageMgdl} mg/dL` : t('chat.trendNoReading')}`).join(', '),
-  });
 
   // After "End consultation" in the confirm: the doctor goes on to write notes, the patient's consultation ends at once.
   const confirmed = () => {
@@ -193,9 +156,6 @@ export default function ConsultationScreen() {
   const appointmentLabel = booking?.scheduledAt
     ? `${shortApptDay(booking.scheduledAt, language)} · ${formatApptTime(booking.scheduledAt)}`
     : ended ? t('chat.ended') : t('chat.consultation');
-  // The frame's "● CONSULTATION ACTIVE" under the name. The dot means the consultation is open, not that the other
-  // person has the app open (the app does not track presence). Otherwise the header names the appointment slot.
-  const active = !!booking && canConsult && !ended && !(unpaid && !isDoctor);
 
   const body = () => {
     if (!id) return <Text style={styles.notice}>{t('chat.noneSelected')}</Text>;
@@ -235,10 +195,7 @@ export default function ConsultationScreen() {
         >
           <View style={styles.introCard}>
             <SymbolView name={{ ios: 'lock.fill', android: 'lock', web: 'lock' }} size={13} tintColor={homeColors.textFaint} />
-            <Text style={styles.introText}>
-              {t('chat.intro', { name: counterpartName })}
-              {booking.scheduledAt ? `\n${t('chat.slot', { slot: appointmentLabel })}` : ''}
-            </Text>
+            <Text style={styles.introText}>{t('chat.intro', { name: counterpartName })}</Text>
           </View>
 
           {messages.map((message) => {
@@ -250,14 +207,10 @@ export default function ConsultationScreen() {
               <View key={message.id}>
                 {showDay ? <Text style={styles.dayDivider}>{day}</Text> : null}
                 <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-                  {!mine ? <View style={styles.smallAvatar}><Text style={styles.smallAvatarText}>{initialsOf(counterpartName)}</Text></View> : null}
-                  <View style={[styles.bubbleColumn, mine && styles.bubbleColumnMine]}>
-                    <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                      <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{message.text}</Text>
-                      {message.trend ? <TrendChart points={message.trend} language={language} label={trendLabel(message.trend)} /> : null}
-                    </View>
+                  <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{message.text}</Text>
                     <Text style={[styles.bubbleTime, mine && styles.bubbleTimeMine]}>
-                      {message.sentAt ? message.sentAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : t('chat.sending')}
+                      {message.sentAt ? message.sentAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : t('chat.sending')}
                     </Text>
                   </View>
                 </View>
@@ -293,45 +246,27 @@ export default function ConsultationScreen() {
 
         {error || loadFailed ? <Text style={styles.error}>{error || t('chat.loadFailed')}</Text> : null}
 
-        {!ended && emojiOpen ? (
-          <View style={styles.emojiRow}>
-            {QUICK_EMOJI.map((emoji) => (
-              <Pressable key={emoji} accessibilityRole="button" accessibilityLabel={emoji} style={styles.emojiButton} onPress={() => setDraft((value) => `${value}${emoji}`)}>
-                <Text style={styles.emoji}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-
         {ended ? (
           <View style={styles.composer}>
-            <View style={[styles.inputWrap, styles.inputClosed]}><Text style={styles.closedText}>{t('chat.closed')}</Text></View>
+            <View style={[styles.input, styles.inputClosed]}><Text style={styles.closedText}>{t('chat.closed')}</Text></View>
             <View style={[styles.sendButton, styles.sendButtonClosed]}>
-              <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={18} tintColor="#FFF" />
+              <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={17} tintColor="#FFF" />
             </View>
           </View>
         ) : (
           <View style={styles.composer}>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.attach')} style={styles.plusButton} onPress={() => setAttachOpen(true)} disabled={sharing} hitSlop={6}>
-              {sharing ? <ActivityIndicator color={homeColors.textMuted} /> : <SymbolView name={{ ios: 'plus', android: 'add', web: 'add' }} size={22} tintColor="#64748B" />}
-            </Pressable>
-            <View style={styles.inputWrap}>
-              <TextInput
-                value={draft}
-                onChangeText={setDraft}
-                accessibilityLabel={t('chat.placeholder')}
-                placeholder={t('chat.placeholder')}
-                placeholderTextColor="#94A3B8"
-                style={styles.input}
-                multiline
-                onSubmitEditing={send}
-              />
-              <Pressable accessibilityRole="button" accessibilityLabel={t('chat.emoji')} accessibilityState={{ expanded: emojiOpen }} style={styles.emojiToggle} onPress={() => setEmojiOpen((open) => !open)} hitSlop={6}>
-                <SymbolView name={{ ios: 'face.smiling', android: 'sentiment_satisfied', web: 'sentiment_satisfied' }} size={22} tintColor={emojiOpen ? homeColors.green : '#94A3B8'} />
-              </Pressable>
-            </View>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              accessibilityLabel={t('chat.placeholder')}
+              placeholder={t('chat.placeholder')}
+              placeholderTextColor="#94A3B8"
+              style={styles.input}
+              multiline
+              onSubmitEditing={send}
+            />
             <Pressable accessibilityRole="button" accessibilityLabel={t('chat.send')} accessibilityState={{ disabled: !draft.trim() || sending }} style={[styles.sendButton, (!draft.trim() || sending) && styles.sendButtonDisabled]} onPress={send} disabled={!draft.trim() || sending}>
-              <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={18} tintColor="#FFF" />
+              <SymbolView name={{ ios: 'paperplane.fill', android: 'send', web: 'send' }} size={17} tintColor="#FFF" />
             </Pressable>
           </View>
         )}
@@ -347,24 +282,12 @@ export default function ConsultationScreen() {
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.header}>
         <Pressable accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.backButton} onPress={goBack} hitSlop={10}>
-          <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor="#0F172A" />
+          <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} size={16} tintColor={homeColors.green} />
         </Pressable>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initialsOf(counterpartName)}</Text>
-          {active ? <View style={styles.activeDot} /> : null}
-        </View>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(counterpartName)}</Text></View>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle} numberOfLines={1}>{counterpartName}</Text>
-          {active ? (
-            <View style={styles.statusRow}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText} numberOfLines={1}>{t('chat.active')}</Text>
-            </View>
-          ) : ended ? (
-            <Text style={[styles.statusText, styles.statusEnded]} numberOfLines={1}>{t('chat.endedShort')}</Text>
-          ) : (
-            <Text style={styles.headerSubtitle} numberOfLines={1}>{appointmentLabel}</Text>
-          )}
+          <Text style={styles.headerSubtitle} numberOfLines={1}>{appointmentLabel}</Text>
         </View>
         {canConsult && !ended && !(unpaid && !isDoctor) ? (
           <Pressable accessibilityRole="button" accessibilityLabel={t('call.videoCall')} style={styles.callButton} onPress={startVideoCall} hitSlop={8}>
@@ -409,26 +332,6 @@ export default function ConsultationScreen() {
         </View>
       </Modal>
 
-      {/* "+" in the message box: what can be added to a message. */}
-      <Modal visible={attachOpen} animationType="fade" transparent onRequestClose={() => setAttachOpen(false)}>
-        <View style={styles.sheetOverlay}>
-          <ModalBackdrop onClose={() => setAttachOpen(false)} />
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{t('chat.attach')}</Text>
-            <Pressable accessibilityRole="button" style={styles.sheetOption} onPress={shareTrend}>
-              <View style={styles.sheetIcon}><SymbolView name={{ ios: 'chart.xyaxis.line', android: 'show_chart', web: 'show_chart' }} size={20} tintColor={homeColors.green} /></View>
-              <View style={styles.sheetCopy}>
-                <Text style={styles.sheetOptionTitle}>{t('chat.shareTrend')}</Text>
-                <Text style={styles.sheetOptionText}>{t('chat.shareTrendDetail')}</Text>
-              </View>
-            </Pressable>
-            <Pressable accessibilityRole="button" style={styles.confirmKeep} onPress={() => setAttachOpen(false)}>
-              <Text style={styles.confirmKeepText}>{t('common.cancel')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
       <DoctorNotesForm
         visible={notesForm !== null}
         title={notesForm === 'later' ? t('chat.notesTitle') : t('chat.endTitle')}
@@ -447,83 +350,59 @@ export default function ConsultationScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   addNotes: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', marginTop: 10, minHeight: 44 },
-  addNotesText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 15 },
+  addNotesText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', gap: 12, paddingBottom: 16, paddingHorizontal: 20, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
-  backButton: { alignItems: 'center', backgroundColor: '#F5F7F9', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
+  backButton: { alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, height: 40, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 40 },
   headerCopy: { flex: 1 },
-  headerTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 17 },
-  headerSubtitle: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
-  statusRow: { alignItems: 'center', flexDirection: 'row', gap: 5, marginTop: 3 },
-  statusDot: { backgroundColor: homeColors.green, borderRadius: 3, height: 6, width: 6 },
-  statusText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 11, letterSpacing: 0.8 },
-  statusEnded: { color: homeColors.textMuted, marginTop: 3 },
+  headerTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 17, fontWeight: '800' },
+  headerSubtitle: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 2 },
   callButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   moreButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 28 },
-  avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
-  activeDot: { backgroundColor: homeColors.green, borderColor: '#FFF', borderRadius: 7, borderWidth: 2, bottom: -1, height: 14, position: 'absolute', right: -1, width: 14 },
-  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
+  avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
+  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   viewSummary: { alignItems: 'center', borderColor: homeColors.green, borderRadius: 14, borderWidth: 1.5, justifyContent: 'center', marginTop: 10, minHeight: 44 },
-  viewSummaryText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
-  inputClosed: { alignItems: 'center' },
-  closedText: { color: '#94A3B8', fontFamily: Brand.font.regular, fontSize: 14 },
+  viewSummaryText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  inputClosed: { justifyContent: 'center', paddingTop: 0 },
+  closedText: { color: '#94A3B8', fontFamily: Fonts.sans, fontSize: 14 },
   sendButtonClosed: { backgroundColor: '#CBD5E1' },
   confirmOverlay: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 32 },
   confirmCard: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 32, gap: 10, maxWidth: 360, padding: 24, width: '100%' },
   confirmIcon: { alignItems: 'center', backgroundColor: '#FDECEC', borderRadius: 32, height: 64, justifyContent: 'center', width: 64 },
-  confirmTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 20, textAlign: 'center' },
-  confirmText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  confirmTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  confirmText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   confirmDanger: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#EF4444', borderRadius: 16, justifyContent: 'center', marginTop: 6, minHeight: 52 },
-  confirmDangerText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 15 },
+  confirmDangerText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   confirmKeep: { alignItems: 'center', alignSelf: 'stretch', borderColor: homeColors.border, borderRadius: 16, borderWidth: 1, justifyContent: 'center', minHeight: 52 },
-  confirmKeepText: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 15 },
+  confirmKeepText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
   loader: { marginTop: 40 },
-  notice: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, padding: 24 },
+  notice: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, padding: 24 },
   gate: { alignItems: 'center', gap: 10, padding: 32, paddingTop: 60 },
-  gateTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18, textAlign: 'center' },
-  gateText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 21, maxWidth: 280, textAlign: 'center' },
+  gateTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  gateText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 14, lineHeight: 21, maxWidth: 280, textAlign: 'center' },
   gateButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 12, justifyContent: 'center', marginTop: 8, minHeight: 46, paddingHorizontal: 24 },
-  gateButtonText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 14 },
+  gateButtonText: { color: '#FFF', fontFamily: Fonts.sans, fontSize: 14, fontWeight: '800' },
   messages: { padding: 20, paddingBottom: 12 },
   introCard: { alignItems: 'flex-start', backgroundColor: homeColors.borderSoft, borderRadius: 14, flexDirection: 'row', gap: 8, marginBottom: 20, padding: 12 },
-  introText: { color: homeColors.textMuted, flex: 1, fontFamily: Brand.font.regular, fontSize: 11, lineHeight: 17 },
-  dayDivider: { color: homeColors.textFaint, fontFamily: Brand.font.bold, fontSize: 11, letterSpacing: 1, marginVertical: 14, textAlign: 'center' },
-  bubbleRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 10, marginBottom: 16 },
+  introText: { color: homeColors.textMuted, flex: 1, fontFamily: Fonts.sans, fontSize: 11, lineHeight: 17 },
+  dayDivider: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginVertical: 14, textAlign: 'center' },
+  bubbleRow: { flexDirection: 'row', marginBottom: 10 },
   bubbleRowMine: { justifyContent: 'flex-end' },
   bubbleRowTheirs: { justifyContent: 'flex-start' },
-  smallAvatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
-  smallAvatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 11 },
-  bubbleColumn: { alignItems: 'flex-start', maxWidth: '78%' },
-  bubbleColumnMine: { alignItems: 'flex-end' },
-  bubble: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 14 },
-  bubbleMine: { backgroundColor: homeColors.green, borderTopRightRadius: 6 },
-  bubbleTheirs: { backgroundColor: '#F1F3F5', borderTopLeftRadius: 6 },
-  bubbleText: { color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 15, lineHeight: 22 },
+  bubble: { borderRadius: 18, maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleMine: { backgroundColor: homeColors.green, borderBottomRightRadius: 6 },
+  bubbleTheirs: { backgroundColor: homeColors.card, borderBottomLeftRadius: 6, borderColor: homeColors.border, borderWidth: 1 },
+  bubbleText: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 14, lineHeight: 20 },
   bubbleTextMine: { color: '#FFF' },
-  // The time sits under the bubble, as in the frame.
-  bubbleTime: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 10, marginTop: 4 },
-  bubbleTimeMine: { textAlign: 'right' },
-  emptyChat: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 13, marginTop: 40, textAlign: 'center' },
+  bubbleTime: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 10, marginTop: 4, textAlign: 'right' },
+  bubbleTimeMine: { color: 'rgba(255, 255, 255, 0.75)' },
+  emptyChat: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 13, marginTop: 40, textAlign: 'center' },
   summaryCard: { backgroundColor: homeColors.greenTint, borderRadius: 18, gap: 6, marginTop: 24, padding: 18 },
   summaryHeader: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  summaryTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 15 },
-  summaryWhen: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 11 },
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 12, paddingHorizontal: 20, paddingBottom: 6 },
+  summaryTitle: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 15, fontWeight: '800' },
+  summaryWhen: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11 },
+  error: { color: '#D9364F', fontFamily: Fonts.sans, fontSize: 12, paddingHorizontal: 20, paddingBottom: 6 },
   composer: { alignItems: 'flex-end', backgroundColor: homeColors.card, borderTopColor: homeColors.border, borderTopWidth: 1, flexDirection: 'row', gap: 10, padding: 16, paddingBottom: 28 },
-  plusButton: { alignItems: 'center', height: 50, justifyContent: 'center', width: 28 },
-  inputWrap: { alignItems: 'flex-end', backgroundColor: '#F1F3F5', borderRadius: 22, flex: 1, flexDirection: 'row', minHeight: 50, paddingLeft: 16, paddingRight: 8 },
-  input: { color: '#0F172A', flex: 1, fontFamily: Brand.font.regular, fontSize: 15, maxHeight: 110, minHeight: 50, paddingTop: 15 },
-  emojiToggle: { alignItems: 'center', height: 50, justifyContent: 'center', width: 36 },
-  emojiRow: { backgroundColor: homeColors.card, borderTopColor: homeColors.border, borderTopWidth: 1, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', paddingHorizontal: 12, paddingVertical: 8 },
-  emojiButton: { alignItems: 'center', height: 44, justifyContent: 'center', width: 40 },
-  emoji: { fontSize: 24 },
-  sendButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 25, elevation: 4, height: 50, justifyContent: 'center', shadowColor: homeColors.green, shadowOffset: { height: 4, width: 0 }, shadowOpacity: 0.3, shadowRadius: 8, width: 50 },
-  sheetOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, gap: 12, padding: 24, paddingBottom: 36 },
-  sheetTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
-  sheetOption: { alignItems: 'center', backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 14 },
-  sheetIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
-  sheetCopy: { flex: 1 },
-  sheetOptionTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 15 },
-  sheetOptionText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
+  input: { backgroundColor: '#F5F7F9', borderColor: homeColors.border, borderRadius: 22, borderWidth: 1, color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 14, maxHeight: 110, minHeight: 46, paddingHorizontal: 16, paddingTop: 13 },
+  sendButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 23, height: 46, justifyContent: 'center', width: 46 },
   sendButtonDisabled: { opacity: 0.45 },
 });

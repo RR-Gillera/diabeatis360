@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { Brand } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
@@ -34,10 +34,9 @@ const BUTTON_ICONS = {
 } as const;
 
 /** The big green button. `icon` adds Figma's trailing chevron, arrow or check after the title. */
-// `style` lets one screen follow its own Figma frame (e.g. the pill-shaped Submit Verification) without changing the rest.
-export function AuthButton({ title, onPress, disabled, icon, style }: { title: string; onPress: () => void; disabled?: boolean; icon?: keyof typeof BUTTON_ICONS; style?: StyleProp<ViewStyle> }) {
+export function AuthButton({ title, onPress, disabled, icon }: { title: string; onPress: () => void; disabled?: boolean; icon?: keyof typeof BUTTON_ICONS }) {
   const symbol = icon ? BUTTON_ICONS[icon] : null;
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, style, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text>{symbol ? <SymbolView name={{ ios: symbol.ios, android: symbol.android, web: symbol.android }} size={20} tintColor="#FFFFFF" /> : null}</Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: Boolean(disabled) }} onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.button, disabled && styles.disabled, pressed && styles.pressed]}><Text style={styles.buttonText}>{title}</Text>{symbol ? <SymbolView name={{ ios: symbol.ios, android: symbol.android, web: symbol.android }} size={20} tintColor="#FFFFFF" /> : null}</Pressable>;
 }
 
 // The "G" and "f" buttons under the "OR CONNECT WITH" / "OR SIGN UP WITH" line on Login and Sign Up (DECISIONS.md D23;

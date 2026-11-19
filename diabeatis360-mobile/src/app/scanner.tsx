@@ -14,11 +14,12 @@ import { FREE_LIMITS, PREMIUM_FAIR_USE } from '@/constants/plans';
 import { Brand } from '@/constants/theme';
 import type { LabelAnalysis } from '@/features/ai/types';
 import { useAuth } from '@/features/auth/auth-context';
+import { saveProduct } from '@/features/scanner/product-service';
 import { ScanResult } from '@/features/scanner/scan-result';
 import { canUseFeature } from '@/features/subscription/subscription-service';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
-import { AiError, requestLabelAnalysis } from '@/lib/ai';
+import { AiError, requestLabelAnalysis, requestProductLookup } from '@/lib/ai';
 import { aiErrorText } from '@/lib/ai-error-text';
 
 type Phase = 'camera' | 'analyzing' | 'result' | 'retry';
@@ -31,9 +32,10 @@ function splitDataUrl(value: string): { base64: string; mimeType: 'image/jpeg' |
   return { base64: match ? value.slice(match[0].length) : value, mimeType };
 }
 
-// Nutrition Scanner (Figma 25:1092 camera, 195:2908 result). The person photographs the nutrition facts label; the
-// photo goes to the analyzeLabel function, which asks Gemini, and is never stored (D2). Free plan: 3 scans a day,
-// enforced on the server. There is no barcode scanning: it was dropped with the adviser (DECISIONS.md D12).
+// Nutrition Scanner (Figma 25:1092 camera, 195:2908 result). Product memory (DECISIONS.md D12): the barcode is read
+// first and looked up in the shared Products collection, which needs no AI call and no Free scan. Only a barcode that
+// is not saved yet (or a product without one) needs a label photo: it goes to the analyzeLabel Cloud Function, which
+// asks Gemini; the photo is never stored (D2). Free plan: 3 photo scans a day, enforced on the server.
 export default function ScannerScreen() {
   // The camera fills the whole screen, under the status bar too; the controls on top start below it (screen-top.ts).
   const { top: statusBarHeight } = useSafeAreaInsets();
@@ -51,6 +53,14 @@ export default function ScannerScreen() {
   const [error, setError] = useState<AiError | null>(null);
   const [usage, setUsage] = useState<{ premium: boolean; left: number; limit: number } | null>(null);
   const [allowed, setAllowed] = useState(true);
+  // The barcode seen by the camera. `lastCode` stops the camera (which reports the same code many times a second)
+  // from starting a second lookup.
+  const [barcode, setBarcode] = useState<string | null>(null);
+  const lastCode = useRef<string | null>(null);
+  // Figma P-16: "Barcode" or "Scan nutrition label". Only the guidance changes; a barcode in view is always read.
+  const [mode, setMode] = useState<'barcode' | 'label'>('label');
+  // Free scans used up, but the person chose to look up a barcode (that needs no scan, D12) instead of the limit screen.
+  const [barcodeOnly, setBarcodeOnly] = useState(false);
 
   // Free-plan usage line. Re-read whenever `usageTick` changes (after a scan), never synchronously in the effect.
   const [usageTick, setUsageTick] = useState(0);
@@ -73,6 +83,8 @@ export default function ScannerScreen() {
   const scanAgain = () => {
     setPhase('camera');
     setAnalysis(null);
+    setBarcode(null);
+    lastCode.current = null;
     setMessage('');
     setError(null);
     refreshUsage();
@@ -86,13 +98,35 @@ export default function ScannerScreen() {
       if (!photo?.base64) throw new AiError('unknown', t('ai.error.unknown'));
       setPhase('analyzing');
       const { base64, mimeType } = splitDataUrl(photo.base64);
-      const result = await requestLabelAnalysis(base64, mimeType);
+      const result = await requestLabelAnalysis(base64, mimeType, barcode ?? undefined);
       if (result.readable) {
         setAnalysis(result);
         setPhase('result');
       } else {
         setMessage(result.message);
         setPhase('retry');
+      }
+    } catch (value) {
+      setError(value instanceof AiError ? value : new AiError('unknown', t('ai.error.unknown')));
+      setPhase('retry');
+    } finally {
+      refreshUsage();
+    }
+  };
+
+  // A barcode appeared in the frame. Only real product barcodes (EAN/UPC: 6 to 14 digits) are looked up.
+  const handleBarcode = async ({ data }: { data: string }) => {
+    if (phase !== 'camera' || data === lastCode.current || !/^[0-9]{6,14}$/.test(data)) return;
+    lastCode.current = data;
+    setPhase('analyzing');
+    try {
+      const found = await requestProductLookup(data);
+      setBarcode(data);
+      if (found.found) {
+        setAnalysis(found);
+        setPhase('result');
+      } else {
+        setPhase('camera'); // a new product: the person now photographs its label
       }
     } catch (value) {
       setError(value instanceof AiError ? value : new AiError('unknown', t('ai.error.unknown')));
@@ -129,8 +163,10 @@ export default function ScannerScreen() {
         <KeyboardSafeScroll contentContainerStyle={styles.resultScroll}>
           <ScanResult
             analysis={analysis}
+            barcode={barcode ?? undefined}
             onAlternatives={() => router.push({ pathname: '/healthier-alternatives', params: { id: analysis.scan_id } } as never)}
             onScanAgain={scanAgain}
+            onShare={barcode && uid && !analysis.from_memory ? (name, brand) => saveProduct(uid, barcode, analysis, name, brand) : undefined}
           />
           <AppText style={styles.usageLight}>{usageText}</AppText>
         </KeyboardSafeScroll>
@@ -139,7 +175,7 @@ export default function ScannerScreen() {
   }
 
   // Figma P-20: the Free plan's 3 scans are used up (known before scanning, or from the server's answer).
-  if ((phase === 'camera' && !allowed) || (phase === 'retry' && error?.code === 'limit')) {
+  if ((phase === 'camera' && !allowed && !barcodeOnly) || (phase === 'retry' && error?.code === 'limit')) {
     return (
       <ScrollView style={styles.light} contentContainerStyle={[styles.limitScroll, { paddingTop: statusBarHeight + 16 }]}>
         <RoundBackButton onPress={() => goBack()} />
@@ -151,6 +187,8 @@ export default function ScannerScreen() {
           footer={t('scan.limit.footer')}
           onUpgrade={() => router.push('/subscription')}
         />
+        <PrimaryButton title={t('scan.barcodeInstead')} variant="outline" onPress={() => { scanAgain(); setBarcodeOnly(true); setMode('barcode'); }} />
+        <AppText style={styles.limitNote}>{t('scan.barcodeNote')}</AppText>
       </ScrollView>
     );
   }
@@ -171,7 +209,7 @@ export default function ScannerScreen() {
 
   if (phase === 'retry') {
     // The scan function is not deployed yet (the Firebase project is not on the Blaze plan): trying again cannot
-    // help, so this screen offers only Back.
+    // help, and the camera would just re-read the same barcode, so this screen offers only Back.
     const unavailable = error?.code === 'feature-unavailable';
     // A limit Premium cannot lift (fair use, or the whole project's daily cap, D20): trying again today cannot help.
     const capped = error?.code === 'daily-cap';
@@ -195,25 +233,42 @@ export default function ScannerScreen() {
   // ---- camera
   return (
     <View style={styles.dark}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} onCameraReady={() => setReady(true)} />
+      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} onCameraReady={() => setReady(true)}
+        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] }}
+        onBarcodeScanned={phase === 'camera' ? handleBarcode : undefined}
+      />
 
       <View style={[styles.topBar, { paddingTop: statusBarHeight + 8 }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={t('scan.closeScanner')} style={styles.round} onPress={() => goBack()} hitSlop={8}>
           <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#FFF" />
         </Pressable>
-        <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{t('scan.title')}</AppText></View>
+        <View style={styles.pill}><AppText weight="bold" style={styles.pillText}>{mode === 'barcode' ? t('scan.barcodeTitle') : t('scan.title')}</AppText></View>
         <Pressable accessibilityRole="switch" accessibilityLabel={t('scan.torch')} accessibilityState={{ checked: torch }} style={[styles.round, torch && styles.roundOn]} onPress={() => setTorch((value) => !value)} hitSlop={8}>
           <SymbolView name={{ ios: 'bolt.fill', android: 'flash_on', web: 'flash_on' }} size={16} tintColor="#FFF" />
         </Pressable>
       </View>
 
       <View style={styles.frameWrap} pointerEvents="none">
-        <View style={styles.frame} />
-        <AppText style={styles.hint}>{t('scan.hint.label')}</AppText>
+        <View style={[styles.frame, mode === 'barcode' && styles.frameBarcode]}>
+          {mode === 'barcode' ? <View style={styles.scanLine} /> : null}
+        </View>
+        <AppText style={styles.hint}>
+          {barcode
+            ? t('scan.hint.newProduct')
+            : mode === 'barcode' ? t('scan.hint.barcode') : t('scan.hint.label')}
+        </AppText>
       </View>
 
       <View style={styles.bottomBar}>
         {usageText ? <AppText style={styles.usageDark}>{usageText}</AppText> : null}
+        <View style={styles.modes}>
+          {(['barcode', 'label'] as const).map((option) => (
+            <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: mode === option }} style={[styles.modeButton, mode === option && styles.modeActive]} onPress={() => setMode(option)}>
+              {option === 'barcode' ? <SymbolView name={{ ios: 'barcode', android: 'barcode', web: 'barcode' }} size={14} tintColor="#FFF" /> : null}
+              <AppText weight="bold" style={styles.modeText}>{option === 'barcode' ? t('scan.mode.barcode') : t('scan.mode.label')}</AppText>
+            </Pressable>
+          ))}
+        </View>
         {allowed ? (
           <Pressable accessibilityRole="button" accessibilityLabel={t('scan.shutter')} accessibilityState={{ disabled: !ready || phase === 'analyzing' }} style={[styles.shutter, (!ready || phase === 'analyzing') && styles.shutterDisabled]} onPress={capture} disabled={!ready || phase === 'analyzing'}>
             <View style={styles.shutterInner} />
@@ -266,9 +321,16 @@ const styles = StyleSheet.create({
   retryButton: { alignSelf: 'stretch', marginTop: 8 },
   limitScroll: { gap: 12, padding: Brand.sizes.screenPadding, paddingTop: 56 },
   limitTitle: { fontSize: 24, marginTop: 12 },
+  limitNote: { color: Brand.colors.textMuted, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   cantRead: { justifyContent: 'center', padding: 24 },
   cantReadCard: { alignItems: 'center', backgroundColor: '#FFF', borderRadius: 32, gap: 10, padding: 24 },
   cantReadIcon: { alignItems: 'center', backgroundColor: '#FEEFD9', borderRadius: 32, height: 64, justifyContent: 'center', width: 64 },
   cantReadTitle: { fontSize: 19, lineHeight: 25, textAlign: 'center' },
   cantReadText: { color: Brand.colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  frameBarcode: { alignItems: 'center', borderColor: '#22C55E', borderStyle: 'solid', height: 160, justifyContent: 'center' },
+  scanLine: { backgroundColor: '#22C55E', height: 2, width: '88%' },
+  modes: { backgroundColor: 'rgba(17,24,39,0.75)', borderRadius: 999, flexDirection: 'row', padding: 5 },
+  modeButton: { alignItems: 'center', borderRadius: 999, flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
+  modeActive: { backgroundColor: Brand.colors.primary },
+  modeText: { color: '#FFF', fontSize: 13 },
 });

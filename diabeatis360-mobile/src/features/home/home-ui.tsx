@@ -4,8 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 import { GLUCOSE_THRESHOLDS } from '@/constants/glucose';
-import { Brand } from '@/constants/theme';
-import { useTabBarBottomPadding } from '@/components/ui/system-bars';
+import { Brand, Fonts } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
 import type { MessageKey } from '@/i18n/translate';
 
@@ -48,8 +47,6 @@ const navItems = [
 export function BottomNav({ active }: { active: NavTarget }) {
   const router = useRouter();
   const { t } = useT();
-  // Taller when the phone shows the 3-button bar, so the tabs sit above it (constants/system-bars.ts).
-  const navBottom = useTabBarBottomPadding();
   const [before, after] = [navItems.slice(0, 2), navItems.slice(2)];
 
   // dismissTo, not push: a tab bar is not a history. push stacked a fresh copy
@@ -72,7 +69,7 @@ export function BottomNav({ active }: { active: NavTarget }) {
   };
 
   return (
-    <View style={[styles.nav, { paddingBottom: navBottom }]}>
+    <View style={styles.nav}>
       {before.map(renderItem)}
       <Pressable accessibilityRole="button" accessibilityLabel={t('nav.scanner')} onPress={() => router.push('/scanner' as Href)} style={styles.fab}>
         <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={24} tintColor="#FFF" />
@@ -189,17 +186,17 @@ export function RingProgress({ progress, color, trackColor, size = 45, strokeWid
 const styles = StyleSheet.create({
   nav: { alignItems: 'center', backgroundColor: homeColors.card, borderTopColor: homeColors.borderSoft, borderTopWidth: 1, bottom: 0, flexDirection: 'row', justifyContent: 'space-around', left: 0, paddingBottom: 24, paddingTop: 10, position: 'absolute', right: 0 },
   navItem: { alignItems: 'center', gap: 4, minWidth: 56 },
-  navLabel: { fontFamily: Brand.font.bold, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
+  navLabel: { fontFamily: Fonts.sans, fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
   fab: { alignItems: 'center', backgroundColor: homeColors.greenBright, borderColor: '#FFF', borderRadius: 32, borderWidth: 4, elevation: 4, height: 64, justifyContent: 'center', marginTop: -32, shadowColor: homeColors.greenBright, shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.3, shadowRadius: 10, width: 64 },
-  sparklineEmpty: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 13, paddingVertical: 30, textAlign: 'center' },
+  sparklineEmpty: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 13, paddingVertical: 30, textAlign: 'center' },
   chartRow: { flexDirection: 'row' },
   chartAxis: { justifyContent: 'space-between', paddingBottom: 2, paddingRight: 8, width: 28 },
-  chartAxisLabel: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 10, textAlign: 'right' },
+  chartAxisLabel: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 10, textAlign: 'right' },
   chartDayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  chartDayLabel: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 10, textAlign: 'center' },
+  chartDayLabel: { color: homeColors.textFaint, fontFamily: Fonts.sans, fontSize: 10, textAlign: 'center' },
   legend: { columnGap: 14, flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, rowGap: 4 },
   legendItem: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   legendDot: { borderRadius: 4, height: 8, width: 8 },
   legendBar: { backgroundColor: RANGE_GRAY, borderRadius: 3, height: 12, opacity: 0.55, width: 6 },
-  legendText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 11 },
+  legendText: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 11 },
 });

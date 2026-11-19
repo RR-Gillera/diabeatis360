@@ -6,7 +6,6 @@ import { bookingReference } from '@/features/booking/booking-reference';
 import { bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
 import { useBooking } from '@/features/booking/booking-context';
 import { useT } from '@/i18n/language-context';
-import { Brand } from '@/constants/theme';
 
 // Shown straight after a booking request is filed. Deliberately NOT a payment
 // confirmation — nothing has been charged yet, and saying so plainly is the
@@ -72,22 +71,22 @@ const styles = StyleSheet.create({
   scroll: { alignItems: 'center', gap: 20, padding: 24, paddingBottom: 110 },
   content: { alignItems: 'center', gap: 8, marginTop: 70 },
   icon: { alignItems: 'center', backgroundColor: 'rgba(98, 156, 44, 0.1)', borderRadius: 24, height: 64, justifyContent: 'center', width: 64 },
-  title: { color: '#111827', fontSize: 24, fontFamily: Brand.font.extraBold, marginTop: 8, textAlign: 'center' },
-  subtitle: { color: '#6B7280', fontSize: 14, fontFamily: Brand.font.medium, lineHeight: 20, maxWidth: 280, textAlign: 'center' },
+  title: { color: '#111827', fontSize: 24, fontWeight: '800', marginTop: 8, textAlign: 'center' },
+  subtitle: { color: '#6B7280', fontSize: 14, fontWeight: '500', lineHeight: 20, maxWidth: 280, textAlign: 'center' },
   receipt: { alignSelf: 'stretch', gap: 14 },
   receiptHeader: { borderBottomColor: bookingColors.border, borderBottomWidth: 1, paddingBottom: 14 },
-  doctorName: { color: bookingColors.navy, fontSize: 17, fontFamily: Brand.font.extraBold },
-  doctorSpecialty: { color: bookingColors.green, fontSize: 13, fontFamily: Brand.font.bold, marginTop: 2 },
+  doctorName: { color: bookingColors.navy, fontSize: 17, fontWeight: '800' },
+  doctorSpecialty: { color: bookingColors.green, fontSize: 13, fontWeight: '700', marginTop: 2 },
   row: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  label: { color: '#91A4BF', fontSize: 11, fontFamily: Brand.font.extraBold, letterSpacing: 0.6 },
-  value: { color: bookingColors.navy, fontSize: 14, fontFamily: Brand.font.bold },
-  bookingId: { color: bookingColors.navy, fontFamily: Brand.font.bold, fontSize: 12 },
+  label: { color: '#91A4BF', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  value: { color: bookingColors.navy, fontSize: 14, fontWeight: '700' },
+  bookingId: { color: bookingColors.navy, fontFamily: 'monospace', fontSize: 12, fontWeight: '700' },
   pendingBadge: { backgroundColor: '#FEF3C7', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  pendingText: { color: '#B45309', fontSize: 12, fontFamily: Brand.font.extraBold },
+  pendingText: { color: '#B45309', fontSize: 12, fontWeight: '800' },
   totalRow: { borderTopColor: bookingColors.border, borderTopWidth: 1, paddingTop: 14 },
-  totalLabel: { color: bookingColors.navy, fontSize: 13, fontFamily: Brand.font.extraBold },
-  totalValue: { color: bookingColors.navy, fontSize: 20, fontFamily: Brand.font.extraBold },
+  totalLabel: { color: bookingColors.navy, fontSize: 13, fontWeight: '800' },
+  totalValue: { color: bookingColors.navy, fontSize: 20, fontWeight: '900' },
   nextSteps: { alignItems: 'flex-start', alignSelf: 'stretch', backgroundColor: 'rgba(98, 156, 44, 0.08)', borderRadius: 14, flexDirection: 'row', gap: 10, padding: 14 },
-  nextStepsText: { color: bookingColors.muted, flex: 1, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18 },
+  nextStepsText: { color: bookingColors.muted, flex: 1, fontSize: 12, lineHeight: 18 },
   button: { alignSelf: 'stretch', bottom: 32, left: 24, position: 'absolute', right: 24 },
 });

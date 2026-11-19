@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useT } from '@/i18n/language-context';
 
 /**
@@ -20,6 +20,6 @@ export function DemoPaymentNote() {
 const styles = StyleSheet.create({
   box: { alignItems: 'flex-start', backgroundColor: '#FEF3C7', borderRadius: 16, gap: 6, padding: 12 },
   badge: { backgroundColor: '#B45309', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { color: '#FFFFFF', fontFamily: Brand.font.extraBold, fontSize: 11 },
-  text: { color: '#78350F', fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19 },
+  badgeText: { color: '#FFFFFF', fontFamily: Fonts.sans, fontSize: 11, fontWeight: '800' },
+  text: { color: '#78350F', fontFamily: Fonts.sans, fontSize: 13, lineHeight: 19 },
 });

@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
-import { Brand } from '@/constants/theme';
+import { Fonts } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToDoctorPatients } from '@/features/doctor/doctor-service';
 import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
@@ -71,12 +71,12 @@ export default function DoctorPatientsScreen() {
 
 const styles = StyleSheet.create({
   searchBox: { alignItems: 'center', backgroundColor: 'rgba(98, 156, 44, 0.1)', borderColor: '#E2E8F0', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 48, paddingHorizontal: 16 },
-  searchInput: { color: '#0F172A', flex: 1, fontFamily: Brand.font.regular, fontSize: 15 },
+  searchInput: { color: '#0F172A', flex: 1, fontFamily: Fonts.sans, fontSize: 15 },
   card: { alignItems: 'center', flexDirection: 'row', gap: 14, marginTop: 16 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 18 },
+  avatarText: { color: homeColors.green, fontFamily: Fonts.sans, fontSize: 18, fontWeight: '800' },
   copy: { flex: 1 },
-  name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 16 },
-  meta: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 3 },
+  name: { color: '#0F172A', fontFamily: Fonts.sans, fontSize: 16, fontWeight: '800' },
+  meta: { color: homeColors.textMuted, fontFamily: Fonts.sans, fontSize: 12, marginTop: 3 },
   pendingDot: { backgroundColor: '#F59E0B', borderRadius: 4, height: 8, width: 8 },
 });

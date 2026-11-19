@@ -8,8 +8,9 @@ const { FieldValue } = require('firebase-admin/firestore')
 const { HttpsError } = require('firebase-functions/v2/https')
 
 const { interpretGlucose } = require('./glucose')
-const { hasPremium } = require('./limits')
-const { reserveSlot } = require('./usage')
+const { rateNutrients } = require('./rating')
+const { allowanceFor, hasPremium } = require('./limits')
+const { reserveSlot, usedToday } = require('./usage')
 const {
   buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, diabetesTypeOf, dislikedIngredients,
   exerciseSchema, labelSchema, mealSchema, parseAllergens, containsAllergen,
@@ -19,7 +20,7 @@ const CRITICAL_MESSAGE =
   'Your latest blood sugar reading is in a dangerous range. Please contact your doctor or go to the nearest hospital now. ' +
   'Suggestions are paused until your reading is back in range.'
 
-// DECISIONS.md D25: suggestions and label scans both avoid the person's allergens, so they need an
+// DECISIONS.md D25: suggestions, label scans and barcode ratings all avoid the person's allergens, so they need an
 // answer to the allergy question first ("None" is an answer). Without one: no Gemini call and nothing counted.
 const ALLERGIES_MESSAGE = 'Add your allergies first (or tap "I don\'t have food allergies") in Profile > Health Profile, so suggestions and scans can avoid them.'
 const allergiesDeclared = (value) => (Array.isArray(value) ? value.some((item) => String(item).trim()) : String(value ?? '').trim().length > 0)
@@ -46,6 +47,8 @@ async function loadContext(db, uid) {
     premium: hasPremium(subs.docs.map((doc) => doc.data())),
   }
 }
+
+const validBarcode = (value) => typeof value === 'string' && /^[0-9]{6,14}$/.test(value)
 
 // What the app is told is left today. Premium is "unlimited" in the app (a fair-use ceiling stays on the server), so null.
 const remainingFor = (premium, limit, used) => (premium ? null : Math.max(0, limit - used))
@@ -111,7 +114,7 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BASE64_LENGTH = 7 * 1024 * 1024 // about 5 MB of image
 
 /** Reads a nutrition label photo for the signed-in user. The image is sent to Gemini and never stored (D2). */
-async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
+async function analyzeLabel({ db, uid, image, barcode, callAi, now = new Date() }) {
   if (!image || typeof image.base64 !== 'string' || !IMAGE_TYPES.includes(image.mimeType)) {
     throw new HttpsError('invalid-argument', 'Send a JPEG, PNG or WebP photo of the label.')
   }
@@ -148,6 +151,7 @@ async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
       product_name: result.product_name,
       health_rating: result.health_rating,
       scanned_at: FieldValue.serverTimestamp(),
+      product_id: validBarcode(barcode) ? barcode : null,
       source: 'gemini_label',
       analysis: {
         ingredients_text: result.ingredients_text,
@@ -164,4 +168,67 @@ async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
   }
 }
 
-module.exports = { generateRecommendations, analyzeLabel, CRITICAL_MESSAGE, ALLERGIES_MESSAGE, containsAllergen }
+/**
+ * Looks a barcode up in the shared Products collection (D12). Found: the saved nutrients are rated again for THIS
+ * person (their allergies decide the warnings) and no Gemini call is made. Not found: the app then asks for a label photo.
+ */
+async function lookupProduct({ db, uid, barcode, now = new Date() }) {
+  if (!validBarcode(barcode)) throw new HttpsError('invalid-argument', 'That barcode is not valid.')
+  const snapshot = await db.doc(`Products/${barcode}`).get()
+  if (!snapshot.exists) return { found: false }
+  const product = snapshot.data()
+  const { profile, premium } = await loadContext(db, uid)
+  requireAllergies(profile)
+
+  const nutrients = product.nutrients ?? {}
+  const allergens = parseAllergens(profile.allergies)
+  const matched = containsAllergen(`${product.product_name ?? ''} ${product.ingredients_text ?? ''}`, allergens)
+  const rated = rateNutrients(nutrients, diabetesTypeOf(profile.diabetes_type))
+  const rating = matched.length ? 'unsuitable' : rated.rating
+  const avoid = [...allergens, ...dislikedIngredients(profile)]
+  const alternatives = (Array.isArray(product.alternatives) ? product.alternatives : [])
+    .filter((entry) => entry && entry.instead_of && entry.try && !containsAllergen(entry.try, avoid).length)
+    .slice(0, 4)
+  const analysis = {
+    brand: product.brand ?? '',
+    serving_size: product.serving_size ?? '',
+    calories: nutrients.calories ?? 0,
+    carbs_g: nutrients.carbs_g ?? 0,
+    sugar_g: nutrients.sugar_g ?? 0,
+    fiber_g: nutrients.fiber_g ?? 0,
+    protein_g: nutrients.protein_g ?? 0,
+    sodium_mg: nutrients.sodium_mg ?? 0,
+    insight: rated.insight,
+    allergen_warnings: matched.map((allergen) => `Contains ${allergen}`),
+    alternatives,
+    ingredients_text: product.ingredients_text ?? '',
+  }
+
+  const saved = await db.collection('Nutrition_Scans').add({
+    user_id: uid,
+    image_url: null,
+    product_name: product.product_name,
+    health_rating: rating,
+    scanned_at: FieldValue.serverTimestamp(),
+    product_id: barcode,
+    source: 'product_memory',
+    analysis,
+  })
+  // Only Gemini label scans use up the Free allowance, so this lookup reads the counter and never changes it.
+  const used = await usedToday(db, uid, 'scan', now)
+
+  return {
+    found: true,
+    readable: true,
+    scan_id: saved.id,
+    product_name: product.product_name,
+    health_rating: rating,
+    ...analysis,
+    from_memory: true,
+    verified: product.verified === true,
+    barcode,
+    remaining: remainingFor(premium, allowanceFor('scan', premium).limit, used),
+  }
+}
+
+module.exports = { generateRecommendations, analyzeLabel, lookupProduct, CRITICAL_MESSAGE, ALLERGIES_MESSAGE, containsAllergen }

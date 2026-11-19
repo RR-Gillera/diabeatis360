@@ -9,7 +9,6 @@ import { payForBooking, subscribeToBooking } from '@/features/booking/booking-se
 import type { AppointmentHistoryEntry, PaymentMethod } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
-import { Brand } from '@/constants/theme';
 
 // Online methods are still mocked for the capstone demo; "Pay On-Site" is the
 // honest option for a clinic that settles in person, and records intent rather
@@ -174,30 +173,30 @@ const styles = StyleSheet.create({
   scroll: { gap: 16, padding: 24, paddingBottom: 40 },
   notice: { color: bookingColors.muted, padding: 24 },
   gateCard: { alignItems: 'center', gap: 12, paddingVertical: 32 },
-  gateTitle: { color: bookingColors.navy, fontSize: 18, fontFamily: Brand.font.extraBold, textAlign: 'center' },
-  gateText: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  gateTitle: { color: bookingColors.navy, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  gateText: { color: bookingColors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
   gateButton: { alignItems: 'center', backgroundColor: bookingColors.green, borderRadius: 12, justifyContent: 'center', marginTop: 8, minHeight: 46, paddingHorizontal: 24 },
-  gateButtonText: { color: '#FFF', fontSize: 14, fontFamily: Brand.font.extraBold },
+  gateButtonText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
   amountCard: { alignItems: 'center', paddingVertical: 32 },
-  amountLabel: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 14 },
-  amount: { color: bookingColors.navy, fontSize: 42, fontFamily: Brand.font.extraBold, marginVertical: 12 },
+  amountLabel: { color: bookingColors.muted, fontSize: 14 },
+  amount: { color: bookingColors.navy, fontSize: 42, fontWeight: '900', marginVertical: 12 },
   slotLine: { borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12, width: '100%' },
-  muted: { color: bookingColors.muted, fontFamily: Brand.font.regular, fontSize: 13 },
-  strong: { color: bookingColors.navy, fontSize: 14, fontFamily: Brand.font.extraBold, textAlign: 'right' },
+  muted: { color: bookingColors.muted, fontSize: 13 },
+  strong: { color: bookingColors.navy, fontSize: 14, fontWeight: '800', textAlign: 'right' },
   acceptedBanner: { alignItems: 'center', backgroundColor: '#E9F6ED', borderRadius: 12, flexDirection: 'row', gap: 10, padding: 14 },
-  acceptedText: { color: bookingColors.muted, flex: 1, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18 },
+  acceptedText: { color: bookingColors.muted, flex: 1, fontSize: 12, lineHeight: 18 },
   method: { alignItems: 'center', borderColor: '#E2E8F0', flexDirection: 'row', gap: 14, padding: 16 },
   selectedMethod: { borderColor: bookingColors.green, borderWidth: 2 },
   methodIcon: { alignItems: 'center', borderRadius: 12, height: 48, justifyContent: 'center', width: 48 },
-  methodIconText: { fontSize: 22, fontFamily: Brand.font.extraBold },
+  methodIconText: { fontSize: 22, fontWeight: '900' },
   methodCopy: { flex: 1, gap: 3 },
-  methodName: { color: bookingColors.navy, fontSize: 16, fontFamily: Brand.font.extraBold },
+  methodName: { color: bookingColors.navy, fontSize: 16, fontWeight: '800' },
   radio: { alignItems: 'center', borderColor: '#E2E8F0', borderRadius: 14, borderWidth: 2, height: 24, justifyContent: 'center', width: 24 },
   radioSelected: { backgroundColor: bookingColors.green, borderColor: bookingColors.green },
-  check: { color: '#FFF', fontFamily: Brand.font.extraBold },
-  error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13 },
+  check: { color: '#FFF', fontWeight: '900' },
+  error: { color: '#D9364F', fontSize: 13 },
   checkout: { alignItems: 'center', backgroundColor: '#FFF', borderTopColor: bookingColors.border, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -24, padding: 24 },
   checkoutLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 8, marginBottom: 5 },
-  checkoutLabel: { color: bookingColors.navy, fontSize: 11, fontFamily: Brand.font.extraBold },
+  checkoutLabel: { color: bookingColors.navy, fontSize: 11, fontWeight: '800' },
   payButton: { flex: 1, marginLeft: 24 },
 });

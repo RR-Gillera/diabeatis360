@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   menu: { gap: 12, marginTop: 24 },
   legal: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center', marginTop: 24 },
   legalLink: { color: profileColors.faint, fontFamily: Brand.font.medium, fontSize: 12, paddingVertical: 6 },
-  legalDot: { color: profileColors.faint, fontFamily: Brand.font.regular, fontSize: 12 },
+  legalDot: { color: profileColors.faint, fontSize: 12 },
   dim: { alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'center', padding: 24 },
   dialog: { alignSelf: 'stretch', backgroundColor: '#FFFFFF', borderRadius: 28, gap: 12, padding: 24 },
   dialogTitle: { color: profileColors.navy, fontFamily: Brand.font.extraBold, fontSize: 22 },
