@@ -381,12 +381,44 @@ export default function ConsultationScreen() {
                 ? router.push({ pathname: '/doctor/patient/[id]', params: { id: booking.patientId } })
                 : router.push({ pathname: '/booking/appointment', params: { id: booking.id } })),
             },
+            // D51: flag the other person on this booking. The report screen fixes the category; firestore.rules checks that
+            // the person really is the other one on this booking.
+            ...((isDoctor ? booking.patientId : booking.provider?.id)
+              ? [{
+                label: t(isDoctor ? 'report.flagPatient' : 'report.flagDoctor'),
+                icon: { ios: 'exclamationmark.bubble', android: 'report', web: 'report' } as const,
+                onPress: () => router.push({
+                  pathname: '/report-problem',
+                  params: { about: isDoctor ? booking.patientId : booking.provider?.id ?? '', booking: booking.id, name: counterpartName },
+                }),
+              }]
+              : []),
             ...(!ended && !(unpaid && !isDoctor)
               ? [{ label: t('chat.end'), icon: { ios: 'xmark', android: 'close', web: 'close' } as const, destructive: true, onPress: () => setConfirmEnd(true) }]
               : []),
           ]} />
         ) : null}
       </View>
+
+      {/* Frame "Consultation Chat" (doctor view, D50): the patient's readings and their 7-day insights, one tap away. */}
+      {isDoctor && booking?.patientId && canConsult ? (
+        <View style={styles.recordLinks}>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.recordLink}
+            onPress={() => router.push({ pathname: '/doctor/health-logs/[id]', params: { id: booking.patientId, booking: booking.id } } as never)}>
+            <SymbolView name={{ ios: 'list.clipboard.fill', android: 'assignment', web: 'assignment' }} size={14} tintColor="#334155" />
+            <Text style={styles.recordLinkText}>{t('chat.healthLogs')}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.recordLink}
+            onPress={() => router.push({ pathname: '/doctor/insights/[id]', params: { id: booking.patientId, booking: booking.id } } as never)}>
+            <SymbolView name={{ ios: 'chart.line.uptrend.xyaxis', android: 'insights', web: 'insights' }} size={14} tintColor="#334155" />
+            <Text style={styles.recordLinkText}>{t('chat.insights')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {body()}
 
@@ -459,6 +491,9 @@ const styles = StyleSheet.create({
   statusEnded: { color: homeColors.textMuted, marginTop: 3 },
   callButton: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   moreButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 28 },
+  recordLinks: { backgroundColor: homeColors.card, flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 12, paddingHorizontal: 20 },
+  recordLink: { alignItems: 'center', backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 40, paddingHorizontal: 14 },
+  recordLinkText: { color: '#334155', fontFamily: Brand.font.bold, fontSize: 13 },
   avatar: { alignItems: 'center', backgroundColor: 'rgba(220, 242, 169, 0.9)', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
   activeDot: { backgroundColor: homeColors.green, borderColor: '#FFF', borderRadius: 7, borderWidth: 2, bottom: -1, height: 14, position: 'absolute', right: -1, width: 14 },
   avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },

@@ -16,6 +16,9 @@ import {
   type EarnedBadge,
 } from '@/features/gamification/gamification-service';
 import { badgeText } from '@/features/gamification/badge-text';
+import { milestoneProgress, weeklyChallenges } from '@/features/gamification/challenges';
+import { memberTier, TIER_START } from '@/features/gamification/member-tier';
+import { TierBadge } from '@/features/profile/profile-ui';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
@@ -42,6 +45,10 @@ export default function RewardsScreen() {
   }, [uid]);
 
   const stats = useMemo(() => wellnessStats(entries), [entries]);
+  // D51: the Figma "My Rewards" milestone card (points toward the next tier) and this week's automatic challenges.
+  const tier = memberTier(stats.points);
+  const progress = milestoneProgress(stats.points, TIER_START[tier.tier], tier.next ? TIER_START[tier.next] : null);
+  const challenges = useMemo(() => weeklyChallenges(entries), [entries]);
 
   // Writing the derived numbers back keeps the Gamification doc in step with
   // what the patient sees, and awards any badge they have just qualified for.
@@ -73,6 +80,35 @@ export default function RewardsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {failed ? <Text style={styles.error}>{t('rewards.loadFailed')}</Text> : null}
 
+        <View style={styles.milestoneCard}>
+          <View style={styles.milestoneTop}>
+            <Text style={styles.milestoneLabel}>{t('rewards.yourPoints')}</Text>
+            <TierBadge tier={tier.tier} />
+          </View>
+          <Text style={styles.milestonePoints}>
+            {stats.points.toLocaleString('en-US')} <Text style={styles.milestoneUnit}>{t('rewards.pts')}</Text>
+          </Text>
+          {tier.next ? (
+            <View style={styles.milestoneRow}>
+              <Text style={styles.milestoneName}>{t('rewards.milestone', { tier: tier.next })}</Text>
+              <Text style={styles.milestoneTarget}>{TIER_START[tier.next].toLocaleString('en-US')} {t('rewards.pts')}</Text>
+            </View>
+          ) : null}
+          <View
+            accessibilityRole="progressbar"
+            accessibilityLabel={tier.next
+              ? t('rewards.milestoneA11y', { done: stats.points, goal: TIER_START[tier.next], tier: tier.next })
+              : t('rewards.milestoneTop')}
+            style={styles.track}
+          >
+            <View style={[styles.fill, styles.fillMilestone, { width: `${Math.round(progress * 100)}%` }]} />
+          </View>
+          <Text style={styles.milestoneHint}>
+            {tier.next ? t('rewards.milestoneLeft', { points: tier.pointsToNext.toLocaleString('en-US'), tier: tier.next }) : t('rewards.milestoneTop')}
+          </Text>
+          {stats.challengePoints > 0 ? <Text style={styles.milestoneBonus}>{t('rewards.bonusLine', { points: stats.challengePoints })}</Text> : null}
+        </View>
+
         <View style={styles.streakCard}>
           <View style={styles.flameWrap}>
             <SymbolView name={{ ios: 'flame.fill', android: 'local_fire_department', web: 'local_fire_department' }} size={30} tintColor="#F59E0B" />
@@ -96,6 +132,36 @@ export default function RewardsScreen() {
             <Text style={styles.statLabel}>{t('rewards.readings')}</Text>
           </View>
         </View>
+
+        <Text accessibilityRole="header" style={styles.sectionTitle}>{t('rewards.challenges')}</Text>
+        <Text style={styles.sectionNote}>{t('rewards.challengesNote')}</Text>
+        {challenges.map((challenge) => (
+          <View key={challenge.id} style={[styles.challengeCard, challenge.done && styles.challengeDone]}>
+            <View style={styles.challengeTop}>
+              <View style={[styles.challengeIcon, challenge.done ? styles.badgeIconOn : styles.badgeIconOff]}>
+                <SymbolView
+                  name={challenge.done
+                    ? { ios: 'checkmark', android: 'check', web: 'check' }
+                    : { ios: 'flag.fill', android: 'flag', web: 'flag' }}
+                  size={18}
+                  tintColor={challenge.done ? homeColors.green : homeColors.textFaint}
+                />
+              </View>
+              <Text style={styles.challengeTitle}>{t(`rewards.challenge.${challenge.id}`)}</Text>
+              <Text style={[styles.challengePoints, challenge.done && styles.challengePointsDone]}>
+                {challenge.done ? `${t('rewards.challengeDone')} · ` : ''}{t('rewards.challengePoints', { points: challenge.points })}
+              </Text>
+            </View>
+            <View
+              accessibilityRole="progressbar"
+              accessibilityLabel={`${t(`rewards.challenge.${challenge.id}`)}: ${t('rewards.challengeProgress', { value: challenge.value, goal: challenge.goal })}`}
+              style={styles.track}
+            >
+              <View style={[styles.fill, { width: `${Math.round((challenge.value / challenge.goal) * 100)}%` }]} />
+            </View>
+            <Text style={styles.challengeCount}>{t('rewards.challengeProgress', { value: challenge.value, goal: challenge.goal })}</Text>
+          </View>
+        ))}
 
         <Text style={styles.sectionTitle}>{t('rewards.badges')}</Text>
         {badges.length === 0 ? (
@@ -137,6 +203,29 @@ const styles = StyleSheet.create({
   subtitle: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14, marginTop: 2 },
   scroll: { padding: 24, paddingBottom: 140 },
   error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 13, marginBottom: 12 },
+  // Figma "My Rewards": the points card with the tier pill and the progress bar to the next milestone.
+  milestoneCard: { backgroundColor: homeColors.card, borderColor: '#F5B53F', borderRadius: 28, borderWidth: 2, gap: 8, marginBottom: 16, padding: 22 },
+  milestoneTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  milestoneLabel: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 13, letterSpacing: 0.6 },
+  milestonePoints: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 44, letterSpacing: -1.5 },
+  milestoneUnit: { color: homeColors.textFaint, fontFamily: Brand.font.bold, fontSize: 20, letterSpacing: 0 },
+  milestoneRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  milestoneName: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 14 },
+  milestoneTarget: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14 },
+  milestoneHint: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19 },
+  milestoneBonus: { color: homeColors.green, fontFamily: Brand.font.medium, fontSize: 12 },
+  track: { backgroundColor: homeColors.borderSoft, borderRadius: 999, height: 10, overflow: 'hidden' },
+  fill: { backgroundColor: homeColors.green, borderRadius: 999, height: 10 },
+  fillMilestone: { backgroundColor: '#F59E0B' },
+  sectionNote: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  challengeCard: { backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, gap: 10, marginTop: 12, padding: 16 },
+  challengeDone: { borderColor: homeColors.green },
+  challengeTop: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  challengeIcon: { alignItems: 'center', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  challengeTitle: { color: '#0F172A', flex: 1, fontFamily: Brand.font.bold, fontSize: 14, lineHeight: 19 },
+  challengePoints: { color: homeColors.textMuted, fontFamily: Brand.font.bold, fontSize: 13 },
+  challengePointsDone: { color: homeColors.green },
+  challengeCount: { alignSelf: 'flex-end', color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 12 },
   streakCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 28, borderWidth: 1, paddingVertical: 28, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
   flameWrap: { alignItems: 'center', backgroundColor: 'rgba(245, 158, 11, 0.12)', borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
   streakValue: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 52, letterSpacing: -2, marginTop: 12 },

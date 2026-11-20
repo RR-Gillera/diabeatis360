@@ -237,6 +237,18 @@ service cloud.firestore {
         return !keys.hasAny(['phone_number'])
           || (data.phone_number is string && (data.phone_number == '' || data.phone_number.matches('^[+]639[0-9]{9}$')));
       }
+      // A child's account (D16) keeps a copy of its guardian's name and relationship (never the ID photo) so that a doctor
+      // the child booked can see who runs the account (QA DOC-013 part 2): a doctor can read this Users doc (canSeePatient)
+      // but not Guardian_Verifications. The copy may only be written on a 'minor' account, and only equal to the
+      // Guardian_Verifications document as it stands after the same write (the app saves both in one batch), so it
+      // can never say something the admin did not review.
+      function okGuardianCopy(data, keys) {
+        return !keys.hasAny(['guardian_full_name', 'guardian_relationship'])
+          || (data.get('account_type', 'self') == 'minor'
+              && existsAfter(/databases/$(database)/documents/Guardian_Verifications/$(userId))
+              && data.get('guardian_full_name', '') == getAfter(/databases/$(database)/documents/Guardian_Verifications/$(userId)).data.guardian_full_name
+              && data.get('guardian_relationship', '') == getAfter(/databases/$(database)/documents/Guardian_Verifications/$(userId)).data.relationship_to_minor);
+      }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.
       allow read: if isUser(userId) || isAdmin() || canSeePatient(userId);
@@ -245,7 +257,8 @@ service cloud.firestore {
       allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
                     && request.resource.data.get('account_type', 'self') in ['self', 'minor']
                     && okHealth(request.resource.data, request.resource.data.keys())
-                    && okPhone(request.resource.data, request.resource.data.keys());
+                    && okPhone(request.resource.data, request.resource.data.keys())
+                    && okGuardianCopy(request.resource.data, request.resource.data.keys());
       // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
       // account_type (D16) is set once — the Users doc already exists by the time onboarding chooses "For me" /
       // "For my child" (it is created earlier, at email verification), so this has to be an update, not a
@@ -255,6 +268,7 @@ service cloud.firestore {
                     || (isUser(userId) && !changedKeys().hasAny(['is_active'])
                         && okHealth(request.resource.data, changedKeys())
                         && okPhone(request.resource.data, changedKeys())
+                        && okGuardianCopy(request.resource.data, changedKeys())
                         && (!changedKeys().hasAny(['account_type'])
                             || (!('account_type' in resource.data) && request.resource.data.account_type in ['self', 'minor'])));
       // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
@@ -682,6 +696,55 @@ service cloud.firestore {
                     && (!('audience' in request.resource.data) || request.resource.data.audience in ['all', 'patient', 'doctor'])
                     && (!('status' in request.resource.data) || request.resource.data.status in ['draft', 'published']);
       allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------ reports (D51: "Report a problem", Table 31 #6)
+
+    // A patient or doctor reports a problem with the app, or flags the other person on a booking they share; an admin
+    // reviews it, replies, and marks it resolved. Nobody else can read a report, and nobody can delete one.
+    match /Reports/{reportId} {
+      // "Report this doctor" comes from the patient on that booking, "Report this patient" from its doctor, and the flagged
+      // person must be the other one on it. This is what stops anyone flagging a stranger.
+      function flagsTheOtherPerson(data) {
+        return (data.category == 'doctor_conduct'
+                  && bookingData(data.booking_id).patient_id == request.auth.uid
+                  && bookingData(data.booking_id).provider_id == data.reported_user_id)
+          || (data.category == 'patient_conduct'
+                  && bookingData(data.booking_id).provider_id == request.auth.uid
+                  && bookingData(data.booking_id).patient_id == data.reported_user_id);
+      }
+      function validNewReport(data) {
+        return data.keys().hasOnly(['reporter_id', 'reporter_role', 'category', 'message', 'reported_user_id', 'booking_id', 'status', 'created_at'])
+          && data.keys().hasAll(['reporter_id', 'reporter_role', 'category', 'message', 'status', 'created_at'])
+          && data.reporter_id == request.auth.uid
+          // Only a label for the admin's list; it must match the role on the reporter's own profile. A person who has not
+          // confirmed their email has no profile yet (D21), so they count as a patient.
+          && data.reporter_role in ['patient', 'doctor']
+          && data.reporter_role == (exists(/databases/$(database)/documents/Users/$(request.auth.uid))
+                ? get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.get('role', 'patient')
+                : 'patient')
+          && data.category in ['app_problem', 'payment', 'account', 'doctor_conduct', 'patient_conduct', 'other']
+          && data.message is string && data.message.size() >= 10 && data.message.size() <= 1000
+          && data.status == 'open'
+          && data.created_at == request.time
+          // A report about a person needs the booking that links you to them; every other category names nobody.
+          && (data.category in ['doctor_conduct', 'patient_conduct']
+                ? (data.reported_user_id is string && data.booking_id is string && flagsTheOtherPerson(data))
+                : !('reported_user_id' in data) && !('booking_id' in data));
+      }
+
+      // The reporter sees their own reports (and the admin's reply); admins see all of them.
+      allow read: if signedIn() && (resource.data.reporter_id == request.auth.uid || isAdmin());
+      // Anyone signed in may report (even before confirming their email: "I never got the email" is a real problem).
+      allow create: if signedIn() && validNewReport(request.resource.data);
+      // Only an admin answers and resolves, under their own name. The report itself cannot be rewritten.
+      allow update: if isAdmin()
+                    && changedKeys().hasOnly(['status', 'admin_reply', 'resolved_by', 'resolved_at'])
+                    && request.resource.data.status in ['open', 'resolved']
+                    && request.resource.data.get('admin_reply', '') is string
+                    && request.resource.data.get('admin_reply', '').size() <= 1000
+                    && (!('resolved_by' in changedKeys()) || request.resource.data.resolved_by == request.auth.uid);
+      allow delete: if false;
     }
 
     // ------------------------------------------------------------------ gamification

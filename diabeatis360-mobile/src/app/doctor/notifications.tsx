@@ -36,6 +36,8 @@ type Notice = {
   /** Set when the notice is a stored Notifications doc rather than derived. */
   notificationId?: string;
   bookingId?: string;
+  /** A reply to the doctor's report (D51): tapping opens Report a problem. */
+  opensReports?: boolean;
   unread?: boolean;
   /** A booking request still waiting for an answer: listed first. */
   pending?: boolean;
@@ -186,7 +188,25 @@ export default function DoctorNotificationsScreen() {
           background: criticalRed,
         };
       });
-    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...toNotices(appointments, t, language)];
+    // An admin answered one of the doctor's reports (D51); tapping opens Report a problem, where the reply is shown.
+    const reportNotices: Notice[] = stored
+      .filter((entry) => entry.type === 'report_update')
+      .map((entry) => ({
+        id: entry.id,
+        kind: 'other' as const,
+        patientId: '',
+        notificationId: entry.id,
+        opensReports: true,
+        unread: !entry.isRead,
+        title: t('notif.kind.report_update'),
+        detail: entry.message,
+        when: entry.sentAt,
+        icon: 'exclamationmark.bubble.fill' as const,
+        iconAndroid: 'report' as const,
+        color: '#64748B',
+        background: '#EEF1F5',
+      }));
+    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...reportNotices, ...toNotices(appointments, t, language)];
     // An unread critical reading first (D28), then pending requests and other unread notices, then the rest; newest
     // first within each — the doctor's action queue matters more than strict chronology (doctor-notices.ts).
     return sortNotices(list);
@@ -250,6 +270,7 @@ export default function DoctorNotificationsScreen() {
                   if (notice.notificationId) void markNotificationRead(notice.notificationId);
                   if (notice.bookingId) router.push({ pathname: '/consultation/[id]', params: { id: notice.bookingId } });
                   else if (notice.patientId) router.push({ pathname: '/doctor/patient/[id]', params: { id: notice.patientId } });
+                  else if (notice.opensReports) router.push('/report-problem');
                 }}
               >
                 <View style={[styles.icon, { backgroundColor: notice.background }]}>

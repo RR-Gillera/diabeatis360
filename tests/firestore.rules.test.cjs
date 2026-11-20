@@ -242,6 +242,28 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await allow('the rejected minor resubmits with a new photo', updateDoc(doc(pMinorRejected, 'Guardian_Verifications/pMinorRejected'), { guardian_full_name: 'Maria Dela Cruz', relationship_to_minor: 'parent', guardian_id_photo_url: 'https://x/new-id.jpg', verification_status: 'pending', submitted_at: serverTimestamp() }));
   await deny('delete a guardian verification', require('firebase/firestore').deleteDoc(doc(a1, 'Guardian_Verifications/pMinorApproved')));
 
+  // ---- The guardian's name copied onto the child's Users doc for the booked doctor (QA DOC-013 part 2, PAT-011)
+  const pMinorBatch = signedIn('pMinorBatch').firestore();
+  await allow('a new child account creates its Users doc', setDoc(doc(pMinorBatch, 'Users/pMinorBatch'), { full_name: 'Parent Typed At Signup', role: 'patient', is_active: true, account_type: 'minor' }));
+  await deny('the guardian copy cannot be written before a verification exists', updateDoc(doc(pMinorBatch, 'Users/pMinorBatch'), { guardian_full_name: 'Maria Dela Cruz', guardian_relationship: 'parent' }));
+  {
+    const batch = writeBatch(pMinorBatch);
+    batch.set(doc(pMinorBatch, 'Guardian_Verifications/pMinorBatch'), newGuardian('pMinorBatch'));
+    batch.set(doc(pMinorBatch, 'Users/pMinorBatch'), { guardian_full_name: 'Maria Dela Cruz', guardian_relationship: 'parent' }, { merge: true });
+    await allow('the verification and its Users copy are saved together (the app\'s batch)', batch.commit());
+  }
+  await allow("the child's own name replaces the parent's in full_name", updateDoc(doc(pMinorBatch, 'Users/pMinorBatch'), { full_name: 'Juan Dela Cruz' }));
+  await deny('the guardian copy cannot name someone the admin did not review', updateDoc(doc(pMinorBatch, 'Users/pMinorBatch'), { guardian_full_name: 'Someone Else' }));
+  await deny('the guardian copy cannot change the relationship on its own', updateDoc(doc(pMinorBatch, 'Users/pMinorBatch'), { guardian_relationship: 'legal_guardian' }));
+  {
+    const batch = writeBatch(pMinorBatch);
+    batch.set(doc(pMinorBatch, 'Guardian_Verifications/pMinorBatch'), { guardian_full_name: 'Someone Else' }, { merge: true });
+    batch.set(doc(pMinorBatch, 'Users/pMinorBatch'), { guardian_full_name: 'Someone Else' }, { merge: true });
+    await deny('a pending verification cannot be renamed together with its copy', batch.commit());
+  }
+  await allow('an approved child account may write a copy equal to its verification', updateDoc(doc(pMinorApproved, 'Users/pMinorApproved'), { guardian_full_name: 'Maria Guardian', guardian_relationship: 'parent' }));
+  await deny("a 'self' account cannot carry a guardian copy", updateDoc(doc(p1, 'Users/p1'), { guardian_full_name: 'Maria Guardian', guardian_relationship: 'parent' }));
+
   await deny('admin creates another Admins doc', setDoc(doc(a1, 'Admins/a9'), { full_name: 'x' }));
 
   // ---- Glucose_Logs
@@ -848,6 +870,54 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await deny('D49: a number in another form is refused', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '0917 123 4567' }));
   await deny('D49: a landline or short number is refused', updateDoc(doc(dWallet, 'Users/dWallet'), { phone_number: '+63321234567' }));
   await deny('D49: a patient cannot read the doctor\'s number', getDoc(doc(p1, 'Users/dWallet')));
+
+  // ---- D51: Report a problem, and flagging the other person on a shared booking (Table 31 #6)
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'Users/d1'), { full_name: 'Dr One', role: 'doctor' });
+    await setDoc(doc(ctx.firestore(), 'Users/d5'), { full_name: 'Dr Five', role: 'doctor' });
+  });
+  const report = (reporter, over = {}) => ({
+    reporter_id: reporter, reporter_role: 'patient', category: 'app_problem',
+    message: 'The chart does not load on my phone.', status: 'open', created_at: serverTimestamp(), ...over,
+  });
+  const flagDoctor = (over = {}) => report('p1', { category: 'doctor_conduct', reported_user_id: 'd1', booking_id: 'bConfirmed', message: 'The doctor did not join the call.', ...over });
+  const flagPatient = (over = {}) => report('d1', { reporter_role: 'doctor', category: 'patient_conduct', reported_user_id: 'p1', booking_id: 'bConfirmed', message: 'The patient was abusive in chat.', ...over });
+  await allow('D51: p1 reports an app problem', setDoc(doc(p1, 'Reports/r1'), report('p1')));
+  await allow('D51: p1 reads their own report', getDoc(doc(p1, 'Reports/r1')));
+  await allow('D51: p1 lists their own reports', getDocs(query(collection(p1, 'Reports'), where('reporter_id', '==', 'p1'))));
+  await deny('D51: p2 cannot read p1\'s report', getDoc(doc(p2, 'Reports/r1')));
+  await deny('D51: the doctor cannot read a report they are not the reporter of', getDoc(doc(d1, 'Reports/r1')));
+  await allow('D51: an admin reads any report', getDoc(doc(a1, 'Reports/r1')));
+  await allow('D51: an admin lists all reports', getDocs(collection(a1, 'Reports')));
+  await allow('D51: an unconfirmed account can still report a problem', setDoc(doc(signedIn('p2', { email_verified: false }).firestore(), 'Reports/rUnconfirmed'), report('p2')));
+  await allow('D51: ...even before it has a profile (it counts as a patient)', setDoc(doc(signedIn('pNoProfile', { email_verified: false }).firestore(), 'Reports/rNoProfile'), report('pNoProfile')));
+  await deny('D51: ...and such an account cannot call itself a doctor', setDoc(doc(signedIn('pNoProfile2', { email_verified: false }).firestore(), 'Reports/rNoProfile2'), report('pNoProfile2', { reporter_role: 'doctor' })));
+  await deny('D51: anonymous cannot report', setDoc(doc(anon, 'Reports/rAnon'), report('nobody')));
+  await deny('D51: a report cannot be filed in someone else\'s name', setDoc(doc(p1, 'Reports/r2'), report('p2')));
+  await deny('D51: a patient cannot label themselves a doctor', setDoc(doc(p1, 'Reports/r3'), report('p1', { reporter_role: 'doctor' })));
+  await deny('D51: a report cannot start resolved', setDoc(doc(p1, 'Reports/r4'), report('p1', { status: 'resolved' })));
+  await deny('D51: a message under 10 characters is refused', setDoc(doc(p1, 'Reports/r5'), report('p1', { message: 'broken' })));
+  await deny('D51: a message over 1,000 characters is refused', setDoc(doc(p1, 'Reports/r6'), report('p1', { message: 'x'.repeat(1001) })));
+  await deny('D51: an unknown category is refused', setDoc(doc(p1, 'Reports/r7'), report('p1', { category: 'spam' })));
+  await deny('D51: the time must be the server\'s', setDoc(doc(p1, 'Reports/r8'), report('p1', { created_at: Timestamp.now() })));
+  await deny('D51: no extra fields (e.g. admin_reply)', setDoc(doc(p1, 'Reports/r9'), report('p1', { admin_reply: 'Fixed!' })));
+  await deny('D51: an app problem cannot name a person', setDoc(doc(p1, 'Reports/r10'), report('p1', { reported_user_id: 'd1', booking_id: 'bConfirmed' })));
+  await allow('D51: p1 flags the doctor of their booking', setDoc(doc(p1, 'Reports/rFlagDoctor'), flagDoctor()));
+  await allow('D51: the doctor flags the patient of their booking', setDoc(doc(d1, 'Reports/rFlagPatient'), flagPatient()));
+  await deny('D51: a conduct report needs the person', setDoc(doc(p1, 'Reports/r11'), without(flagDoctor(), 'reported_user_id')));
+  await deny('D51: a conduct report needs the booking', setDoc(doc(p1, 'Reports/r12'), without(flagDoctor(), 'booking_id')));
+  await deny('D51: p2 cannot flag a doctor through a booking that is not theirs', setDoc(doc(p2, 'Reports/r13'), { ...flagDoctor(), reporter_id: 'p2' }));
+  await deny('D51: p1 cannot flag a doctor who is not on the booking', setDoc(doc(p1, 'Reports/r14'), flagDoctor({ reported_user_id: 'd2' })));
+  await deny('D51: a patient cannot use "patient conduct" to flag another patient', setDoc(doc(p1, 'Reports/r15'), flagDoctor({ category: 'patient_conduct', reported_user_id: 'p2' })));
+  await deny('D51: a doctor cannot flag a patient through a booking that is not theirs', setDoc(doc(signedIn('d5').firestore(), 'Reports/r16'), { ...flagPatient(), reporter_id: 'd5' }));
+  await deny('D51: the reporter cannot change their report', updateDoc(doc(p1, 'Reports/r1'), { message: 'Something else entirely.' }));
+  await deny('D51: the reporter cannot resolve their own report', updateDoc(doc(p1, 'Reports/r1'), { status: 'resolved' }));
+  await allow('D51: an admin replies and resolves under their own name', updateDoc(doc(a1, 'Reports/r1'), { status: 'resolved', admin_reply: 'Fixed in the latest update.', resolved_by: 'a1', resolved_at: serverTimestamp() }));
+  await deny('D51: an admin cannot resolve in another admin\'s name', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { status: 'resolved', resolved_by: 'a-someone-else' }));
+  await deny('D51: an admin cannot rewrite what the reporter said', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { message: 'Edited by admin.' }));
+  await deny('D51: an admin reply over 1,000 characters is refused', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { admin_reply: 'x'.repeat(1001) }));
+  await allow('D51: an admin reopens a report', updateDoc(doc(a1, 'Reports/r1'), { status: 'open' }));
+  await deny('D51: nobody deletes a report, not even an admin', deleteDoc(doc(a1, 'Reports/r1')));
 
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));

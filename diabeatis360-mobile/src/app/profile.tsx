@@ -124,6 +124,7 @@ export default function ProfileScreen() {
           <MenuRow icon={{ ios: 'bell.fill', android: 'notifications' }} title={t('profile.menu.notifications')} subtitle={reminderStatus} onPress={() => router.push('/notification-settings')} />
           <MenuRow icon={{ ios: 'person.2.fill', android: 'family_restroom' }} title={t('family.title')} subtitle={(familyCount === 0 ? t('family.menuNone') : familyCount === 1 ? t('family.menuOne') : t('family.menuTwo')).toUpperCase()} onPress={() => router.push('/family-contacts')} />
           <MenuRow icon={{ ios: 'lock.fill', android: 'lock' }} title={t('pin.menu.change')} onPress={() => router.push('/change-pin')} />
+          <MenuRow icon={{ ios: 'exclamationmark.bubble.fill', android: 'report' }} title={t('report.menu')} onPress={() => router.push('/report-problem')} />
           <MenuRow icon={{ ios: 'gift.fill', android: 'redeem' }} tint="green" title={t('profile.menu.rewards')} subtitle={t('profile.rewardsLine', { tier: tier.toUpperCase(), points: compactNumber(stats.points) })} onPress={() => router.push('/rewards')} />
           {premium
             ? <PremiumCard title={t('profile.premium.member')} subtitle={t('profile.premium.manage')} onPress={() => router.push('/subscription')} />

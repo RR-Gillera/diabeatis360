@@ -299,3 +299,33 @@ Append newest at the bottom. Format:
 - **Files:** mobile `app/doctor/{profile.tsx,edit-profile.tsx (new)}`, `app/onboarding/professional-info.tsx` (specialty list moved), `features/doctor/{doctor-profile.ts,doctor-profile.test.mjs,doctor-profile-ui.tsx (all new),doctor-service.ts,types.ts}`, `i18n/{en,fil}.ts`; `firestore.rules` + `tests/firestore.rules.test.cjs`; docs DECISIONS (D49), FIRESTORE_SCHEMA, MANUSCRIPT_CHANGES, FIGMA_MAP, ROADMAP, TEST_LOG.
 - **Verified:** tsc and lint clean; unit 226 (220 pass, 6 skipped); rules 513/513; browser 19/19 (profile and edit) plus the 30 wallet checks again. **Not run on a phone.**
 - **Known gaps / for the team:** a verified doctor can change the PRC number or expiry without a new admin review (open question in D49). The admin panel does not show the doctor's phone yet. The Filipino lines were written by Claude. Deploy the rules (`phone_number`) with the app.
+
+## 2026-11-19 — Claude Code — Doctor Consultation History, Health Logs, Blood Sugar Insights (D50)
+- **Done:** Consultation History rebuilt with Consultations (Upcoming / Completed / Cancelled, month headings, This Month, name search) and Earnings (wallet balance card with This month / Consultations / Pending, Weekly Trend, Earnings History). New Health Logs (blood sugar readings, day filter, edit history) and Blood Sugar Insights (latest reading, plain-number reading summary, 7-day trend) screens, opened from two new doctor-only buttons in the chat. D-06's Logs tab now uses the same reading card.
+- **Files:** mobile `app/doctor/{history.tsx,health-logs/[id].tsx (new),insights/[id].tsx (new),patient/[id].tsx}`, `app/consultation/[id].tsx`, `features/doctor/{consultation-history.ts,reading-insight.ts,chart-axis.ts,reading-card.tsx,week-line-chart.tsx (+3 tests, all new),doctor-ui.tsx}`, `i18n/{en,fil}.ts`; docs DECISIONS (D50), FIGMA_MAP, ROADMAP; frames saved in `FIGMA/DOCTOR/`.
+- **Verified:** unit 236 (230 pass, 6 skipped; 10 new); lint clean; tsc clean for these files (3 stale route-type errors in older wallet files until `expo start` regenerates `.expo/types`). **Not run in a browser or on a phone.**
+- **Known gaps:** the frames' Meals / Exercise tabs, Apple Health and "AI Health Coach" are deliberately not built (D50); tell the designer. The Filipino lines were written by Claude. The frames were given as screenshots; add their node IDs to FIGMA_MAP.
+
+## 2026-11-20 — Claude Code — Manuscript re-check for Capstone 2; Report a problem (D51 part 1)
+- **Done:** `MANUSCRIPT_CHANGES.md` rewritten against the Capstone 2 .docx with the team's new decisions (D51: build risk prediction, milestones and challenges, Report a problem; glucose cut-offs confirmed by the adviser; Table 24 and the Gantt chart unchanged). Built **Report a problem**: patient Profile and doctor My Profile entry, "Report this doctor / patient" in the consultation menu, the reporter's own list with the admin's reply, admin **Reported Issues** page (review, deactivate the flagged account, reply, resolve and notify), `Reports` rules, `report_update` notifications.
+- **Files:** see DECISIONS D51 part 1; docs `DECISIONS.md`, `FIRESTORE_SCHEMA.md`, `MANUSCRIPT_CHANGES.md`, `ROADMAP.md`, `TEST_LOG.md`.
+- **Verified:** rules 549/549, mobile unit 241 (235 pass, 6 skipped), admin unit 10, tsc and lint clean, admin build OK, browser 17/17 against the emulators (screenshots `docs/reports/d51-reports-2026-11-20`). Not on a phone.
+- **Known gaps:** no Figma frame for either screen; the doctor's side tested by rules only; reports cannot be rate-limited. **Next (D51):** milestones and weekly challenges, then risk prediction.
+
+## 2026-11-20 — Claude Code — Milestones and weekly challenges (D51 part 2)
+- **Done:** My Rewards milestone card (points, tier, progress to the next tier) and three automatic weekly challenges (5 days, 3 before-and-after-meal days, 14 readings; Monday–Sunday Philippine time) whose bonus points join the wellness points.
+- **Files:** `features/gamification/{challenges.ts,challenges.test.mjs}` (new), `gamification-service.ts`, `member-tier.ts`, `app/rewards.tsx`, `i18n/{en,fil}.ts`.
+- **Verified:** unit 250 (244 pass, 6 skipped; 9 new), tsc and lint clean, browser 7/7 against the emulators with exact expected totals (screenshots `docs/reports/d51-challenges-2026-11-20`). Not on a phone.
+- **Known gaps:** no Redeem Points or steps (nothing to redeem, no step data). The Filipino lines were written by Claude. **Next (D51):** risk prediction.
+
+## 2026-11-20 — Claude Code — Pediatric account: child's name and guardian for the doctor (UT-005, D52)
+- **Done:** "For my child" now asks the child's full name and saves it to `Users.full_name` (QA PAT-011); the guardian's name and relationship are copied onto the child's Users doc in the same batch as `Guardian_Verifications`, and the doctor's child badge shows "Guardian: … (…)" (DOC-013 part 2). The rules keep the copy equal to the reviewed verification.
+- **Files:** `firestore.rules`, `tests/firestore.rules.test.cjs` (+9), `seed.cjs`; mobile `app/onboarding/guardian.tsx`, `features/auth/guardian-service.ts`, `features/doctor/{types.ts,doctor-service.ts,doctor-ui.tsx}`, `app/doctor/{patient,request}/[id].tsx`, `i18n/{en,fil}.ts`; docs DECISIONS D52, FIRESTORE_SCHEMA, ROADMAP.
+- **Verified:** rules 558/558 (mutation-checked), mobile unit 249 pass / 6 skipped, tsc and lint clean. Not run in a browser or on a phone.
+- **Known gaps:** older child accounts show no guardian line until they resubmit; the rejection → resubmit path (GV-P10) still needs a phone run; the Filipino lines were written by Claude. Deploy order does not matter (the old app never writes the copy; the old rules allow it).
+
+## 2026-11-20 — Claude Code — AI Diabetes Risk Prediction (D51 part 3)
+- **Done:** risk level from a fixed 5-factor rule over 30 days of readings (`functions/lib/risk.js`), Gemini writes only the explanation and prevention / correction / maintenance advice (cleaned of allergens and medicine), once a day, saved as `AI_Suggestions` type `risk`; AI Health Insights screen and Home card.
+- **Files:** see DECISIONS D51 part 3.
+- **Verified:** functions 129/129, mobile unit 255 (249 pass, 6 skipped), tsc and lint clean, browser 6/6 with a fake Gemini (screenshots `docs/reports/d51-risk-2026-11-20`). Not with the real Gemini, not on a phone.
+- **To do:** redeploy the Vercel functions (`/api/predictRisk`); ask the adviser to look at the rule table (DECISIONS D51 part 3) before the defense. The Filipino lines were written by Claude.

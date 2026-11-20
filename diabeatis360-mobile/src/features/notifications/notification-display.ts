@@ -4,7 +4,7 @@
 import { shortDay, translate, type Language, type MessageKey } from '@/i18n/translate';
 
 /** Same values as NotificationType in notification-service.ts (kept as plain strings so this file has no imports). */
-type Kind = 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification' | 'doctor_verification';
+type Kind = 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification' | 'doctor_verification' | 'report_update';
 
 export type NotificationFilter = 'all' | 'appointments' | 'messages' | 'alerts';
 
@@ -31,6 +31,7 @@ const TITLES: Record<Kind, string> = {
   reminder: 'Reminder',
   guardian_verification: 'Guardian verification',
   doctor_verification: 'Account verification',
+  report_update: 'Reply to your report',
 };
 
 export function notificationTitle(kind: Kind, language: Language = 'English') {

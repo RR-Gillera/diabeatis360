@@ -134,6 +134,8 @@ export function subscribeToPatientProfile(
         languagePreference: String(data.language_preference ?? ''),
         // A child's account run by a parent or guardian (D16; shown to the doctor, QA DOC-013).
         isMinor: data.account_type === 'minor',
+        guardianName: String(data.guardian_full_name ?? ''),
+        guardianRelationship: String(data.guardian_relationship ?? ''),
       });
     },
     (error) => onError(error),

@@ -243,6 +243,18 @@ export default function UserHomeScreen() {
             <Text style={styles.insightsText}>{t(`home.insight.${week.insight}`, { inRange: week.inRange, count: week.count })}</Text>
           </View>
         </View>
+
+        {/* AI Diabetes Risk Prediction (D51): the level is a fixed rule over 30 days of readings; Gemini writes the advice. */}
+        <Pressable accessibilityRole="button" accessibilityLabel={`${t('risk.homeTitle')}. ${t('risk.homeText')}`} style={styles.riskCard} onPress={() => router.push('/risk-insights')}>
+          <View style={styles.riskIcon}>
+            <SymbolView name={{ ios: 'gauge.with.dots.needle.50percent', android: 'speed', web: 'speed' }} size={20} tintColor={homeColors.green} />
+          </View>
+          <View style={styles.insightsCopy}>
+            <Text style={styles.insightsTitle}>{t('risk.homeTitle')}</Text>
+            <Text style={styles.insightsText}>{t('risk.homeText')}</Text>
+          </View>
+          <SymbolView name={{ ios: 'chevron.right', android: 'chevron_right', web: 'chevron_right' }} size={18} tintColor={homeColors.textFaint} />
+        </Pressable>
       </ScrollView>
       <BottomNav active="home" />
       {/* A new reading opens the same result screen as on the Log tab: what it means, and Call 911 first if it is critical. */}
@@ -310,6 +322,8 @@ const styles = StyleSheet.create({
   activityPoints: { color: homeColors.green, fontFamily: Brand.font.bold, fontSize: 13 },
   insights: { alignItems: 'flex-start', backgroundColor: homeColors.greenTint, borderRadius: 16, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 20, padding: 20 },
   insightsCopy: { flex: 1 },
+  riskCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: homeColors.border, borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 12, padding: 18 },
+  riskIcon: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
   insightsTitle: { color: homeColors.textDark, fontFamily: Brand.font.bold, fontSize: 15 },
   insightsText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19, marginTop: 4 },
 });

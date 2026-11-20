@@ -1,6 +1,6 @@
 // The membership tier shown on Profile (Figma "BRONZE MEMBER" badge; DECISIONS.md D31). It comes only from wellness
-// points (gamification-service.ts: 5 points per reading logged + 2 per day of the current streak), so it rewards
-// steady logging. It is NOT the paid plan: Free or Premium is shown separately. No app imports, so npm test checks it.
+// points (gamification-service.ts: 5 points per reading logged + 2 per day of the current streak + the weekly challenge
+// bonuses, challenges.ts), so it rewards steady logging. Reaching Silver or Gold is a "milestone" on My Rewards (D51). It is NOT the paid plan: Free or Premium is shown separately. No app imports, so npm test checks it.
 
 export type MemberTier = 'Bronze' | 'Silver' | 'Gold';
 

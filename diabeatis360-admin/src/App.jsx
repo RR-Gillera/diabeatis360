@@ -5,6 +5,7 @@ import { AuthProvider } from './auth/AuthContext'
 import Layout from './components/Layout'
 import AnalyticsPage from './pages/AnalyticsPage'
 import ContentPage from './pages/ContentPage'
+import IssuesPage from './pages/IssuesPage'
 import LoginPage from './pages/LoginPage'
 import OverviewPage from './pages/OverviewPage'
 import ProvidersPage from './pages/ProvidersPage'
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/content" element={<ContentPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/revenue" element={<RevenuePage />} />
+              <Route path="/issues" element={<IssuesPage />} />
               <Route path="/settings" element={<SettingsPage />} />
 
               {/* Pre-restyle routes, kept as redirects (2026-09-29 Admin Figma pass). */}

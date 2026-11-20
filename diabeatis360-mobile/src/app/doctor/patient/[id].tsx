@@ -6,7 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Brand } from '@/constants/theme';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { bucketCurrentWeek } from '@/features/home/week-chart';
-import { EditHistory } from '@/features/glucose/glucose-ui';
+import { ReadingCard } from '@/features/doctor/reading-card';
 import { subscribeToPatientProfile } from '@/features/doctor/doctor-service';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
@@ -14,7 +14,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import type { ProviderBookingEntry } from '@/features/booking/types';
 import { ChildAccountBadge, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { PatientProfile } from '@/features/doctor/types';
-import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
+import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { homeColors, WeeklyChart } from '@/features/home/home-ui';
 import { isChatAvailable } from '@/constants/enums';
 import { glucoseDirection } from '@/constants/glucose';
@@ -25,14 +25,6 @@ import { ACTIVITY_LEVELS, DIETS, dislikedText, foodList, normalizeDiet } from '@
 import { foodLabel } from '@/constants/food-words';
 import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type MessageKey } from '@/i18n/translate';
-
-// The badge colours per reading; the words come from constants/enums.ts in the person's language.
-const readingStyle: Record<Interpretation, { color: string; background: string }> = {
-  normal: { color: homeColors.green, background: homeColors.greenTint },
-  low: { color: homeColors.orange, background: 'rgba(251, 146, 60, 0.12)' },
-  high: { color: homeColors.red, background: 'rgba(239, 68, 68, 0.12)' },
-  critical: { color: '#FFFFFF', background: homeColors.red },
-};
 
 // A doctor reads a patient's records only while that patient shares them, by booking this doctor (DECISIONS.md D22). After a
 // decline, or when the patient stops sharing, the database says "permission denied"; say what that means in plain words.
@@ -130,7 +122,7 @@ export default function DoctorPatientDetailScreen() {
               <View style={styles.whoCopy}>
                 <Text style={styles.whoName}>{profile.fullName}</Text>
                 <Text style={styles.whoMeta}>{age !== null ? t('doctor.patient.age', { age }) : t('doctor.request.noAge')}</Text>
-                {profile.isMinor ? <ChildAccountBadge /> : null}
+                {profile.isMinor ? <ChildAccountBadge guardianName={profile.guardianName} guardianRelationship={profile.guardianRelationship} /> : null}
               </View>
             </View>
             <View style={styles.segment}>
@@ -234,41 +226,16 @@ export default function DoctorPatientDetailScreen() {
                 <Text style={[doctorStyles.sectionTitle, styles.sectionSpacing]}>{t('doctor.patient.history')}</Text>
                 {entries.length === 0 ? (
                   <EmptyState icon="drop.fill" iconAndroid="monitor_heart" title={t('doctor.patient.noReadings')} detail={t('doctor.patient.noReadingsText')} />
-                ) : entries.slice(0, 20).map((entry) => {
-                  const style = readingStyle[entry.interpretation];
-                  return (
-                    <View key={entry.id} style={[doctorStyles.card, styles.entryCard]}>
-                      <View style={styles.entryLeft}>
-                        <View style={[styles.entryIcon, { backgroundColor: style.background }]}>
-                          <SymbolView name={{ ios: 'drop.fill', android: 'water_drop', web: 'water_drop' }} size={16} tintColor={style.color} />
-                        </View>
-                        <View style={styles.entryText}>
-                          <Text style={styles.entryReading}>{entry.readingMgdl} <Text style={styles.entryUnit}>mg/dL</Text></Text>
-                          <Text style={styles.entryMeta}>
-                            {entry.loggedAt ? shortDay(entry.loggedAt, language) : '—'}
-                            {entry.loggedAt ? ` · ${entry.loggedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}
-                            {' · '}{label('mealContext', entry.context)}
-                          </Text>
-                          {entry.notes ? <Text style={styles.entryNotes}>&ldquo;{entry.notes}&rdquo;</Text> : null}
-                          {/* A reading the patient changed after logging it is marked, and the doctor can see the original
-                              value and each change with its time (D44), so an edited number is never taken at face value. */}
-                          {entry.editCount > 0 ? (
-                            <Pressable accessibilityRole="button" onPress={() => setHistoryOpen(historyOpen === entry.id ? null : entry.id)} hitSlop={6}>
-                              <Text style={styles.entryEdited}>
-                                {entry.editCount === 1 ? t('glucose.history.edited') : t('glucose.history.editedCount', { count: entry.editCount })}
-                                {' · '}{historyOpen === entry.id ? t('glucose.history.hide') : t('glucose.history.show')}
-                              </Text>
-                            </Pressable>
-                          ) : null}
-                          {historyOpen === entry.id ? <EditHistory logId={entry.id} /> : null}
-                        </View>
-                      </View>
-                      <View style={[styles.entryBadge, { backgroundColor: style.background }]}>
-                        <Text style={[styles.entryBadgeText, { color: style.color }]}>{label('interpretation', entry.interpretation)}</Text>
-                      </View>
-                    </View>
-                  );
-                })}
+                ) : entries.slice(0, 20).map((entry) => (
+                  // The same card as the "Health Logs" screen (D50), with the edit history the doctor can open (D44).
+                  <ReadingCard
+                    key={entry.id}
+                    entry={entry}
+                    now={openedAt}
+                    historyOpen={historyOpen === entry.id}
+                    onToggleHistory={() => setHistoryOpen(historyOpen === entry.id ? null : entry.id)}
+                  />
+                ))}
               </>
             ) : null}
 
@@ -338,15 +305,4 @@ const styles = StyleSheet.create({
   consultCopy: { flex: 1 },
   consultTitle: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 15 },
   consultMeta: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
-  entryCard: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between', marginTop: 12 },
-  entryLeft: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 14 },
-  entryIcon: { alignItems: 'center', borderRadius: 16, height: 40, justifyContent: 'center', width: 40 },
-  entryReading: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 16 },
-  entryUnit: { color: homeColors.textFaint, fontFamily: Brand.font.medium, fontSize: 12 },
-  entryMeta: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
-  entryNotes: { color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12, fontStyle: 'italic', marginTop: 4 },
-  entryText: { flex: 1 },
-  entryEdited: { color: homeColors.green, fontFamily: Brand.font.bold, fontSize: 12, marginTop: 6 },
-  entryBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  entryBadgeText: { fontFamily: Brand.font.extraBold, fontSize: 10, textTransform: 'uppercase' },
 });

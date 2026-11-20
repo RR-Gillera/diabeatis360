@@ -176,6 +176,7 @@ export default function DoctorProfileScreen() {
               onPress={() => router.push('/doctor/wallet')}
             />
             <LinkRow icon={{ ios: 'globe', android: 'language' }} title={t('profile.menu.language')} value={language} onPress={() => router.push('/language-settings')} />
+            <LinkRow icon={{ ios: 'exclamationmark.bubble.fill', android: 'report' }} title={t('report.menu')} onPress={() => router.push('/report-problem')} />
           </ProfileSection>
 
           <Pressable accessibilityRole="button" style={styles.logout} onPress={() => { signOut(); resetTo(router, '/'); }}>

@@ -8,11 +8,12 @@ const { FieldValue } = require('firebase-admin/firestore')
 const { HttpsError } = require('firebase-functions/v2/https')
 
 const { interpretGlucose } = require('./glucose')
-const { hasPremium } = require('./limits')
+const { hasPremium, startOfManilaDay } = require('./limits')
+const { assessRisk } = require('./risk')
 const { reserveSlot } = require('./usage')
 const {
-  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, diabetesTypeOf, dislikedIngredients,
-  exerciseSchema, labelSchema, mealSchema, parseAllergens, containsAllergen,
+  buildLabelPrompt, buildRecommendationPrompt, buildRiskPrompt, cleanExercises, cleanLabel, cleanMeals, cleanRiskAdvice,
+  diabetesTypeOf, dislikedIngredients, exerciseSchema, labelSchema, mealSchema, parseAllergens, containsAllergen, riskSchema,
 } = require('./prompts')
 
 const CRITICAL_MESSAGE =
@@ -164,4 +165,83 @@ async function analyzeLabel({ db, uid, image, callAi, now = new Date() }) {
   }
 }
 
-module.exports = { generateRecommendations, analyzeLabel, CRITICAL_MESSAGE, ALLERGIES_MESSAGE, containsAllergen }
+/**
+ * AI Diabetes Risk Prediction (DECISIONS.md D51). The level comes from the fixed rule in risk.js; Gemini only explains
+ * it and gives advice. Order of the checks, each of which ends the request:
+ *   1. the latest reading is critical  -> the emergency message, the rule's level, no Gemini call (like the other AI);
+ *   2. an assessment was already made today (Manila day) -> that one again, no Gemini call;
+ *   3. fewer than 5 readings in 14 days -> "not enough readings", no Gemini call, nothing saved;
+ *   4. no allergy answer -> refused like the other AI features (the advice may name foods);
+ * then one daily 'risk' slot is taken (it also counts toward the project-wide Gemini cap), Gemini is asked, the advice is
+ * cleaned, and the result is saved in AI_Suggestions with suggestion_type 'risk'. It never uses up the Free plan's
+ * meal/exercise generations.
+ */
+async function predictRisk({ db, uid, callAi, now = new Date() }) {
+  const [userSnap, logsSnap, subsSnap, savedSnap] = await Promise.all([
+    db.doc(`Users/${uid}`).get(),
+    db.collection('Glucose_Logs').where('patient_id', '==', uid).get(),
+    db.collection('Subscriptions').where('user_id', '==', uid).get(),
+    db.collection('AI_Suggestions').where('user_id', '==', uid).get(),
+  ])
+  const profile = userSnap.data() ?? {}
+  const logs = logsSnap.docs.map((doc) => doc.data())
+  const millis = (log) => (log.logged_at && log.logged_at.toMillis ? log.logged_at.toMillis() : 0)
+  const latest = [...logs].sort((a, b) => millis(b) - millis(a))[0]
+
+  if (latest) {
+    const latestClass = interpretGlucose(Number(latest.reading_mgdl), latest.context === 'after_meal' ? 'after_meal' : 'before_meal', diabetesTypeOf(profile.diabetes_type))
+    if (latestClass === 'critical') {
+      const assessment = assessRisk({ logs, profile, now })
+      return { status: 'critical', message: CRITICAL_MESSAGE, assessment: assessment.enough ? assessment : null }
+    }
+  }
+
+  const todayStart = startOfManilaDay(now).getTime()
+  const savedToday = savedSnap.docs
+    .map((doc) => doc.data())
+    .filter((data) => data.suggestion_type === 'risk' && data.generated_at && data.generated_at.toMillis() >= todayStart)
+    .sort((a, b) => b.generated_at.toMillis() - a.generated_at.toMillis())[0]
+  if (savedToday) {
+    try {
+      const { assessment, advice } = JSON.parse(savedToday.response)
+      return { status: 'ok', cached: true, assessed_at: savedToday.generated_at.toDate().toISOString(), assessment, advice }
+    } catch {
+      // An unreadable saved result is ignored and a new one is made below.
+    }
+  }
+
+  const assessment = assessRisk({ logs, profile, now })
+  if (!assessment.enough) return { status: 'not_enough', readings_recent: assessment.readings_recent, needed: assessment.needed }
+  requireAllergies(profile)
+
+  const premium = hasPremium(subsSnap.docs.map((doc) => doc.data()), now)
+  const slot = await reserveSlot({ db, uid, feature: 'risk', premium, now })
+  let keepSlot = false
+  try {
+    const prompt = buildRiskPrompt({ profile, assessment })
+    let raw
+    try {
+      raw = await callAi({ system: prompt.system, user: prompt.user, schema: riskSchema })
+    } catch {
+      throw new HttpsError('unavailable', 'The risk assessment service is busy right now. Please try again in a moment.')
+    }
+    const advice = cleanRiskAdvice(raw, [...parseAllergens(profile.allergies), ...dislikedIngredients(profile)])
+    if (!advice.summary && !advice.prevention.length && !advice.maintenance.length) {
+      throw new HttpsError('unavailable', 'We could not prepare safe advice right now. Please try again.')
+    }
+
+    await db.collection('AI_Suggestions').add({
+      user_id: uid,
+      suggestion_type: 'risk',
+      prompt: prompt.user.slice(0, 1500),
+      response: JSON.stringify({ assessment, advice }),
+      generated_at: FieldValue.serverTimestamp(),
+    })
+    keepSlot = true
+    return { status: 'ok', cached: false, assessed_at: now.toISOString(), assessment, advice }
+  } finally {
+    if (!keepSlot) await slot.release()
+  }
+}
+
+module.exports = { generateRecommendations, analyzeLabel, predictRisk, CRITICAL_MESSAGE, ALLERGIES_MESSAGE, containsAllergen }

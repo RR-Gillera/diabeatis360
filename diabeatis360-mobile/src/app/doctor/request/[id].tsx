@@ -84,7 +84,7 @@ export default function RequestDetailsScreen() {
               <Text style={styles.name}>{name}</Text>
               <Text style={styles.age}>{age !== null ? t('doctor.request.age', { age }) : t('doctor.request.noAge')}</Text>
               {/* QA DOC-013: the doctor knows before accepting that a parent or guardian runs this child's account (D16). */}
-              {patient?.isMinor ? <ChildAccountBadge align="center" /> : null}
+              {patient?.isMinor ? <ChildAccountBadge align="center" guardianName={patient.guardianName} guardianRelationship={patient.guardianRelationship} /> : null}
               <View style={styles.divider} />
               <View style={styles.grid}>
                 <View style={styles.cell}><Text style={styles.label}>{t('appt.date')}</Text><Text style={styles.value}>{booking.scheduledAt ? formatApptDate(booking.scheduledAt, language) : '—'}</Text></View>

@@ -342,3 +342,106 @@ test('without an allergy answer every AI feature is refused: no Gemini call, not
   const result = await generateRecommendations({ db, uid: 'uNoAllergies', kind: 'meal', callAi: ai })
   assert.ok(result.items.length > 0)
 })
+
+// ---- AI Diabetes Risk Prediction (DECISIONS.md D51) -------------------------------------------------------------
+const { predictRisk } = require('../lib/handlers')
+const riskAnswer = {
+  summary: 'Most of your readings are in range, so your risk is low.',
+  prevention: ['Walk for 30 minutes after dinner', 'Ask about your insulin dose', 'Have a peanut butter snack'],
+  correction: [],
+  maintenance: ['Keep logging before breakfast', 'Choose brown rice'],
+}
+const RISK_NOW = new Date('2026-11-20T04:00:00Z') // noon in Manila
+const addReadingAt = (uid, value, daysAgo, context = 'before_meal') => db.collection('Glucose_Logs').add({
+  patient_id: uid, reading_mgdl: value, context, logged_at: Timestamp.fromDate(new Date(RISK_NOW.getTime() - daysAgo * 86400000)),
+})
+const steadyWeek = async (uid, value = 110) => { for (let day = 1; day <= 6; day += 1) await addReadingAt(uid, value, day) }
+
+test('risk: fewer than 5 readings in 14 days gives "not enough", with no Gemini call, nothing saved or counted', { skip }, async () => {
+  await reset()
+  await addUser('rk1')
+  for (let day = 1; day <= 4; day += 1) await addReadingAt('rk1', 110, day)
+  const ai = fakeAi(riskAnswer)
+  const result = await predictRisk({ db, uid: 'rk1', callAi: ai, now: RISK_NOW })
+  assert.deepEqual(result, { status: 'not_enough', readings_recent: 4, needed: 5 })
+  assert.equal(ai.calls, 0)
+  assert.equal((await db.collection('AI_Suggestions').get()).size, 0)
+  assert.equal((await db.collection('Usage_Counters').get()).size, 0)
+})
+
+test('risk: the rule sets the level, Gemini only explains it; unsafe tips are dropped; saved as type "risk"', { skip }, async () => {
+  await reset()
+  await addUser('rk2', { activity_level: 'Light' })
+  await steadyWeek('rk2')
+  const ai = fakeAi(riskAnswer)
+  const result = await predictRisk({ db, uid: 'rk2', callAi: ai, now: RISK_NOW })
+  assert.equal(result.status, 'ok')
+  assert.equal(result.cached, false)
+  assert.equal(result.assessment.level, 'low')
+  assert.equal(result.assessment.score, 0)
+  assert.deepEqual(result.advice.prevention, ['Walk for 30 minutes after dinner'], 'the insulin and peanut tips must be removed')
+  assert.equal(ai.calls, 1)
+
+  const saved = await db.collection('AI_Suggestions').get()
+  assert.equal(saved.size, 1)
+  assert.equal(saved.docs[0].data().suggestion_type, 'risk')
+  assert.match(saved.docs[0].data().prompt, /Risk level: LOW/)
+  assert.match(saved.docs[0].data().prompt, /peanuts/, 'the allergies are in the prompt')
+  assert.match(saved.docs[0].data().prompt, /Type 2/)
+  const day = manilaDayKey(RISK_NOW)
+  assert.equal((await counter(`${day}_rk2`)).risk, 1)
+  assert.equal((await counter(`${day}_rk2`)).ai ?? 0, 0, 'a risk assessment does not use up a meal/exercise generation')
+  assert.equal((await counter(day)).gemini, 1, 'but it counts toward the project-wide Gemini cap')
+})
+
+test('risk: the same Manila day shows the saved result again (no Gemini call); the next day makes a new one', { skip }, async () => {
+  await reset()
+  await addUser('rk3')
+  await steadyWeek('rk3')
+  const ai = fakeAi(riskAnswer)
+  const first = await predictRisk({ db, uid: 'rk3', callAi: ai, now: RISK_NOW })
+  const again = await predictRisk({ db, uid: 'rk3', callAi: ai, now: new Date('2026-11-20T15:59:00Z') }) // 23:59 Manila
+  assert.equal(again.cached, true)
+  assert.deepEqual(again.assessment, first.assessment)
+  assert.equal(ai.calls, 1)
+  const nextDay = await predictRisk({ db, uid: 'rk3', callAi: ai, now: new Date('2026-11-20T16:00:00Z') }) // 00:00 Manila
+  assert.equal(nextDay.cached, false)
+  assert.equal(ai.calls, 2)
+})
+
+test('risk: a critical latest reading shows the emergency message and the rule\'s level, with no Gemini call', { skip }, async () => {
+  await reset()
+  await addUser('rk4')
+  await steadyWeek('rk4')
+  await db.collection('Glucose_Logs').add({ patient_id: 'rk4', reading_mgdl: 280, context: 'after_meal', logged_at: Timestamp.fromDate(new Date(RISK_NOW.getTime() - 3600000)) })
+  const ai = fakeAi(riskAnswer)
+  const result = await predictRisk({ db, uid: 'rk4', callAi: ai, now: RISK_NOW })
+  assert.equal(result.status, 'critical')
+  assert.equal(result.message, CRITICAL_MESSAGE)
+  assert.equal(result.assessment.factors.find((factor) => factor.key === 'dangerous').status, 'critical')
+  assert.equal(ai.calls, 0)
+  assert.equal((await db.collection('AI_Suggestions').get()).size, 0)
+})
+
+test('risk: no allergy answer is refused; a Gemini failure or an empty answer gives the slot back', { skip }, async () => {
+  await reset()
+  await addUser('rk5', { allergies: '' })
+  await steadyWeek('rk5')
+  assert.equal(await code(predictRisk({ db, uid: 'rk5', callAi: fakeAi(riskAnswer), now: RISK_NOW })), 'failed-precondition')
+  await db.doc('Users/rk5').update({ allergies: 'None' })
+  const failing = async () => { throw new Error('Gemini down') }
+  assert.equal(await code(predictRisk({ db, uid: 'rk5', callAi: failing, now: RISK_NOW })), 'unavailable')
+  assert.equal(await code(predictRisk({ db, uid: 'rk5', callAi: fakeAi({ summary: 'Take your metformin.', prevention: ['More insulin'], correction: [], maintenance: [] }), now: RISK_NOW })), 'unavailable')
+  assert.equal((await counter(`${manilaDayKey(RISK_NOW)}_rk5`)).risk, 0)
+  assert.equal((await db.collection('AI_Suggestions').get()).size, 0)
+  assert.equal((await predictRisk({ db, uid: 'rk5', callAi: fakeAi(riskAnswer), now: RISK_NOW })).status, 'ok')
+})
+
+test('risk: a Free patient who already used both meal/exercise generations still gets the risk assessment', { skip }, async () => {
+  await reset()
+  await addUser('rk6', { allergies: 'None' })
+  await steadyWeek('rk6')
+  const ai = fakeAi(exercisesAnswer)
+  for (let i = 0; i < FREE_LIMITS.ai; i += 1) await generateRecommendations({ db, uid: 'rk6', kind: 'exercise', callAi: ai, now: RISK_NOW })
+  assert.equal((await predictRisk({ db, uid: 'rk6', callAi: fakeAi(riskAnswer), now: RISK_NOW })).status, 'ok')
+})

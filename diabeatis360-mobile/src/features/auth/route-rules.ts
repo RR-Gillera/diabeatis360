@@ -8,7 +8,7 @@ export type GuardRole = 'guest' | 'user' | 'doctor';
 export const PATIENT_ONLY = [
   'user-home', 'glucose-log', 'glucose-result', 'booking', 'scanner', 'meal-suggestions', 'meal-details', 'exercise-tips',
   'exercise-details', 'healthier-alternatives', 'rewards', 'subscription', 'profile', 'health-profile', 'dietary-preference',
-  'notification-settings', 'notifications', 'family-contacts',
+  'notification-settings', 'notifications', 'family-contacts', 'risk-insights',
 ] as const;
 
 /** Where to send someone who opened an address starting with `first`, or null to let them stay. */

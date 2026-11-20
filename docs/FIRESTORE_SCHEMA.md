@@ -6,7 +6,7 @@ intent. Names below are lowercase for readability. If this file and seed.cjs dis
 ## Existing collections (16, from the manuscript data dictionary, already seeded)
 | Collection | Doc ID | Key fields |
 |---|---|---|
-| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, disliked_ingredients (D40), diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), phone_number (D49: doctors only, optional, `''` or `+639XXXXXXXXX`, checked by the rules; on Users so patients cannot read it), created_at, is_active |
+| users | Auth UID | email, full_name, birthdate (ts), activity_level, dietary_preference, disliked_ingredients (D40), diabetes_type, location, language_preference, account_type (`self`/`minor`, D16, set once), guardian_full_name + guardian_relationship (D52: `minor` only, a copy of its Guardian_Verifications, kept equal by the rules, so a booked doctor sees the guardian; for a `minor`, full_name is the CHILD's name), phone_number (D49: doctors only, optional, `''` or `+639XXXXXXXXX`, checked by the rules; on Users so patients cannot read it), created_at, is_active |
 | guardian_verifications | **the child's own Auth UID** (D16: one per pediatric account, not auto — matches the manuscript's "Minor's Own User ID") | user_id, guardian_full_name, guardian_id_photo_url (Firebase Storage download URL), relationship_to_minor (`parent`/`legal_guardian`/`other`), verification_status (`pending`/`approved`/`rejected`), reviewed_by, reviewed_at, rejection_reason, submitted_at |
 | providers | Auth UID | email, full_name, specialty, prc_license_number, city, consultation_fee (number), is_verified, verified_by, created_at, is_active |
 | admins | Auth UID | email, full_name, role (`super_admin`/`admin`), last_login, created_at |
@@ -57,7 +57,7 @@ dictionary + ERD so the panel sees consistency). Prefer adding fields over new c
 | Payment + commission (Book Appointment, admin revenue) | on bookings: `payment_method`, `payment_status` (`unpaid`/`paid`/`onsite`, mocked online payment), `platform_commission` — or a `payments` collection (DECISIONS.md D3) |
 | Announcements (Send Announcements) | `announcements` collection (title, message, created_by, created_at) read by both apps, or fan-out into notifications |
 | Daily usage limits (Subscription) | **As built (DECISIONS.md D20, 2026-10-16): server-only `Usage_Counters`.** The first version counted today's `ai_suggestions` / `nutrition_scans`, but requests sent at the same moment all passed that check. See "Usage_Counters" below. |
-| Risk prediction (dashboard, manuscript scope, not in Table 24) | optional `risk_predictions` or store as `ai_suggestions` with type "Risk" |
+| Risk prediction (D51, built 2026-11-20) | **As built:** `AI_Suggestions` with `suggestion_type: 'risk'` (one a day, written only by the server; `response` = JSON of the rule's assessment and the advice). `Usage_Counters/{day}_{uid}` gains a `risk` count (1 a day). No new collection. |
 
 
 ## Added scope (adviser-requested, 2026-09-26) — NOT in the signed Table 24
@@ -125,6 +125,13 @@ No index is needed: the server's daily count queries `Family_Alerts where day ==
 | Payout_Accounts | the doctor's Auth UID | kind (`bank` / `gcash`), provider_name (a bank from the fixed list, or "GCash"), account_name (2–80 chars), last4 (exactly 4 digits), updated_at (server time) | the doctor, admins (not patients) | Where withdrawals go. Written by the **doctor**; the rules check every field, so only the last 4 digits of a number can be stored. |
 
 Also on `Providers`: `wallet_blocked` (boolean, server-written; true while the wallet is below 0, so Find a Doctor hides the doctor and the rules refuse new bookings). No index is needed: the app reads `Wallet_Transactions where provider_id ==` and sorts on the phone.
+
+## Report a problem — `Reports` (DECISIONS.md D51, 2026-11-20; manuscript Table 31 #6)
+| Collection | Doc ID | Fields | Who reads | Meaning |
+|---|---|---|---|---|
+| Reports | auto | reporter_id, reporter_role (`patient` / `doctor`, must match the reporter's `Users.role`; no profile yet = `patient`), category (`app_problem` / `payment` / `account` / `doctor_conduct` / `patient_conduct` / `other`), message (10–1,000 chars), reported_user_id + booking_id (**only** for the two conduct categories: the other person on a booking the reporter is on), status (`open` / `resolved`), created_at (server time); set by an admin: admin_reply (≤ 1,000), resolved_by (that admin's uid), resolved_at | the reporter, admins | Written by the **reporter** (create only, must start `open`) and by **admins** (only the four admin fields). Never deleted. Resolving also writes a `Notifications` row of type `report_update` to the reporter. |
+
+No index is needed: the app reads `Reports where reporter_id ==` and the admin sidebar badge `Reports where status ==`, both single equality filters. Known limit: the rules cannot rate-limit reports, so a person could send many; an admin sees them all in one list.
 
 ## Indexes you'll likely need
 - glucose_logs: `user_id ==` + `logged_at desc`

@@ -63,3 +63,30 @@ export type LabelAnalysis =
 
 /** A suggestion set saved by the function in AI_Suggestions, read back so details screens need no new AI call. */
 export type SavedSuggestion<T> = { id: string; kind: SuggestionKind; items: T[]; generatedAt: Date | null };
+
+// ---- AI Diabetes Risk Prediction (DECISIONS.md D51) -----------------------------------------------------------
+// What functions/lib/handlers.js predictRisk returns. The level comes from the fixed rule in functions/lib/risk.js;
+// Gemini only writes the advice.
+export type RiskLevel = 'low' | 'moderate' | 'high';
+export type RiskFactorKey = 'in_range' | 'dangerous' | 'average' | 'trend' | 'activity';
+export type RiskFactor = {
+  key: RiskFactorKey;
+  status: string;
+  points: number;
+  value: { percent?: number | null; critical?: number; low?: number; mgdl?: number; limit?: number; context?: string; level?: string };
+};
+export type RiskAssessment = {
+  enough: true;
+  level: RiskLevel;
+  score: number;
+  max_score: number;
+  factors: RiskFactor[];
+  readings_used: number;
+  window_days: number;
+  diabetes_type: string;
+};
+export type RiskAdvice = { summary: string; prevention: string[]; correction: string[]; maintenance: string[] };
+export type RiskResult =
+  | { status: 'ok'; cached: boolean; assessed_at: string; assessment: RiskAssessment; advice: RiskAdvice }
+  | { status: 'not_enough'; readings_recent: number; needed: number }
+  | { status: 'critical'; message: string; assessment: RiskAssessment | null };

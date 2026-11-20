@@ -7,7 +7,7 @@ const {
 } = require('../lib/limits')
 
 test('free limits match the manuscript: 2 AI generations and 3 scans a day', () => {
-  assert.deepEqual(FREE_LIMITS, { ai: 2, scan: 3 })
+  assert.deepEqual(FREE_LIMITS, { ai: 2, scan: 3, risk: 1 }) // risk: one daily assessment on every plan (D51), not a manuscript limit
 })
 
 test('a day starts at midnight Manila time (UTC+8)', () => {
@@ -51,7 +51,7 @@ test('checkLimit: free users stop at the free limit, premium at the fair-use cei
 })
 
 test('premium is "unlimited" in the app but has a fair-use ceiling far above normal use (D20)', () => {
-  assert.deepEqual(PREMIUM_LIMITS, { ai: 30, scan: 30 })
+  assert.deepEqual(PREMIUM_LIMITS, { ai: 30, scan: 30, risk: 1 })
   assert.ok(PREMIUM_LIMITS.ai > FREE_LIMITS.ai * 5 && PREMIUM_LIMITS.scan > FREE_LIMITS.scan * 5)
   assert.deepEqual(allowanceFor('ai', false), { limit: 2, scope: 'free' })
   assert.deepEqual(allowanceFor('ai', true), { limit: 30, scope: 'fair_use' })

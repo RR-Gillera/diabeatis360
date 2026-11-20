@@ -3,6 +3,7 @@
 // Diabeatis360 Cloud Functions (DECISIONS.md D1: option A). The mobile app calls these; only these call Gemini.
 //   generateRecommendations({ kind: 'meal' | 'exercise' })   -> AI meal / exercise suggestions
 //   analyzeLabel({ imageBase64, mimeType })                    -> nutrition label reading
+//   predictRisk({})                                            -> the daily diabetes risk assessment (D51)
 //   joinCall({ bookingId })                                    -> the LiveKit video room of an accepted call (D39)
 //   notifyFamily({ logId })                                    -> texts the family about a critical reading (D45)
 //   settleWallet / topUpWallet / withdrawFromWallet            -> the doctor's wallet (D47, demo money)
@@ -15,7 +16,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 
 const { callGemini } = require('./lib/gemini')
-const { analyzeLabel, generateRecommendations } = require('./lib/handlers')
+const { analyzeLabel, generateRecommendations, predictRisk } = require('./lib/handlers')
 const { joinCall } = require('./lib/calls')
 const { notifyFamily } = require('./lib/family')
 const { semaphoreSender } = require('./lib/sms')
@@ -49,6 +50,9 @@ const askGemini = (args) => callGemini({
 
 exports.generateRecommendations = onCall(options, (request) =>
   generateRecommendations({ db: getFirestore(), uid: requireUser(request), kind: request.data && request.data.kind, callAi: askGemini }))
+
+exports.predictRisk = onCall(options, (request) =>
+  predictRisk({ db: getFirestore(), uid: requireUser(request), callAi: askGemini }))
 
 exports.analyzeLabel = onCall(options, (request) =>
   analyzeLabel({

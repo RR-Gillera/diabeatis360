@@ -2,11 +2,13 @@
 
 // Daily limits for the AI features (manuscript business model, DECISIONS.md D5; counters and caps D20).
 // The mobile app shows the Free numbers (src/constants/plans.ts) but ONLY the server enforces any of them.
-const FREE_LIMITS = { ai: 2, scan: 3 }
+// risk (D51): one risk assessment a day on both plans; it is saved and shown again for the rest of the day, so a second
+// request the same day only happens when two arrive at the same moment, and that one is refused.
+const FREE_LIMITS = { ai: 2, scan: 3, risk: 1 }
 
 // "Unlimited" Premium still has a ceiling per person per day, far above normal use, so a script or a stuck loop on one
 // account cannot burn the shared Gemini quota. The app keeps saying "unlimited" (fair use); the manuscript notes it.
-const PREMIUM_LIMITS = { ai: 30, scan: 30 }
+const PREMIUM_LIMITS = { ai: 30, scan: 30, risk: 1 }
 
 // All people together, per day: the free Gemini quota belongs to the whole project, so one cap protects everyone.
 // 200 is a guess below a typical Flash free tier. Open https://aistudio.google.com/rate-limit, read the "requests per

@@ -2,7 +2,7 @@ import { httpsCallable, httpsCallableFromURL } from 'firebase/functions';
 
 import { functions } from '@/firebase';
 import type {
-  ExerciseSuggestion, LabelAnalysis, MealSuggestion, RecommendationResult, SuggestionKind,
+  ExerciseSuggestion, LabelAnalysis, MealSuggestion, RecommendationResult, RiskResult, SuggestionKind,
 } from '@/features/ai/types';
 
 import { AiError, toAiError } from './ai-error';
@@ -50,4 +50,9 @@ export function requestExerciseSuggestions() {
 /** The photo is sent to the function and never stored (DECISIONS.md D2). */
 export function requestLabelAnalysis(imageBase64: string, mimeType: 'image/jpeg' | 'image/png' | 'image/webp') {
   return call<{ imageBase64: string; mimeType: string }, LabelAnalysis>('analyzeLabel', { imageBase64, mimeType });
+}
+
+/** The daily diabetes risk assessment (DECISIONS.md D51). The server decides everything; the app sends nothing. */
+export function requestRiskAssessment() {
+  return call<Record<string, never>, RiskResult>('predictRisk', {});
 }

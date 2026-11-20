@@ -20,6 +20,7 @@ const kindStyle = {
   reminder: { color: '#F59E0B', background: '#FEF3C7', icon: 'clock.fill', iconAndroid: 'schedule' },
   guardian_verification: { color: homeColors.green, background: homeColors.greenTint, icon: 'person.badge.shield.checkmark', iconAndroid: 'verified_user' },
   doctor_verification: { color: homeColors.green, background: homeColors.greenTint, icon: 'person.badge.shield.checkmark', iconAndroid: 'verified_user' },
+  report_update: { color: '#64748B', background: '#EEF1F5', icon: 'exclamationmark.bubble.fill', iconAndroid: 'report' },
 } as const satisfies Record<NotificationType, { color: string; background: string; icon: string; iconAndroid: string }>;
 
 
@@ -48,6 +49,7 @@ export default function NotificationsScreen() {
     else if (entry.type === 'booking_update' && entry.relatedId) router.push({ pathname: '/booking/appointment', params: { id: entry.relatedId } });
     else if (entry.type === 'glucose_alert') router.push('/booking/find-doctor');
     else if (entry.type === 'guardian_verification') router.push('/profile');
+    else if (entry.type === 'report_update') router.push('/report-problem');
   };
 
   const markAll = async () => {

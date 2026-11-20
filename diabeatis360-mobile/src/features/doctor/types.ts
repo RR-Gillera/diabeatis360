@@ -52,6 +52,10 @@ export type PatientProfile = {
   /** A child's account, run by a parent or guardian (Users.account_type == 'minor', D16). Shown on Request Details and
    *  the patient record (QA DOC-013). */
   isMinor: boolean;
+  /** A child's account only: the guardian's name and relationship code, copied from Guardian_Verifications onto Users
+   *  (QA DOC-013 part 2). '' on an older child's account saved before the copy existed. */
+  guardianName: string;
+  guardianRelationship: string;
 };
 
 // One row in the doctor's Patients tab — the patient plus a summary of their
