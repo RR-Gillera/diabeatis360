@@ -14,6 +14,7 @@ import { filterRequests, REQUEST_TABS, requestTabFor, type RequestRange, type Re
 import { DoctorBottomNav, doctorStyles, StatusPill } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useT } from '@/i18n/language-context';
+import { PhotoLayer } from '@/features/photos/avatar';
 
 const SORTS: RequestSort[] = ['soonest', 'latest'];
 const RANGES: RequestRange[] = ['all', 'today', 'week'];
@@ -93,6 +94,7 @@ export default function DoctorRequestsScreen() {
               <View style={[styles.avatar, entry.queueNumber ? styles.avatarQueued : null]}>
                 {/* The queue number replaces the initials once assigned, so the doctor reads the day's order straight down. */}
                 <Text style={[styles.avatarText, entry.queueNumber ? styles.avatarTextQueued : null]}>{entry.queueNumber ? `#${entry.queueNumber}` : initialsOf(entry.patientName)}</Text>
+                {entry.queueNumber ? null : <PhotoLayer uid={entry.patientId} radius={16} />}
               </View>
               <View style={styles.copy}>
                 <View style={styles.nameRow}>

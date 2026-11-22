@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BottomSheetModal } from '@/components/ui/bottom-sheet-modal';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
-import { ModalBackdrop } from '@/components/ui/modal-backdrop';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
-import { useAuth } from '@/features/auth/auth-context';
-import { BookingMoreMenu, bookingColors, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
-import { initialsOf } from '@/features/booking/appointment-tabs';
-import { AppointmentHistoryList } from '@/features/booking/booking-history';
+import { bookingColors, formatFee, MyAppointmentsButton, PrimaryButton, providerName, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBookableProviders } from '@/features/booking/booking-service';
 import { useBooking } from '@/features/booking/booking-context';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { NotificationBell } from '@/features/notifications/notification-bell';
 import { useT } from '@/i18n/language-context';
 import type { Provider } from '@/features/booking/types';
+import { Avatar } from '@/features/photos/avatar';
 
 // The filter values match the specialty the doctor saved (English); only the chip text is translated.
 const filters = ['All', 'Endocrinologist', 'Diabetologist', 'Nutritionist'] as const;
 
 export default function FindDoctorScreen() {
   const router = useRouter();
-  const { uid } = useAuth();
   const { selectProvider } = useBooking();
   const { t } = useT();
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -35,7 +32,7 @@ export default function FindDoctorScreen() {
   useEffect(() => subscribeToBookableProviders(setProviders, () => setLoadFailed(true)), []);
 
   const visibleProviders = useMemo(() => providers.filter((provider) => {
-    const matchesSearch = `${provider.fullName} ${provider.specialty} ${provider.city}`.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = `${providerName(provider)} ${provider.specialty} ${provider.city}`.toLowerCase().includes(search.toLowerCase());
     return matchesSearch && (filter === 'All' || provider.specialty.toLowerCase() === filter.toLowerCase());
   }), [filter, providers, search]);
 
@@ -53,7 +50,7 @@ export default function FindDoctorScreen() {
         </View>
         <View style={styles.headerActions}>
           <NotificationBell style={styles.headerButton} />
-          <BookingMoreMenu style={styles.headerButton} />
+          <MyAppointmentsButton style={styles.headerButton} />
         </View>
       </View>
 
@@ -67,11 +64,7 @@ export default function FindDoctorScreen() {
             <Text style={[styles.filterText, filter === item && styles.activeFilterText]}>{t(`doctors.filter.${item}`)}</Text>
           </Pressable>
         )} />
-        <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>{t('doctors.yourAppointments')}</Text>
-          <AppointmentHistoryList patientId={uid} />
-        </View>
-
+        {/* "Your Appointments" used to be listed here too; it lives in My Appointments (the calendar button above). */}
         <Text style={styles.sectionTitle}>{t('doctors.all')}</Text>
         {loadFailed ? <Text style={styles.error}>{t('doctors.loadFailed')}</Text> : null}
         {/* "No match" only when the person searched or filtered; with no doctors at all it said that to someone who had typed nothing. */}
@@ -79,9 +72,9 @@ export default function FindDoctorScreen() {
         {visibleProviders.map((provider) => (
           <View key={provider.id} style={ui.card}>
             <View style={styles.doctorTop}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(provider.fullName)}</Text></View>
+              <Avatar uid={provider.id} name={provider.fullName} style={styles.avatar} textStyle={styles.avatarText} />
               <View style={styles.doctorCopy}>
-                <Text style={styles.doctorName}>{provider.fullName}</Text>
+                <Text style={styles.doctorName}>{providerName(provider)}</Text>
                 <Text style={styles.specialty}>{provider.specialty}</Text>
                 {provider.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>{t('doctors.verified')}</Text></View> : null}
                 {/* A doctor who chose Available 24/7 (D43): any day and any time can be requested. */}
@@ -108,37 +101,38 @@ export default function FindDoctorScreen() {
 
 // "View Profile": the doctor's details in one place before booking, including the PRC licence number, which the card
 // does not show. It reads the same Provider the list already loaded, so it needs no extra Firestore read.
-function DoctorProfileSheet({ doctor, onClose, onConsult }: { doctor: Provider | null; onClose: () => void; onConsult: (doctor: Provider) => void }) {
+function DoctorProfileSheet({ doctor: openDoctor, onClose, onConsult }: { doctor: Provider | null; onClose: () => void; onConsult: (doctor: Provider) => void }) {
   const { t } = useT();
+  // The screen clears `doctor` the moment Close is tapped; keep showing the last one while the sheet slides down.
+  const [doctor, setDoctor] = useState(openDoctor);
+  if (openDoctor && openDoctor !== doctor) setDoctor(openDoctor);
   return (
-    <Modal visible={doctor !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.sheetOverlay}>
-        <ModalBackdrop onClose={onClose} />
-        {doctor ? (
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.doctorTop}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(doctor.fullName)}</Text></View>
-              <View style={styles.doctorCopy}>
-                <Text accessibilityRole="header" style={styles.doctorName}>{doctor.fullName}</Text>
-                <Text style={styles.specialty}>{doctor.specialty}</Text>
-                {doctor.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>{t('doctors.verified')}</Text></View> : null}
-              </View>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={onClose} hitSlop={10} style={styles.sheetClose}>
-                <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#64748B" />
-              </Pressable>
+    <BottomSheetModal visible={openDoctor !== null} onClose={onClose}>
+      {doctor ? (
+        <View style={styles.sheet}>
+          {/* No grab bar on top: it suggested the sheet could be dragged down, which it cannot (team feedback,
+              2026-11-22). The X button, a tap on the grey, or the back button closes it. */}
+          <View style={styles.doctorTop}>
+            <Avatar uid={doctor.id} name={doctor.fullName} style={styles.avatar} textStyle={styles.avatarText} />
+            <View style={styles.doctorCopy}>
+              <Text accessibilityRole="header" style={styles.doctorName}>{providerName(doctor)}</Text>
+              <Text style={styles.specialty}>{doctor.specialty}</Text>
+              {doctor.isVerified ? <View style={styles.verified}><Text style={styles.verifiedText}>{t('doctors.verified')}</Text></View> : null}
             </View>
-            <View style={styles.sheetRows}>
-              <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctor.profile.prc')}</Text><Text style={styles.sheetValue} selectable>{doctor.prcLicenseNumber}</Text></View>
-              <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctors.profile.location')}</Text><Text style={styles.sheetValue}>{doctor.city}</Text></View>
-              <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctors.profile.fee')}</Text><Text style={styles.sheetValue}>{formatFee(doctor.consultationFee)}</Text></View>
-              <View style={[styles.sheetRow, styles.sheetRowLast]}><Text style={styles.sheetLabel}>{t('doctors.profile.hours')}</Text><Text style={styles.sheetValue}>{t(doctor.availabilityMode === 'always' ? 'doctor.schedule.always' : 'doctors.profile.bySchedule')}</Text></View>
-            </View>
-            <PrimaryButton title={t('doctors.consult')} onPress={() => onConsult(doctor)} />
+            <Pressable accessibilityRole="button" accessibilityLabel={t('common.close')} onPress={onClose} hitSlop={10} style={styles.sheetClose}>
+              <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={16} tintColor="#64748B" />
+            </Pressable>
           </View>
-        ) : null}
-      </View>
-    </Modal>
+          <View style={styles.sheetRows}>
+            <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctor.profile.prc')}</Text><Text style={styles.sheetValue} selectable>{doctor.prcLicenseNumber}</Text></View>
+            <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctors.profile.location')}</Text><Text style={styles.sheetValue}>{doctor.city}</Text></View>
+            <View style={styles.sheetRow}><Text style={styles.sheetLabel}>{t('doctors.profile.fee')}</Text><Text style={styles.sheetValue}>{formatFee(doctor.consultationFee)}</Text></View>
+            <View style={[styles.sheetRow, styles.sheetRowLast]}><Text style={styles.sheetLabel}>{t('doctors.profile.hours')}</Text><Text style={styles.sheetValue}>{t(doctor.availabilityMode === 'always' ? 'doctor.schedule.always' : 'doctors.profile.bySchedule')}</Text></View>
+          </View>
+          <PrimaryButton title={t('doctors.consult')} onPress={() => onConsult(doctor)} />
+        </View>
+      ) : null}
+    </BottomSheetModal>
   );
 }
 
@@ -159,7 +153,6 @@ const styles = StyleSheet.create({
   activeFilterText: { color: '#FFF' },
   error: { color: '#D9364F', fontFamily: Brand.font.regular, fontSize: 14 },
   empty: { color: bookingColors.muted, paddingVertical: 20, textAlign: 'center' },
-  historySection: { gap: 12 },
   sectionTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
   doctorTop: { flexDirection: 'row', gap: 14 },
   avatar: { alignItems: 'center', backgroundColor: '#DFF2E8', borderRadius: 14, height: 64, justifyContent: 'center', width: 64 },
@@ -180,9 +173,7 @@ const styles = StyleSheet.create({
   secondaryButton: { alignItems: 'center', borderColor: bookingColors.border, borderRadius: 12, borderWidth: 1, justifyContent: 'center', minHeight: 52, paddingHorizontal: 14 },
   secondaryText: { color: bookingColors.muted, fontSize: 14, fontFamily: Brand.font.extraBold },
   actionPrimary: { flex: 1 },
-  sheetOverlay: { backgroundColor: 'rgba(15, 23, 42, 0.45)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 32, borderTopRightRadius: 32, gap: 20, padding: 24, paddingBottom: 32 },
-  sheetHandle: { alignSelf: 'center', backgroundColor: '#E2E8F0', borderRadius: 3, height: 5, marginBottom: -4, width: 44 },
   sheetClose: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
   sheetRows: { borderColor: bookingColors.border, borderRadius: 16, borderWidth: 1, paddingHorizontal: 16 },
   sheetRow: { alignItems: 'center', borderBottomColor: bookingColors.border, borderBottomWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', paddingVertical: 14 },

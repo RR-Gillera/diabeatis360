@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { bookingReference } from '@/features/booking/booking-reference';
-import { BookingHeader, bookingColors, formatApptDate, formatApptTime, formatFee, paymentMethodLabel, styles as ui } from '@/features/booking/booking-ui';
+import { BookingHeader, bookingColors, formatApptDate, formatApptTime, formatFee, paymentMethodLabel, providerName, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, BookingStatus, PaymentStatus } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -56,7 +56,7 @@ export default function AppointmentScreen() {
             <View style={[styles.status, { backgroundColor: statusCopy[entry.status as BookingStatus]?.background }]}>
               <Text style={[styles.statusText, { color: statusCopy[entry.status as BookingStatus]?.color }]}>{label('bookingStatus', entry.status).toUpperCase()}</Text>
             </View>
-            <Text style={styles.name}>{entry.provider.fullName}</Text>
+            <Text style={styles.name}>{providerName(entry.provider)}</Text>
             <Text style={styles.specialty}>{entry.provider.specialty}</Text>
 
             {/* Live from the booking doc, not from the confirmation notification:

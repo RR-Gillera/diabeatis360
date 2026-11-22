@@ -191,6 +191,34 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await deny('admin records ANOTHER admin as reviewed_by', updateDoc(doc(a1, 'Providers/d1'), { reviewed_by: 'a-someone-else' }));
   await deny('admin records ANOTHER admin as verified_by', updateDoc(doc(a1, 'Providers/d1'), { verified_by: 'a-someone-else' }));
   await deny('admin verifies a doctor but names someone else as verified_by', updateDoc(doc(a1, 'Providers/d5'), { is_verified: true, verified_by: 'a-someone-else' }));
+  // ---- D55 part 1: the credentials after a doctor's name ("MD, FPCP"). Patients see `credentials`; only an admin fills
+  // it, and only with exactly what the doctor asked for in `credentials_requested`. The steps below run in order on dc1.
+  const dc1 = doc(asDoctor('dc1'), 'Providers/dc1');
+  const dc1AsAdmin = doc(a1, 'Providers/dc1');
+  await allow('doctor creates their profile asking for credentials', setDoc(dc1, { full_name: 'Cred Doc', is_verified: false, credentials_requested: 'MD, FPCP' }));
+  await deny('doctor creates their profile with credentials already approved', setDoc(doc(asDoctor('dc2'), 'Providers/dc2'), { full_name: 'Sneaky', is_verified: false, credentials: 'MD' }));
+  await deny('doctor creates their profile with a credentials rejection reason', setDoc(doc(asDoctor('dc3'), 'Providers/dc3'), { full_name: 'Sneaky', is_verified: false, credentials_rejection_reason: 'x' }));
+  await deny('doctor approves their own credentials', updateDoc(dc1, { credentials: 'MD, FPCP' }));
+  await deny('doctor asks for credentials with symbols outside letters . , ( ) -', updateDoc(dc1, { credentials_requested: 'MD; FPCP' }));
+  await deny('doctor asks for credentials with digits', updateDoc(dc1, { credentials_requested: 'MD 2020' }));
+  await deny('doctor asks for credentials longer than 60 characters', updateDoc(dc1, { credentials_requested: 'M'.repeat(61) }));
+  await deny('doctor asks for credentials starting with a comma', updateDoc(dc1, { credentials_requested: ', MD' }));
+  await deny('doctor asks for credentials that are not text', updateDoc(dc1, { credentials_requested: 42 }));
+  await allow('doctor asks for credentials written with periods and brackets', updateDoc(dc1, { credentials_requested: 'M.D., Ph.D. (Hon)' }));
+  await allow('doctor changes the request', updateDoc(dc1, { credentials_requested: 'MD, FPCP, FPSEDM' }));
+  await deny('a patient writes a doctor\'s credentials', updateDoc(doc(p1, 'Providers/dc1'), { credentials: 'MD' }));
+  await deny('admin approves something other than the request', updateDoc(dc1AsAdmin, { credentials: 'MD, PhD', credentials_requested: '' }));
+  await deny('admin puts words in the doctor\'s request', updateDoc(dc1AsAdmin, { credentials_requested: 'MD' }));
+  await deny('admin rejects with a reason longer than 500 characters', updateDoc(dc1AsAdmin, { credentials_rejection_reason: 'x'.repeat(501) }));
+  await allow('admin rejects the request with a reason (the request stays for the doctor to see)', updateDoc(dc1AsAdmin, { credentials_rejection_reason: 'FPSEDM not found in the society directory' }));
+  await deny('doctor writes their own credentials rejection reason', updateDoc(dc1, { credentials_rejection_reason: 'all fine' }));
+  await allow('doctor asks again and clears the reason', updateDoc(dc1, { credentials_requested: 'MD, FPCP', credentials_rejection_reason: '' }));
+  await allow('admin approves exactly the request and clears it', updateDoc(dc1AsAdmin, { credentials: 'MD, FPCP', credentials_requested: '', credentials_rejection_reason: '' }));
+  await deny('doctor changes their approved credentials directly', updateDoc(dc1, { credentials: 'MD, FPCP, PhD' }));
+  await allow('admin removes credentials that turn out to be false', updateDoc(dc1AsAdmin, { credentials: '' }));
+  await allow('doctor asks for credentials once more', updateDoc(dc1, { credentials_requested: 'MD' }));
+  await allow('admin approves it', updateDoc(dc1AsAdmin, { credentials: 'MD', credentials_requested: '' }));
+  await allow('doctor removes their own approved credentials', updateDoc(dc1, { credentials: '' }));
   // ---- Routing / role (mobile decides patient vs doctor from Users.role ONLY — auth-context.tsx). These tests pin
   // what a Providers doc does and does not give a patient, so a future change is deliberate, not accidental.
   await allow('a patient may create their own UNVERIFIED Providers doc (it does not change their routing: Users.role does)', setDoc(doc(asDoctor('p9'), 'Providers/p9'), { full_name: 'Pat Nine', is_verified: false }));
@@ -918,6 +946,73 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await deny('D51: an admin reply over 1,000 characters is refused', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { admin_reply: 'x'.repeat(1001) }));
   await allow('D51: an admin reopens a report', updateDoc(doc(a1, 'Reports/r1'), { status: 'open' }));
   await deny('D51: nobody deletes a report, not even an admin', deleteDoc(doc(a1, 'Reports/r1')));
+
+  // ---- App_Pins (D53): the account's PIN hash, readable and writable by its owner only
+  const pinDoc = (extra = {}) => ({ salt: 'a'.repeat(32), hash: 'b'.repeat(64), failed_attempts: 0, updated_at: serverTimestamp(), ...extra });
+  await allow('D53: p1 saves their own PIN', setDoc(doc(p1, 'App_Pins/p1'), pinDoc()));
+  await allow('D53: p1 reads their own PIN', getDoc(doc(p1, 'App_Pins/p1')));
+  await allow('D53: p1 counts a wrong try', updateDoc(doc(p1, 'App_Pins/p1'), { failed_attempts: 2, updated_at: serverTimestamp() }));
+  await allow('D53: a doctor saves their own PIN', setDoc(doc(d1, 'App_Pins/d1'), pinDoc()));
+  await deny('D53: another patient cannot read p1\'s PIN', getDoc(doc(p2, 'App_Pins/p1')));
+  await deny('D53: a doctor cannot read a patient\'s PIN', getDoc(doc(d1, 'App_Pins/p1')));
+  await deny('D53: an admin cannot read a PIN', getDoc(doc(a1, 'App_Pins/p1')));
+  await deny('D53: signed-out cannot read a PIN', getDoc(doc(anon, 'App_Pins/p1')));
+  await deny('D53: another patient cannot replace p1\'s PIN', setDoc(doc(p2, 'App_Pins/p1'), pinDoc()));
+  await deny('D53: another patient cannot delete p1\'s PIN', deleteDoc(doc(p2, 'App_Pins/p1')));
+  await deny('D53: the PIN itself can never be stored', setDoc(doc(p1, 'App_Pins/p1'), pinDoc({ pin: '482915' })));
+  await deny('D53: the hash must be a SHA-256 hash', setDoc(doc(p1, 'App_Pins/p1'), pinDoc({ hash: '482915' })));
+  await deny('D53: the salt must be 16 random bytes in hex', setDoc(doc(p1, 'App_Pins/p1'), pinDoc({ salt: 'x' })));
+  await deny('D53: wrong tries cannot go above five', updateDoc(doc(p1, 'App_Pins/p1'), { failed_attempts: 6, updated_at: serverTimestamp() }));
+  await deny('D53: the time must be the server\'s', setDoc(doc(p1, 'App_Pins/p1'), pinDoc({ updated_at: Timestamp.now() })));
+  await deny('D53: salt and hash are required', setDoc(doc(p1, 'App_Pins/p1'), without(pinDoc(), 'hash')));
+  await allow('D53: p1 deletes their own PIN ("Forgot PIN?")', deleteDoc(doc(p1, 'App_Pins/p1')));
+
+  // ---- Profile_Photos (D54): one small JPEG per person; doctors' photos are public to signed-in users, patients' are not
+  const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==';
+  const photoDoc = (extra = {}) => ({ photo: jpeg, updated_at: serverTimestamp(), ...extra });
+  await allow('D54: p1 saves their own photo', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc()));
+  await allow('D54: p1 reads their own photo', getDoc(doc(p1, 'Profile_Photos/p1')));
+  await allow('D54: the doctor p1 booked (Care_Links) sees p1\'s photo', getDoc(doc(d1, 'Profile_Photos/p1')));
+  await allow('D54: an admin sees p1\'s photo', getDoc(doc(a1, 'Profile_Photos/p1')));
+  await deny('D54: another patient cannot see p1\'s photo', getDoc(doc(p2, 'Profile_Photos/p1')));
+  await deny('D54: an unverified doctor cannot see a patient\'s photo', getDoc(doc(d2, 'Profile_Photos/p1')));
+  await deny('D54: signed-out cannot see a patient\'s photo', getDoc(doc(anon, 'Profile_Photos/p1')));
+  await deny('D54: another patient cannot replace p1\'s photo', setDoc(doc(p2, 'Profile_Photos/p1'), photoDoc()));
+  await deny('D54: a doctor cannot replace a patient\'s photo', setDoc(doc(d1, 'Profile_Photos/p1'), photoDoc()));
+  await deny('D54: only JPEG data addresses (no links to elsewhere)', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc({ photo: 'https://example.com/me.jpg' })));
+  await deny('D54: no PNG', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc({ photo: 'data:image/png;base64,iVBORw0KGgo=' })));
+  await deny('D54: an empty photo', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc({ photo: 'data:image/jpeg;base64,' })));
+  await deny('D54: a photo over 200,000 characters', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc({ photo: `data:image/jpeg;base64,${'A'.repeat(200000)}` })));
+  await deny('D54: no extra fields', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc({ caption: 'me' })));
+  await deny('D54: the time must be the server\'s', setDoc(doc(p1, 'Profile_Photos/p1'), photoDoc({ updated_at: Timestamp.now() })));
+  await deny('D54: another patient cannot delete p1\'s photo', deleteDoc(doc(p2, 'Profile_Photos/p1')));
+  await allow('D54: p1 removes their own photo', deleteDoc(doc(p1, 'Profile_Photos/p1')));
+
+  // A doctor's photo and Providers.has_photo, which puts the doctor on Find a Doctor.
+  const savePhotoAndFlag = (db, uid, { photo = true, flag = true } = {}) => {
+    const batch = writeBatch(db);
+    if (photo) batch.set(doc(db, `Profile_Photos/${uid}`), photoDoc());
+    batch.update(doc(db, `Providers/${uid}`), { has_photo: flag });
+    return batch.commit();
+  };
+  await deny('D54: a doctor cannot say has_photo without a photo', updateDoc(doc(d1, 'Providers/d1'), { has_photo: true }));
+  await deny('D54: has_photo must be true or false', savePhotoAndFlag(d1, 'd1', { flag: 'yes' }));
+  await allow('D54: a doctor saves a photo and has_photo in one write', savePhotoAndFlag(d1, 'd1'));
+  await allow('D54: a patient sees a doctor\'s photo (the doctor directory)', getDoc(doc(p2, 'Profile_Photos/d1')));
+  await deny('D54: signed-out cannot see a doctor\'s photo', getDoc(doc(anon, 'Profile_Photos/d1')));
+  await allow('D54: a doctor replaces their photo', setDoc(doc(d1, 'Profile_Photos/d1'), photoDoc()));
+  await deny('D54: a doctor cannot remove their photo (patients must recognise them)', deleteDoc(doc(d1, 'Profile_Photos/d1')));
+  await deny('D54: another doctor cannot replace a doctor\'s photo', setDoc(doc(d2, 'Profile_Photos/d1'), photoDoc()));
+  // Doctor setup (professional-info): a new Providers profile and its photo in one write.
+  const dNew = signedIn('dNew').firestore();
+  const newDoctor = (withPhoto) => {
+    const batch = writeBatch(dNew);
+    if (withPhoto) batch.set(doc(dNew, 'Profile_Photos/dNew'), photoDoc());
+    batch.set(doc(dNew, 'Providers/dNew'), { full_name: 'Dr New', specialty: 'Endocrinologist', is_verified: false, has_photo: true });
+    return batch.commit();
+  };
+  await deny('D54: doctor setup cannot claim has_photo without saving the photo', newDoctor(false));
+  await allow('D54: doctor setup saves the profile and the photo together', newDoctor(true));
 
   // ---- default deny
   await deny('unknown collection read', getDoc(doc(p1, 'Secrets/x')));

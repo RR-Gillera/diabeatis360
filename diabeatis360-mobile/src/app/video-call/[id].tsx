@@ -17,6 +17,7 @@ import { callClock } from '@/features/consultation/consultation-format';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
 import { shortDay } from '@/i18n/translate';
+import { PhotoLayer } from '@/features/photos/avatar';
 
 // The video call screen (DECISIONS.md D11; Figma P-26 to P-29, D-08 to D-10). Both people are here once the call is
 // accepted. What is shown depends only on the Calls/{bookingId} document, so both phones always agree:
@@ -129,7 +130,9 @@ export default function VideoCallScreen() {
 
   const retryJoin = () => { setJoined(null); setAttempt((value) => value + 1); };
 
-  const openChat = () => { if (id) router.replace({ pathname: '/consultation/[id]', params: { id } }); };
+  // dismissTo goes BACK to this booking's chat when the call was opened from it, and only opens the chat (in place of
+  // this screen) when it is not in the history. replace() always made a second chat, so Back led to the first one.
+  const openChat = () => { if (id) router.dismissTo({ pathname: '/consultation/[id]', params: { id } }); };
   // The room could not be opened: end the call so the other person is not left waiting, then go to the chat.
   const messageInstead = async () => {
     if (id) await endCall(id).catch(() => {});
@@ -194,7 +197,7 @@ export default function VideoCallScreen() {
       <View style={[styles.dark, styles.ringing]}>
         <View style={styles.ringBody}>
           <View style={styles.ringOuter}><View style={styles.ringInner}>
-            <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{initialsOf(otherName)}</AppText></View>
+            <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{initialsOf(otherName)}</AppText><PhotoLayer uid={otherId} radius={32} /></View>
           </View></View>
           <AppText weight="extraBold" style={styles.title}>{isCaller ? t('call.calling', { name }) : t('call.isCalling', { name })}</AppText>
           <AppText style={styles.text}>{isCaller ? t(isDoctor ? 'call.waitPatient' : 'call.waitDoctor') : t('call.videoConsultation')}</AppText>
@@ -250,7 +253,7 @@ export default function VideoCallScreen() {
             <Pressable accessibilityRole="button" style={[styles.bigButton, styles.green]} onPress={openChat}>
               <AppText weight="bold" style={styles.bigButtonText}>{isDoctor ? t('call.openChat') : t('call.backToChat')}</AppText>
             </Pressable>
-            <Pressable accessibilityRole="button" style={[styles.bigButton, styles.white]} onPress={isDoctor ? () => router.replace('/doctor/appointments') : openSummary}>
+            <Pressable accessibilityRole="button" style={[styles.bigButton, styles.white]} onPress={isDoctor ? () => router.dismissTo('/doctor/appointments') : openSummary}>
               <AppText weight="bold" style={styles.whiteText}>{isDoctor ? t('call.backToRequests') : t('call.viewSummary')}</AppText>
             </Pressable>
           </>

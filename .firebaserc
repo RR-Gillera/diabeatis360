@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "diabeatis360-b2ab8"
-  }
+    "default": "diabeatis360-b2ab8",
+    "web": "diabeatis360"
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -9,6 +9,7 @@ import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
 import { AddReadingModal, readingColors } from '@/features/glucose/glucose-ui';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 import { BottomNav, homeColors, WeeklyChart } from '@/features/home/home-ui';
+import { NotificationBell } from '@/features/notifications/notification-bell';
 import { bucketCurrentWeek } from '@/features/home/week-chart';
 import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
@@ -111,15 +112,24 @@ export default function GlucoseLogScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Text accessibilityRole="header" style={styles.headerTitle}>{t('glucose.title')}</Text>
-        {/* Figma P-07 / P-13: only the calendar button; the old "more" button is gone (DECISIONS D24). */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={dayLabel ? t('glucose.filterShowing', { day: dayLabel }) : t('glucose.filter')}
-          style={[styles.headerButton, day ? styles.headerButtonActive : null]}
-          onPress={() => setPickingDay(true)}>
-          <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor={day ? '#FFFFFF' : '#64748B'} />
-        </Pressable>
+        {/* The short line under the title says what the tab is for (team feedback on the 1.1 APK, 2026-11-22), like the
+            Doctors tab's "Consult with diabetes experts". flex: 1 lets a longer Filipino line wrap beside the buttons. */}
+        <View style={styles.headerCopy}>
+          <Text accessibilityRole="header" style={styles.headerTitle}>{t('glucose.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('glucose.subtitle')}</Text>
+        </View>
+        {/* Figma P-07 / P-13: the calendar (day filter) button; the old "more" button is gone (DECISIONS D24).
+            The bell matches the Home and Doctors headers, so notifications are one tap away from every tab. */}
+        <View style={styles.headerActions}>
+          <NotificationBell style={styles.headerButton} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={dayLabel ? t('glucose.filterShowing', { day: dayLabel }) : t('glucose.filter')}
+            style={[styles.headerButton, day ? styles.headerButtonActive : null]}
+            onPress={() => setPickingDay(true)}>
+            <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor={day ? '#FFFFFF' : '#64748B'} />
+          </Pressable>
+        </View>
       </View>
 
       {entries.length === 0 ? (
@@ -234,7 +244,10 @@ export default function GlucoseLogScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 },
+  headerCopy: { flex: 1, marginRight: 12 },
   headerTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24, letterSpacing: -0.6 },
+  headerSubtitle: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14, marginTop: 2 },
+  headerActions: { flexDirection: 'row', gap: 12 },
   headerButton: { alignItems: 'center', backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
   headerButtonActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
   emptyScreen: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingBottom: 120, paddingHorizontal: 40 },

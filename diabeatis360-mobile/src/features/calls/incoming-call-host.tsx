@@ -8,6 +8,7 @@ import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { useT } from '@/i18n/language-context';
+import { PhotoLayer } from '@/features/photos/avatar';
 
 import { answerCall, fetchDisplayName, STALE_RING_MS, subscribeToIncomingCalls, type CallRecord } from './call-service';
 import { CallError } from './join-error';
@@ -83,7 +84,7 @@ export function IncomingCallHost() {
       <View style={styles.screen}>
         <View style={styles.top}>
           <View style={styles.ringOuter}><View style={styles.ringInner}>
-            <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{initialsOf(callerName)}</AppText></View>
+            <View style={styles.avatar}><AppText weight="extraBold" style={styles.avatarText}>{initialsOf(callerName)}</AppText><PhotoLayer uid={call.callerId} radius={32} /></View>
           </View></View>
           <AppText accessibilityRole="header" weight="extraBold" style={styles.name}>{callerName ? t('call.isCalling', { name: callerName }) : t('call.incoming')}</AppText>
           <AppText style={styles.sub}>{`${t('call.videoConsultation')} · ${callerRole}`}</AppText>

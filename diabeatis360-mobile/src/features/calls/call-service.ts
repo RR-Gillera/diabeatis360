@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Timestamp, updateDoc, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { withCredentials } from '@/features/doctor/credentials';
 import { createNotification } from '@/features/notifications/notification-service';
 import { translate, type Language } from '@/i18n/translate';
 
@@ -54,17 +55,20 @@ function fromDoc(id: string, data: Record<string, unknown>): CallRecord {
 /**
  * A person's display name (doctors live in Providers, everyone else in Users). Each read is tried on its own: since the
  * booking-privacy rules (D22) a patient may not read a doctor's Users document, and reading both together failed as a
- * whole, so the patient saw "Your doctor" instead of the doctor's name.
+ * whole, so the patient saw "Your doctor" instead of the doctor's name. A doctor's name carries their approved
+ * credentials ("Dr. Juan Dela Cruz, MD", D55); the initials on the call screen ignore what comes after the comma.
  */
 export async function fetchDisplayName(userId: string) {
-  const nameIn = async (collectionName: string) => {
+  const dataIn = async (collectionName: string) => {
     try {
-      return (await getDoc(doc(db, collectionName, userId))).data()?.full_name as string | undefined;
+      return (await getDoc(doc(db, collectionName, userId))).data();
     } catch {
       return undefined; // not allowed to read it: try the other place
     }
   };
-  return String((await nameIn('Providers')) || (await nameIn('Users')) || 'Diabeatis360 user');
+  const provider = await dataIn('Providers');
+  if (provider?.full_name) return withCredentials(String(provider.full_name), String(provider.credentials ?? ''));
+  return String((await dataIn('Users'))?.full_name || 'Diabeatis360 user');
 }
 
 /**

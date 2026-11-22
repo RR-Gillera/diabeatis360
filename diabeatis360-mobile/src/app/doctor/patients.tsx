@@ -7,14 +7,18 @@ import { SymbolView } from 'expo-symbols';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToDoctorPatients } from '@/features/doctor/doctor-service';
-import { DoctorBottomNav, DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
+import { DoctorHeader, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { PatientSummary } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
+import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
 import { shortDay } from '@/i18n/translate';
 
+// "My Patients", opened from the dashboard's Quick Actions and the History cards. It is a page, not one of the five
+// tabs, so it has a back button and no tab bar (team QA 2026-11-22: the tab bar here lit "Home" on a non-Home page).
 export default function DoctorPatientsScreen() {
   const router = useRouter();
+  const goBack = useSafeBack('/doctor');
   const { uid } = useAuth();
   const { t, language } = useT();
   const [patients, setPatients] = useState<PatientSummary[]>([]);
@@ -33,7 +37,7 @@ export default function DoctorPatientsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <DoctorHeader title={t('doctor.myPatients')} subtitle={t('doctor.patients.subtitle')} />
+      <DoctorHeader title={t('doctor.myPatients')} subtitle={t('doctor.patients.subtitle')} onBack={() => goBack()} />
       <KeyboardSafeScroll contentContainerStyle={doctorStyles.scroll}>
         <View style={styles.searchBox}>
           <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor="#0F172A" />
@@ -64,7 +68,6 @@ export default function DoctorPatientsScreen() {
           </Pressable>
         ))}
       </KeyboardSafeScroll>
-      <DoctorBottomNav active="home" />
     </View>
   );
 }

@@ -65,6 +65,10 @@ async function seed() {
     verified_by: 'test123',
     created_at: now,
     is_active: true,
+    // Credentials after the name (D55): approved suffix, the doctor's request, the admin's reason. '' = none.
+    credentials: '',
+    credentials_requested: '',
+    credentials_rejection_reason: '',
   });
 
   await db.collection('Admins').add({

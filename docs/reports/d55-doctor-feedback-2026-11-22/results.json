@@ -1,0 +1,177 @@
+[
+  {
+    "name": "Home: Recent Activity now also lists booking requests (shared timeline)",
+    "ok": true,
+    "detail": "Recent Activity See all  Announcement QA-ADMIN doctors only (re-run): QA test announcement for doctors only. Fake data, please ignore. Nov 16  New booking request QA Child O"
+  },
+  {
+    "name": "See all opens Recent Activity (not the inbox)",
+    "ok": true,
+    "detail": "http://localhost:8082/doctor/activity"
+  },
+  {
+    "name": "All: 3 requests + 1 consultation the doctor ended + 3 notifications = 7 rows",
+    "ok": true,
+    "detail": "Announcement, New booking request, New booking request, Consultation completed, New message, Critical reading, New booking request"
+  },
+  {
+    "name": "Requests show their current status",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Rows sit under day headings",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Recent Activity has no tab bar (it is a page)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Patients filter: only the message and the reading alert",
+    "ok": true,
+    "detail": "New message, Critical reading"
+  },
+  {
+    "name": "Appointments filter: the 3 requests and the finished consultation",
+    "ok": true,
+    "detail": "New booking request, New booking request, Consultation completed, New booking request"
+  },
+  {
+    "name": "Tapping a finished consultation opens its summary",
+    "ok": true,
+    "detail": "http://localhost:8082/consultation/summary/SrskUoRk90mVb3688Zcwl0AvBkFs_202611170200"
+  },
+  {
+    "name": "Back returns to the dashboard",
+    "ok": true,
+    "detail": "http://localhost:8082/doctor"
+  },
+  {
+    "name": "My Patients has no tab bar",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "My Patients has a back button",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Logout reads LOG OUT, without \"from portal\"",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Change Password opens its own screen",
+    "ok": true,
+    "detail": "http://localhost:8082/doctor/change-password"
+  },
+  {
+    "name": "Too short a new password is refused before Firebase",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Two different new passwords are refused",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "A wrong current password says so",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Correct passwords: \"Password changed\"",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Firebase now accepts the new password, not the old one",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Changed back to the original password",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Edit Profile refuses symbols in the credentials",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Saved as a request in one spelling, not shown yet",
+    "ok": true,
+    "detail": "{\"requested\":\"MD, FPCP\"}"
+  },
+  {
+    "name": "My Profile: \"MD, FPCP · Waiting for admin review\", name without it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Admin: the verified doctor is listed under Credential Requests",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Admin sees what patients would see",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Reject keeps the request and saves the reason",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Doctor sees \"Not approved: <reason>\" on My Profile",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Edit Profile shows the reason under the field",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Asking again clears the reason",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Approve: patients now see exactly the request",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Admin window shows the approved suffix after the name",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "My Profile name carries the approved suffix",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Timeline shows both credential decisions",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Patient: My Appointments shows \"Dr. QA Doctor One, MD, FPSEDM\"",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Admin Remove clears what patients see",
+    "ok": true,
+    "detail": ""
+  }
+]

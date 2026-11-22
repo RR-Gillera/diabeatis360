@@ -40,7 +40,7 @@ export default function App() {
               <Route path="/plans" element={<Navigate to="/revenue?tab=plans" replace />} />
               <Route path="/subscribers" element={<Navigate to="/revenue?tab=subscribers" replace />} />
               <Route path="/products" element={<Navigate to="/content" replace />} />
-              <Route path="/appointments" element={<Navigate to="/revenue" replace />} />
+              <Route path="/appointments" element={<Navigate to="/revenue?tab=payments" replace />} />
               <Route path="/announcements" element={<Navigate to="/settings" replace />} />
               <Route path="/reports" element={<Navigate to="/analytics" replace />} />
               <Route path="/account" element={<Navigate to="/settings?tab=account" replace />} />

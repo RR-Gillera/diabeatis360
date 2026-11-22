@@ -24,3 +24,8 @@ test('initials skip the doctor title and use the first and last name', () => {
   assert.equal(initialsOf('  '), '?');
   assert.equal(initialsOf(null), '?');
 });
+
+test('initials ignore the credentials after the name (D55)', () => {
+  assert.equal(initialsOf('Dr. John Smith, MD, FPCP'), 'JS');
+  assert.equal(initialsOf('Maria Santos, M.D.'), 'MS');
+});

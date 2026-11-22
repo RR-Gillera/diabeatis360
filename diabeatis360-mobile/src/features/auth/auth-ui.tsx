@@ -24,7 +24,9 @@ const FIELD_ICONS_IOS = { mail: 'envelope.fill', lock: 'lock.fill', person: 'per
 
 export function AuthField({ label, secure, onToggleSecure, icon, ...props }: TextInputProps & { label: string; secure?: boolean; onToggleSecure?: () => void; icon?: 'mail' | 'lock' | 'person' }) {
   const { t } = useT();
-  return <View style={styles.fieldGroup}><Text style={styles.label}>{label}</Text><View style={styles.inputWrap}>{icon ? <SymbolView name={{ ios: FIELD_ICONS_IOS[icon], android: icon, web: icon }} size={16} tintColor="#9BACBF" /> : null}<TextInput {...props} secureTextEntry={secure} style={styles.input} placeholderTextColor="#C6D2E2" autoCapitalize="none" />{onToggleSecure ? <Pressable accessibilityRole="button" accessibilityLabel={secure ? t('auth.password.show') : t('auth.password.hide')} onPress={onToggleSecure} hitSlop={10}><SymbolView name={{ ios: secure ? 'eye.slash' : 'eye', android: secure ? 'visibility_off' : 'visibility', web: secure ? 'visibility_off' : 'visibility' }} size={19} tintColor="#C6D2E2" /></Pressable> : null}</View></View>;
+  // An empty label renders nothing: Login draws its own "PASSWORD · Forgot?" row above the field, and an empty <Text>
+  // would still take a line of height and widen the gap.
+  return <View style={styles.fieldGroup}>{label ? <Text style={styles.label}>{label}</Text> : null}<View style={styles.inputWrap}>{icon ? <SymbolView name={{ ios: FIELD_ICONS_IOS[icon], android: icon, web: icon }} size={16} tintColor="#9BACBF" /> : null}<TextInput {...props} secureTextEntry={secure} style={styles.input} placeholderTextColor="#C6D2E2" autoCapitalize="none" />{onToggleSecure ? <Pressable accessibilityRole="button" accessibilityLabel={secure ? t('auth.password.show') : t('auth.password.hide')} onPress={onToggleSecure} hitSlop={10}><SymbolView name={{ ios: secure ? 'eye.slash' : 'eye', android: secure ? 'visibility_off' : 'visibility', web: secure ? 'visibility_off' : 'visibility' }} size={19} tintColor="#C6D2E2" /></Pressable> : null}</View></View>;
 }
 
 const BUTTON_ICONS = {

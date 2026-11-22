@@ -4,7 +4,6 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
 
 import { Brand } from '@/constants/theme';
-import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
@@ -15,6 +14,7 @@ import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
+import { Avatar } from '@/features/photos/avatar';
 
 /** Consultation_Notes holds at most this many characters (firestore.rules, D22). */
 const NOTES_LIMIT = 5000;
@@ -95,7 +95,7 @@ export default function ConsultationDetailsScreen() {
         {booking ? (
           <>
             <View style={[doctorStyles.card, styles.card]}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(booking.patientName)}</Text></View>
+              <Avatar uid={booking.patientId} name={booking.patientName} style={styles.avatar} textStyle={styles.avatarText} />
               <Text style={styles.name}>{booking.patientName || t('summary.patient')}</Text>
               <View style={styles.pill}><Text style={styles.pillText}>{booking.status === 'completed' ? `✓ ${label('bookingStatus', 'completed').toUpperCase()}` : label('bookingStatus', booking.status).toUpperCase()}</Text></View>
               <View style={styles.divider} />

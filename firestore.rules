@@ -284,6 +284,36 @@ service cloud.firestore {
         return !keys.hasAny(['consultation_fee'])
           || (data.consultation_fee is number && data.consultation_fee >= 0 && data.consultation_fee <= 20000);
       }
+      // has_photo (D54) puts a doctor on Find a Doctor, so it may only say true when the doctor's Profile_Photos document
+      // exists after the same write (the app saves both in one batch). A doctor cannot appear "with a photo" without one.
+      function okPhotoFlag(data, keys) {
+        return !keys.hasAny(['has_photo'])
+          || (data.has_photo is bool
+              && (data.has_photo == false || existsAfter(/databases/$(database)/documents/Profile_Photos/$(providerId))));
+      }
+      // The credentials after a doctor's name ("MD, FPCP", DECISIONS.md D55 part 1). Patients see only `credentials`,
+      // and only an admin can give it a value: by approving exactly what the doctor asked for in `credentials_requested`.
+      // Letters, spaces and . , ( ) - only, at most 60 characters (the app's own check is features/doctor/credentials.ts).
+      function okCredentialText(value) {
+        return value is string && value.size() <= 60 && (value == '' || value.matches('[A-Za-z][A-Za-z.,() -]*'));
+      }
+      // The doctor's side: ask for a suffix (or withdraw the request with ''), clear the admin's rejection reason when
+      // asking again, and remove an approved suffix. The doctor can never put a new value in `credentials` itself.
+      function okDoctorCredentials(data, keys) {
+        return (!keys.hasAny(['credentials_requested']) || okCredentialText(data.credentials_requested))
+          && (!keys.hasAny(['credentials']) || data.credentials == '')
+          && (!keys.hasAny(['credentials_rejection_reason']) || data.credentials_rejection_reason == '');
+      }
+      // The admin's side: approve (credentials := the request, the request is cleared), reject with a reason (the request
+      // stays, so the doctor sees what was refused), or remove a suffix that turns out to be false ('').
+      function okAdminCredentials(keys) {
+        return (!keys.hasAny(['credentials'])
+                || request.resource.data.credentials == ''
+                || request.resource.data.credentials == resource.data.get('credentials_requested', ''))
+          && (!keys.hasAny(['credentials_requested']) || request.resource.data.credentials_requested == '')
+          && (!keys.hasAny(['credentials_rejection_reason'])
+              || (request.resource.data.credentials_rejection_reason is string && request.resource.data.credentials_rejection_reason.size() <= 500));
+      }
       // Any signed-in user can browse the doctor directory (patients need it to book).
       allow read: if signedIn();
       // A doctor creates their own profile, but can never create it pre-verified or pre-approved, and can never
@@ -294,7 +324,9 @@ service cloud.firestore {
                     && request.resource.data.get('is_verified', false) == false
                     && request.resource.data.get('is_active', true) == true
                     && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin', 'wallet_blocked'])
-                    && okFee(request.resource.data, request.resource.data.keys());
+                    && okFee(request.resource.data, request.resource.data.keys())
+                    && okPhotoFlag(request.resource.data, request.resource.data.keys())
+                    && okDoctorCredentials(request.resource.data, request.resource.data.keys());
       // wallet_blocked (D47) is written only by the server, so a doctor cannot unblock themselves without topping up.
       // Doctors edit their profile/schedule but cannot verify/activate themselves or touch the admin review
       // trail; they MAY still clear rejection_reason themselves when they resubmit (module 10, admin Figma pass).
@@ -304,14 +336,41 @@ service cloud.firestore {
       // account did it instead of being any string an admin chooses. verified_by is pinned the same way. The fee is checked
       // only when it changes, so a doctor with an old out-of-range fee can still edit their other fields.
       allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin', 'wallet_blocked'])
-                        && okFee(request.resource.data, changedKeys()))
-                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
+                        && okFee(request.resource.data, changedKeys())
+                        && okPhotoFlag(request.resource.data, changedKeys())
+                        && okDoctorCredentials(request.resource.data, changedKeys()))
+                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin',
+                                                            'credentials', 'credentials_requested', 'credentials_rejection_reason'])
+                        && okAdminCredentials(changedKeys())
                         && (!changedKeys().hasAny(['created_by_admin'])
                             || (!('created_by_admin' in resource.data) && request.resource.data.created_by_admin == request.auth.uid))
                         && (!changedKeys().hasAny(['reviewed_by']) || request.resource.data.reviewed_by == request.auth.uid)
                         && (!changedKeys().hasAny(['verified_by']) || request.resource.data.verified_by == request.auth.uid));
       // Doctors are deactivated, not deleted.
       allow delete: if false;
+    }
+
+    // Profile photos (DECISIONS.md D54). One small JPEG per person, saved as text, because Firebase Storage needs the
+    // Blaze plan (D18). The document id IS the person's Auth UID. Kept apart from Users/Providers so the doctor
+    // directory does not download every photo, and so a patient's photo has its own, narrower readers.
+    match /Profile_Photos/{uid} {
+      // A doctor's photo belongs to the doctor directory, so any signed-in user may see it (patients choosing a doctor).
+      // A patient's photo is seen only by the patient, admins, and the doctors the patient shared their profile with
+      // by booking them (Care_Links, D22) — the same people who may read that patient's Users document.
+      allow read: if isUser(uid) || isAdmin()
+                  || (signedIn() && exists(/databases/$(database)/documents/Providers/$(uid)))
+                  || canSeePatient(uid);
+      // Only the person sets their own photo: exactly these two fields, a JPEG "data:" address of at most 200,000
+      // characters (about 150 KB; the app saves about 15-40 KB, photo-rules.ts), stamped with the server's clock.
+      allow create, update: if isUser(uid)
+                    && request.resource.data.keys().hasOnly(['photo', 'updated_at'])
+                    && request.resource.data.photo is string
+                    && request.resource.data.photo.size() <= 200000
+                    && request.resource.data.photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+                    && request.resource.data.updated_at == request.time;
+      // A patient may remove theirs (initials show again). A doctor can only replace it: patients must always be able
+      // to recognise their doctor, and Providers.has_photo would otherwise point at a photo that is gone.
+      allow delete: if isUser(uid) && !exists(/databases/$(database)/documents/Providers/$(uid));
     }
 
     match /Admins/{adminId} {
@@ -873,6 +932,21 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
       // Created only by the analyzeLabel Cloud Function (Admin SDK), never by an app.
       allow create, update, delete: if false;
+    }
+
+    match /App_Pins/{userId} {
+      // The app PIN belongs to the account (DECISIONS.md D53, amends D42). It holds only a random salt and a salted
+      // SHA-256 hash of the 6-digit PIN, never the PIN. A 6-digit PIN has only a million possibilities, so the hash
+      // could be guessed if it leaked: ONLY the owner may read or write it. Not doctors, not admins (no isAdmin() here).
+      allow read, delete: if isUser(userId);
+      allow create, update: if isUser(userId)
+                    && request.resource.data.keys().hasOnly(['salt', 'hash', 'failed_attempts', 'updated_at'])
+                    && request.resource.data.keys().hasAll(['salt', 'hash', 'failed_attempts', 'updated_at'])
+                    && request.resource.data.salt is string && request.resource.data.salt.size() == 32
+                    && request.resource.data.hash is string && request.resource.data.hash.size() == 64
+                    && request.resource.data.failed_attempts is int
+                    && request.resource.data.failed_attempts >= 0 && request.resource.data.failed_attempts <= 5
+                    && request.resource.data.updated_at == request.time;
     }
   }
 }

@@ -68,8 +68,8 @@ test('the Earnings card: this month, consultations settled this month (on-site t
 
 test('Earnings History: settled consultations paid online, newest first, with the patient from the booking', () => {
   assert.deepEqual(earningsHistory(rows, bookings), [
-    { id: 'c', patientName: 'Ana Reyes', at: at(10, 15), amount: 680 },
-    { id: 'a', patientName: 'Maria Santos', at: at(10, 3), amount: 425 },
-    { id: 'b', patientName: 'Jose Rizal', at: at(9, 28), amount: 425 },
+    { id: 'c', patientName: 'Ana Reyes', patientId: '', at: at(10, 15), amount: 680 },
+    { id: 'a', patientName: 'Maria Santos', patientId: '', at: at(10, 3), amount: 425 },
+    { id: 'b', patientName: 'Jose Rizal', patientId: '', at: at(9, 28), amount: 425 },
   ]);
 });

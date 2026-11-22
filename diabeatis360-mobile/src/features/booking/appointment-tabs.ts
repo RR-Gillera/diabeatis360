@@ -19,9 +19,12 @@ export function tabFor(status: string): AppointmentTab | null {
   return null;
 }
 
-/** "Dr. John Smith" -> "JS", "Maria" -> "M". Titles such as "Dr." are skipped. */
+/**
+ * "Dr. John Smith" -> "JS", "Maria" -> "M". Titles such as "Dr." are skipped, and so is anything after a comma:
+ * "Dr. John Smith, MD, FPCP" (approved credentials, D55) is still "JS".
+ */
 export function initialsOf(name: string | null | undefined) {
-  const words = (name ?? '').trim().split(/\s+/).filter((word) => word && !/^(dr|dra|doc)\.?$/i.test(word));
+  const words = (name ?? '').split(',')[0].trim().split(/\s+/).filter((word) => word && !/^(dr|dra|doc)\.?$/i.test(word));
   if (words.length === 0) return '?';
   const first = words[0][0];
   const last = words.length > 1 ? words[words.length - 1][0] : '';

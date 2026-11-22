@@ -7,17 +7,19 @@ import { hasCompletedOnboarding } from '@/features/auth/onboarding';
 import { resetTo } from '@/lib/navigation';
 
 import { shouldLockAfter } from './pin-rules';
-import { clearPin, hasPin, pinSupported } from './pin-service';
+import { clearPin, hasPin, pinStatus, pinSupported } from './pin-service';
 import { PinLock, PinSetup } from './pin-ui';
 
 type Mode = 'none' | 'lock' | 'setup';
 
 /**
- * The app PIN (DECISIONS.md D42). Mounted once in the root layout. It draws a full-screen cover over everything when:
- *  - 'setup': the person finished account setup (onboarding) but has no PIN on this phone yet: they must create one;
- *  - 'lock':  the app was just opened with someone still signed in, or came back after more than 30 seconds away.
- * It is a cover, not a screen, so nothing underneath is shown and no navigation has to be undone. A person who has just
- * typed their password is not asked for the PIN straight away. It does nothing where the phone has no secure storage (web).
+ * The app PIN (DECISIONS.md D42, D53). Mounted once in the root layout. It draws a full-screen cover over everything when:
+ *  - 'setup': the person finished account setup (onboarding) and their ACCOUNT has no PIN yet: they must create one;
+ *  - 'lock':  someone with a PIN is signed in: the app was just opened with a saved sign-in, the person has just logged
+ *             in with their password (also on a new phone or after a reinstall, D53), or the app came back after more
+ *             than 30 seconds away.
+ * It is a cover, not a screen, so nothing underneath is shown and no navigation has to be undone. It does nothing where
+ * the phone has no secure storage (web).
  */
 export function PinGate() {
   const { role, uid, email, sessionReady, signOut } = useAuth();
@@ -29,25 +31,32 @@ export function PinGate() {
   const mode: Mode = state.uid === uid ? state.mode : 'none';
   const setMode = (next: Mode | ((current: Mode) => Mode)) =>
     setState((current) => ({ uid, mode: typeof next === 'function' ? next(current.uid === uid ? current.mode : 'none') : next }));
-  const startupHandled = useRef(false);
+  // Whose sign-in has already been checked for a PIN. Cleared at sign-out, so the next login is checked again.
+  const checkedUid = useRef<string | null>(null);
   const signedIn = role !== 'guest' && uid !== null;
 
-  // 1) The app has just opened: if a saved sign-in was restored and it has a PIN, ask for it. Only the first answer
-  //    from Firebase counts, so a login made later in this run is not asked again.
+  // 1) Someone has just become signed in: a saved sign-in restored when the app opened, or a password login (D53). If
+  //    their account has a PIN, ask for it. pinStatus also copies the account's PIN to this phone after a reinstall.
   useEffect(() => {
-    if (!sessionReady || startupHandled.current) return;
-    startupHandled.current = true;
-    if (!signedIn || !uid) return;
-    hasPin(uid).then((has) => { if (has) setState({ uid, mode: 'lock' }); });
+    if (!sessionReady) return;
+    if (!signedIn || !uid) { checkedUid.current = null; return; }
+    if (checkedUid.current === uid) return;
+    checkedUid.current = uid;
+    (async () => {
+      if (!(await pinSupported())) return;
+      if ((await pinStatus(uid)) === 'yes') setState({ uid, mode: 'lock' });
+    })().catch(() => {});
   }, [sessionReady, signedIn, uid]);
 
-  // 2) Setup: signed in, finished onboarding, no PIN yet. Re-checked whenever the first part of the address changes,
-  //    which is how the end of onboarding (a move to Home) is noticed. Also covers accounts made before the PIN existed.
+  // 2) Setup: signed in, finished onboarding, and the ACCOUNT has no PIN (not merely this phone). Re-checked whenever the
+  //    first part of the address changes, which is how the end of onboarding (a move to Home) is noticed. Also covers
+  //    accounts made before the PIN existed. 'unknown' (no signal) never asks, so a real PIN is not replaced by mistake.
   useEffect(() => {
     if (!signedIn || !uid || mode !== 'none' || first === 'onboarding') return;
     let cancelled = false;
     (async () => {
-      if (!(await pinSupported()) || (await hasPin(uid))) return;
+      // A copy on this phone means the account has a PIN; only without one is Firestore asked (one read, not one per screen).
+      if (!(await pinSupported()) || (await hasPin(uid)) || (await pinStatus(uid)) !== 'no') return;
       if (email && (await hasCompletedOnboarding(email, uid)) && !cancelled) setState({ uid, mode: 'setup' });
     })().catch(() => {});
     return () => { cancelled = true; };
@@ -76,7 +85,7 @@ export function PinGate() {
 
   if (mode === 'none' || !uid) return null;
 
-  // Too many wrong tries, or "Forgot PIN?": the saved PIN is deleted first (logging out alone keeps it), so the next
+  // Too many wrong tries, or "Forgot PIN?": the account's PIN is deleted first (logging out alone keeps it), so the next
   // login makes a new one. After five wrong tries verifyPin has already deleted it; deleting again is harmless.
   const logInAgain = () => {
     const forUid = uid;

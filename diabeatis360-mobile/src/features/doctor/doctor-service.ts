@@ -7,6 +7,7 @@ import { parseBirthdate } from '@/features/auth/birthdate';
 import { normalizePhilippineMobile } from '@/features/family/phone';
 
 import { weekForStore, weekFromStored, weekProblem, type WeeklyHours } from './availability';
+import { credentialsProblem, type credentialsChange } from './credentials';
 import type { DoctorProfile, PatientProfile, PatientSummary } from './types';
 
 export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -39,6 +40,10 @@ export function subscribeToDoctorProfile(
         // Each day's own slots (D48); a doctor saved before D48 has only the shared available_ranges.
         weeklyHours: weekFromStored(data.weekly_hours, data.available_ranges),
         walletBlocked: data.wallet_blocked === true,
+        hasPhoto: data.has_photo === true,
+        credentials: String(data.credentials ?? ''),
+        credentialsRequested: String(data.credentials_requested ?? ''),
+        credentialsRejectionReason: String(data.credentials_rejection_reason ?? ''),
       });
     },
     (error) => onError(error),
@@ -65,6 +70,24 @@ export async function updateDoctorProfile(
   if (fields.city !== undefined) record.city = fields.city.trim();
   if (fields.consultationFee !== undefined) record.consultation_fee = fields.consultationFee;
   await setDoc(doc(db, 'Providers', providerId), record, { merge: true });
+}
+
+/**
+ * Saves the credentials field of Edit Profile (DECISIONS.md D55 part 1), after credentialsChange() decided what to do.
+ * The doctor only ever asks: `credentials` (what patients see) gets a value only when an admin approves the request.
+ * firestore.rules refuses a doctor who tries to write `credentials` with anything but '' (remove).
+ */
+export async function saveDoctorCredentials(providerId: string, change: ReturnType<typeof credentialsChange>) {
+  const reference = doc(db, 'Providers', providerId);
+  if (change.action === 'request') {
+    const problem = credentialsProblem(change.value);
+    if (problem) throw new Error(problem);
+    await updateDoc(reference, { credentials_requested: change.value, credentials_rejection_reason: '' });
+  } else if (change.action === 'withdraw') {
+    await updateDoc(reference, { credentials_requested: '', credentials_rejection_reason: '' });
+  } else if (change.action === 'remove') {
+    await updateDoc(reference, { credentials: '', credentials_requested: '', credentials_rejection_reason: '' });
+  }
 }
 
 // The doctor's mobile number (My Profile, DECISIONS.md D49). It is kept on the doctor's own Users document, NOT on

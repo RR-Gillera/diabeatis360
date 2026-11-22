@@ -13,7 +13,9 @@ import { manilaDayKey } from '@/features/booking/manila-time';
 import { isAvailableAt } from '@/features/doctor/available-now';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
 import { dailyEarnings, dashboardStats, startsIn } from '@/features/doctor/doctor-stats';
-import { DoctorBottomNav, doctorStyles } from '@/features/doctor/doctor-ui';
+import { buildDoctorActivity } from '@/features/doctor/activity-feed';
+import { ActivityRow, useOpenActivity } from '@/features/doctor/activity-ui';
+import { DoctorBottomNav, doctorStyles, TONES, type Tone } from '@/features/doctor/doctor-ui';
 import { EarningsSparkline } from '@/features/doctor/earnings-sparkline';
 import { isProfileComplete } from '@/features/doctor/profile-complete';
 import type { DoctorProfile } from '@/features/doctor/types';
@@ -23,24 +25,11 @@ import { shortTime } from '@/features/notifications/notification-display';
 import { subscribeToNotifications, type NotificationEntry } from '@/features/notifications/notification-service';
 import { useT } from '@/i18n/language-context';
 import { shortDay, type MessageKey } from '@/i18n/translate';
+import { PhotoLayer } from '@/features/photos/avatar';
 
 /** getDay() order, for the long weekday on the dashboard ("Thursday" / "Huwebes"). */
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-/**
- * The coloured icon tiles of the frame. Text on them stays dark or uses the -600/-700 step, which passes WCAG AA on
- * white (D37); the lighter steps are only for icons, which need 3:1.
- */
-const TONES = {
-  blue: { icon: '#2563EB', tile: '#EFF6FF' },
-  amber: { icon: '#B45309', tile: '#FEF3C7' },
-  purple: { icon: '#7C3AED', tile: '#F3E8FF' },
-  green: { icon: homeColors.green, tile: '#ECF5E1' },
-  red: { icon: '#DC2626', tile: '#FEE2E2' },
-  slate: { icon: '#475569', tile: '#F1F5F9' },
-};
-
-type Tone = (typeof TONES)[keyof typeof TONES];
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
 // The doctor's dashboard (Figma "Dashboard", 2026-11-19; DECISIONS D24): today's numbers, the next confirmed
@@ -104,6 +93,10 @@ export default function DoctorHomeScreen() {
   // "Today" is the clinic's day in the Philippines (D26), matching how the slot was booked.
   const nextIsToday = next?.scheduledAt ? manilaDayKey(next.scheduledAt) === manilaDayKey(now) : false;
   const countdown = next?.scheduledAt ? startsInText(startsIn(next.scheduledAt, now), t) : null;
+  // Recent Activity (D55 part 2): the first three rows of the same timeline "See all" opens, so the two always agree.
+  const recent = useMemo(() => buildDoctorActivity(appointments ?? [], activity).slice(0, 3), [appointments, activity]);
+  const patientOfBooking = useMemo(() => new Map((appointments ?? []).map((entry) => [entry.id, entry.patientId])), [appointments]);
+  const openActivity = useOpenActivity(patientOfBooking);
 
   return (
     <View style={doctorStyles.screen}>
@@ -125,6 +118,7 @@ export default function DoctorHomeScreen() {
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={t('nav.profile')} style={styles.me} onPress={() => router.navigate('/doctor/profile')}>
             <Text style={styles.meText}>{initialsOf(profile?.fullName ?? displayName)}</Text>
+            <PhotoLayer uid={uid} radius={26} />
             {status ? <View style={[styles.meDot, { backgroundColor: status.on ? homeColors.greenBright : homeColors.textFaint }]} /> : null}
           </Pressable>
         </View>
@@ -137,8 +131,9 @@ export default function DoctorHomeScreen() {
               <SymbolView name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }} size={16} tintColor={homeColors.orange} />
             </View>
             <View style={styles.alertCopy}>
-              <Text style={styles.alertTitle}>{t('doctor.finishTitle')}</Text>
-              <Text style={styles.alertText}>{t('doctor.finishText')}</Text>
+              {/* A missing photo gets its own words (D54); the rest of the profile may already be complete. */}
+              <Text style={styles.alertTitle}>{profile.hasPhoto ? t('doctor.finishTitle') : t('doctor.photoTitle')}</Text>
+              <Text style={styles.alertText}>{profile.hasPhoto ? t('doctor.finishText') : t('doctor.photoText')}</Text>
             </View>
           </Pressable>
         ) : null}
@@ -166,6 +161,7 @@ export default function DoctorHomeScreen() {
             <View style={styles.nextTop}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{initialsOf(next.patientName)}</Text>
+                <PhotoLayer uid={next.patientId} radius={16} />
                 <View style={styles.videoBadge}>
                   <SymbolView name={{ ios: 'video.fill', android: 'videocam', web: 'videocam' }} size={11} tintColor="#FFFFFF" />
                 </View>
@@ -199,25 +195,12 @@ export default function DoctorHomeScreen() {
 
         <View style={styles.sectionRow}>
           <Text style={doctorStyles.sectionTitle}>{t('doctor.recent')}</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate('/doctor/notifications')} hitSlop={8}><Text style={styles.seeAll}>{t('doctor.seeAll')}</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/doctor/activity' as never)} hitSlop={8}><Text style={styles.seeAll}>{t('doctor.seeAll')}</Text></Pressable>
         </View>
         <View style={[styles.card, styles.gutterCard, styles.activityCard]}>
-          {activity.length === 0 ? <Text style={[styles.muted, styles.activityEmpty]}>{t('doctor.nothingYet')}</Text> : activity.slice(0, 3).map((item, index) => {
-            const look = activityLook(item, t);
-            return (
-              <View key={item.id} style={[styles.activityRow, index > 0 && styles.activityDivider]}>
-                <View style={[styles.activityIcon, { backgroundColor: look.tone.tile }]}>
-                  <SymbolView name={{ ios: look.icon, android: look.iconAndroid, web: look.iconAndroid }} size={17} tintColor={look.tone.icon} />
-                </View>
-                <View style={styles.activityCopy}>
-                  {/* A patient's critical reading (D28) is red here too, as on the Notifications screen (QA DOC-009). */}
-                  <Text style={[styles.activityTitle, look.critical && styles.activityCritical]}>{look.title}</Text>
-                  <Text style={styles.activityText} numberOfLines={2}>{item.message}</Text>
-                </View>
-                <Text style={styles.activityWhen}>{shortTime(item.sentAt, now, language)}</Text>
-              </View>
-            );
-          })}
+          {recent.length === 0 ? <Text style={[styles.muted, styles.activityEmpty]}>{t('doctor.nothingYet')}</Text> : recent.map((row, index) => (
+            <ActivityRow key={row.id} row={row} divider={index > 0} when={shortTime(row.when, now, language)} onPress={() => openActivity(row)} />
+          ))}
         </View>
 
         <Text style={[doctorStyles.sectionTitle, styles.section]}>{t('doctor.quick')}</Text>
@@ -261,29 +244,6 @@ function startsInText(when: ReturnType<typeof startsIn>, t: Translate): string {
   if (when.unit === 'now') return t('doctor.startsIn.now');
   if (when.value === 1) return t(when.unit === 'minutes' ? 'doctor.startsIn.minute' : when.unit === 'hours' ? 'doctor.startsIn.hour' : 'doctor.startsIn.day');
   return t(`doctor.startsIn.${when.unit}`, { count: when.value });
-}
-
-/**
- * The icon, colour and title of a Recent Activity row, from the kind of notification. The row's second line is the
- * notification's own message ("from Maria Santos"). Titles reuse the Notifications screens' words.
- */
-function activityLook(item: NotificationEntry, t: Translate): { icon: SFSymbol; iconAndroid: AndroidSymbol; tone: Tone; title: string; critical?: boolean } {
-  switch (item.type) {
-    case 'booking_update':
-      return { icon: 'calendar.badge.plus', iconAndroid: 'event_available', tone: TONES.blue, title: t('notif.kind.booking_update') };
-    case 'message':
-      return { icon: 'bubble.left.fill', iconAndroid: 'chat', tone: TONES.green, title: t('notif.kind.message') };
-    case 'glucose_alert':
-      return item.severity === 'critical'
-        ? { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', tone: TONES.red, title: t('doctor.notif.critical'), critical: true }
-        : { icon: 'drop.fill', iconAndroid: 'water_drop', tone: TONES.amber, title: t('notif.kind.glucose_alert') };
-    case 'doctor_verification':
-      return item.severity === 'warning'
-        ? { icon: 'exclamationmark.triangle.fill', iconAndroid: 'warning', tone: TONES.red, title: t('doctor.notif.credWarn') }
-        : { icon: 'checkmark.seal.fill', iconAndroid: 'verified', tone: TONES.green, title: t('doctor.notif.credOk') };
-    default:
-      return { icon: 'bell.fill', iconAndroid: 'notifications', tone: TONES.slate, title: t(`notif.kind.${item.type}`) };
-  }
 }
 
 const styles = StyleSheet.create({
@@ -338,14 +298,6 @@ const styles = StyleSheet.create({
   muted: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14 },
   activityCard: { paddingVertical: 4 },
   activityEmpty: { paddingVertical: 16 },
-  activityRow: { alignItems: 'center', flexDirection: 'row', gap: 14, paddingVertical: 14 },
-  activityDivider: { borderTopColor: homeColors.border, borderTopWidth: 1 },
-  activityIcon: { alignItems: 'center', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },
-  activityCopy: { flex: 1, gap: 2 },
-  activityTitle: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15 },
-  activityCritical: { color: '#B91C1C' },
-  activityText: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 18 },
-  activityWhen: { alignSelf: 'flex-start', color: homeColors.textFaint, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
   quickRow: { flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 14 },
   quickCard: { alignItems: 'center', backgroundColor: homeColors.card, borderColor: '#E5E7EB', borderRadius: 20, borderWidth: 1, flex: 1, gap: 10, paddingVertical: 20 },
   quickIcon: { alignItems: 'center', backgroundColor: '#ECF5E1', borderRadius: 20, height: 40, justifyContent: 'center', width: 40 },

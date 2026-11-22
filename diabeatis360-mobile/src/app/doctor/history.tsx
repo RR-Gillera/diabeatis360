@@ -6,7 +6,6 @@ import { SymbolView } from 'expo-symbols';
 import { PLATFORM_COMMISSION_RATE } from '@/constants/commission';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
 import { formatApptDate, formatApptTime } from '@/features/booking/booking-ui';
 import { manilaWallClock } from '@/features/booking/manila-time';
@@ -23,6 +22,7 @@ import { formatPeso, formatSignedPeso } from '@/features/wallet/wallet-format';
 import { settleWallet, subscribeToWalletBalance, subscribeToWalletTransactions, type WalletTransaction } from '@/features/wallet/wallet-service';
 import { useT } from '@/i18n/language-context';
 import { monthNames, type MessageKey } from '@/i18n/translate';
+import { Avatar } from '@/features/photos/avatar';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -181,7 +181,7 @@ export default function DoctorHistoryScreen() {
                     style={[doctorStyles.card, styles.card]}
                     onPress={() => openBooking(entry)}>
                     <View style={styles.cardTop}>
-                      <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(entry.patientName)}</Text></View>
+                      <Avatar uid={entry.patientId} name={entry.patientName} style={styles.avatar} textStyle={styles.avatarText} />
                       <View style={styles.cardCopy}>
                         <Text style={styles.name} numberOfLines={1}>{entry.patientName || t('call.fallbackPatient')}</Text>
                         <Text style={styles.kind}>{t('doctor.history.kind')}</Text>
@@ -244,7 +244,7 @@ export default function DoctorHistoryScreen() {
               <EmptyState icon="wallet.pass" iconAndroid="account_balance_wallet" title={t(searchWords ? 'doctor.history.noMatch' : 'doctor.earnings.empty')} detail={searchWords ? undefined : t('doctor.earnings.emptyText')} />
             ) : earnedShown.map((row) => (
               <View key={row.id} style={[doctorStyles.card, styles.earnRow]}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(row.patientName)}</Text></View>
+                <Avatar uid={row.patientId} name={row.patientName} style={styles.avatar} textStyle={styles.avatarText} />
                 <View style={styles.cardCopy}>
                   <Text style={styles.name} numberOfLines={1}>{row.patientName || t('call.fallbackPatient')}</Text>
                   <Text style={styles.kind}>{row.at ? `${formatApptDate(row.at, language)} • ${formatApptTime(row.at)}` : t('time.justNow')}</Text>

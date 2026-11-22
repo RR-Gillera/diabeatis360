@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
-import { BookingHeader, BookingHeaderActions, bookingColors, formatApptDate, formatApptTime, formatFee, PAYMENT_METHOD_KEYS, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { BookingHeader, BookingHeaderActions, bookingColors, formatApptDate, formatApptTime, formatFee, PAYMENT_METHOD_KEYS, PrimaryButton, providerName, styles as ui } from '@/features/booking/booking-ui';
 import { payForBooking, subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry, PaymentMethod } from '@/features/booking/types';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -70,7 +70,7 @@ export default function ConsultationFeeScreen() {
           <Text style={styles.gateText}>
             {booking.status === 'declined' ? t('pay.declinedText') : t('pay.waitingText')}
           </Text>
-          <Pressable accessibilityRole="button" style={styles.gateButton} onPress={() => router.replace('/booking/find-doctor')}>
+          <Pressable accessibilityRole="button" style={styles.gateButton} onPress={() => router.dismissTo('/booking/find-doctor')}>
             <Text style={styles.gateButtonText}>{t('pay.backToDoctors')}</Text>
           </Pressable>
         </View>
@@ -84,7 +84,7 @@ export default function ConsultationFeeScreen() {
           <Text style={styles.gateText}>
             {booking.paymentStatus === 'onsite' ? t('pay.settledOnsite') : t('pay.settledPaid')}
           </Text>
-          <Pressable accessibilityRole="button" style={styles.gateButton} onPress={() => router.replace({ pathname: '/booking/appointment', params: { id } })}>
+          <Pressable accessibilityRole="button" style={styles.gateButton} onPress={() => router.dismissTo({ pathname: '/booking/appointment', params: { id } })}>
             <Text style={styles.gateButtonText}>{t('booking.viewAppointment')}</Text>
           </Pressable>
         </View>
@@ -98,7 +98,7 @@ export default function ConsultationFeeScreen() {
           <Text style={styles.amount}>{formatFee(booking.fee)}</Text>
           <View style={styles.slotLine}>
             <Text style={styles.muted}>{t('appt.doctor')}</Text>
-            <Text style={styles.strong}>{booking.provider?.fullName ?? t('pay.yourDoctor')}</Text>
+            <Text style={styles.strong}>{booking.provider ? providerName(booking.provider) : t('pay.yourDoctor')}</Text>
           </View>
           <View style={styles.slotLine}>
             <Text style={styles.muted}>{t('pay.slot')}</Text>

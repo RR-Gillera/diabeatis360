@@ -9,7 +9,7 @@ import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { formatApptTime, shortApptDay } from '@/features/booking/booking-ui';
+import { formatApptTime, providerName, shortApptDay } from '@/features/booking/booking-ui';
 import { endConsultation, saveConsultationNotes, sendMessage, subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationNotes, type ConsultationState } from '@/features/consultation/consultation-service';
 import { DoctorNotesForm } from '@/features/consultation/doctor-notes-form';
 import { dailyTrend, hasTrend, type TrendPoint } from '@/features/consultation/glucose-trend';
@@ -26,6 +26,7 @@ import { ensureCallPermissions } from '@/features/calls/video-room';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
 import { shortDay, translate, type Language } from '@/i18n/translate';
+import { Avatar, PhotoLayer } from '@/features/photos/avatar';
 
 function dayLabel(date: Date | null, language: Language) {
   if (!date) return '';
@@ -184,7 +185,9 @@ export default function ConsultationScreen() {
   // Falls back to a role label only when the joined name is genuinely missing.
   const counterpartName = isDoctor
     ? (booking?.patientName || t('call.fallbackPatient'))
-    : (booking?.provider?.fullName || t('call.fallbackDoctor'));
+    : ((booking?.provider && providerName(booking.provider)) || t('call.fallbackDoctor'));
+  // Whose photo the header and the chat bubbles show (D54).
+  const counterpartId = isDoctor ? booking?.patientId : booking?.provider?.id;
   const ended = consultation.status === 'ended';
   const canConsult = isChatAvailable(booking?.status ?? '');
   const unpaid = booking?.paymentStatus === 'unpaid';
@@ -250,7 +253,7 @@ export default function ConsultationScreen() {
               <View key={message.id}>
                 {showDay ? <Text style={styles.dayDivider}>{day}</Text> : null}
                 <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-                  {!mine ? <View style={styles.smallAvatar}><Text style={styles.smallAvatarText}>{initialsOf(counterpartName)}</Text></View> : null}
+                  {!mine ? <Avatar uid={counterpartId} name={counterpartName} style={styles.smallAvatar} textStyle={styles.smallAvatarText} /> : null}
                   <View style={[styles.bubbleColumn, mine && styles.bubbleColumnMine]}>
                     <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                       <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{message.text}</Text>
@@ -351,6 +354,7 @@ export default function ConsultationScreen() {
         </Pressable>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initialsOf(counterpartName)}</Text>
+          <PhotoLayer uid={counterpartId} radius={22} />
           {active ? <View style={styles.activeDot} /> : null}
         </View>
         <View style={styles.headerCopy}>

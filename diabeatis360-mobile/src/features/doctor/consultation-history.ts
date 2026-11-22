@@ -7,7 +7,7 @@
 import { manilaParts } from '@/features/booking/manila-time';
 import type { ActivityRow } from '@/features/wallet/wallet-activity';
 
-type Booking = { id: string; status: string; scheduledAt: Date | null; patientName: string };
+type Booking = { id: string; status: string; scheduledAt: Date | null; patientName: string; patientId?: string };
 
 export type HistoryTab = 'upcoming' | 'completed' | 'cancelled';
 export const HISTORY_TABS: HistoryTab[] = ['upcoming', 'completed', 'cancelled'];
@@ -86,7 +86,7 @@ export function earningsCard(rows: ActivityRow[], now: Date = new Date()) {
   };
 }
 
-export type EarningRow = { id: string; patientName: string; at: Date | null; amount: number };
+export type EarningRow = { id: string; patientName: string; patientId: string; at: Date | null; amount: number };
 
 /**
  * "Earnings History": one row per consultation paid online that is already in the wallet, newest first, with the
@@ -98,7 +98,7 @@ export function earningsHistory(rows: ActivityRow[], bookings: Booking[]): Earni
     .filter((row) => !row.pending && row.kind === 'consultation')
     .map((row) => {
       const booking = byId.get(row.id);
-      return { id: row.id, patientName: booking?.patientName ?? '', at: booking?.scheduledAt ?? row.at, amount: row.amount };
+      return { id: row.id, patientName: booking?.patientName ?? '', patientId: booking?.patientId ?? '', at: booking?.scheduledAt ?? row.at, amount: row.amount };
     })
     .sort((a, b) => (b.at?.getTime() ?? Number.POSITIVE_INFINITY) - (a.at?.getTime() ?? Number.POSITIVE_INFINITY));
 }

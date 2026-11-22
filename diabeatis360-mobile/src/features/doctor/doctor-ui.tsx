@@ -21,6 +21,20 @@ export const statusStyle: Record<BookingStatus, { color: string; background: str
   cancelled: { color: '#D9364F', background: '#FBE6E9' },
 };
 
+/**
+ * The coloured icon tiles of the dashboard frame (its number cards and the Recent Activity rows). Text on them stays
+ * dark or uses the -600/-700 step, which passes WCAG AA on white (D37); the lighter steps are only for icons, which need 3:1.
+ */
+export const TONES = {
+  blue: { icon: '#2563EB', tile: '#EFF6FF' },
+  amber: { icon: '#B45309', tile: '#FEF3C7' },
+  purple: { icon: '#7C3AED', tile: '#F3E8FF' },
+  green: { icon: homeColors.green, tile: '#ECF5E1' },
+  red: { icon: '#DC2626', tile: '#FEE2E2' },
+  slate: { icon: '#475569', tile: '#F1F5F9' },
+};
+export type Tone = (typeof TONES)[keyof typeof TONES];
+
 type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
 
 // The five tabs of the doctor frames (Dashboard 2026-11-19, D-05, D-11; DECISIONS D24): Home, Requests, History,

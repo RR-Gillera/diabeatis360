@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { bookingReference } from '@/features/booking/booking-reference';
-import { bookingColors, formatDate, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { bookingColors, formatDate, formatFee, PrimaryButton, providerName, styles as ui } from '@/features/booking/booking-ui';
 import { useBooking } from '@/features/booking/booking-context';
 import { useT } from '@/i18n/language-context';
 import { Brand } from '@/constants/theme';
@@ -31,7 +31,7 @@ export default function RequestSentScreen() {
         {provider && selectedDate && selectedTime ? (
           <View style={[ui.card, styles.receipt]}>
             <View style={styles.receiptHeader}>
-              <Text style={styles.doctorName}>{provider.fullName}</Text>
+              <Text style={styles.doctorName}>{providerName(provider)}</Text>
               <Text style={styles.doctorSpecialty}>{provider.specialty}</Text>
             </View>
             <View style={styles.row}>

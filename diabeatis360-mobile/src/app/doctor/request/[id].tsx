@@ -6,7 +6,6 @@ import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
-import { initialsOf } from '@/features/booking/appointment-tabs';
 import { bookingReference } from '@/features/booking/booking-reference';
 import { DECLINE_REASON_LIMIT, subscribeToBooking, updateBookingStatus } from '@/features/booking/booking-service';
 import { formatApptDate, formatApptTime, formatFee } from '@/features/booking/booking-ui';
@@ -19,6 +18,7 @@ import type { PatientProfile } from '@/features/doctor/types';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
+import { Avatar } from '@/features/photos/avatar';
 
 // Request Details (doctor Figma frames "Request Details" and "if declined (modal)", DECISIONS D24): who is asking, when, and
 // Accept / Decline. The patient's profile is readable because booking shared it with this doctor (Care_Links, D22). The
@@ -59,7 +59,8 @@ export default function RequestDetailsScreen() {
     try {
       await updateBookingStatus(id, status, status === 'declined' ? reason : '');
       setConfirmDecline(false);
-      router.replace('/doctor/appointments');
+      // Back to the Appointments list this request was opened from, instead of a second copy of it.
+      router.dismissTo('/doctor/appointments');
     } catch {
       setError(t('doctor.request.saveFailed'));
     } finally {
@@ -80,7 +81,7 @@ export default function RequestDetailsScreen() {
         {booking ? (
           <>
             <View style={[doctorStyles.card, styles.card]}>
-              <View style={styles.avatarRing}><View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View></View>
+              <View style={styles.avatarRing}><Avatar uid={patientId} name={name} style={styles.avatar} textStyle={styles.avatarText} /></View>
               <Text style={styles.name}>{name}</Text>
               <Text style={styles.age}>{age !== null ? t('doctor.request.age', { age }) : t('doctor.request.noAge')}</Text>
               {/* QA DOC-013: the doctor knows before accepting that a parent or guardian runs this child's account (D16). */}

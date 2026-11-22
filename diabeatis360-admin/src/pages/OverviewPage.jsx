@@ -191,30 +191,38 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        <Card className="!p-0 self-start">
-          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-            <h2 className="text-lg font-extrabold">Recent Activity Feed</h2>
-            {data.feed.length > 5 ? (
-              <button type="button" className="text-xs font-bold text-brand hover:underline" onClick={() => setShowAll((open) => !open)}>
-                {showAll ? 'Show less' : 'View All Logs'}
-              </button>
-            ) : null}
-          </div>
-          {feed.length === 0 ? (
-            <p className="px-6 py-10 text-center text-sm text-muted">Nothing has happened yet. New sign-ups, bookings and verifications show up here.</p>
-          ) : feed.map((event) => (
-            <div key={event.id} className="border-b border-gray-100 px-6 py-4 last:border-0">
-              <p className="text-sm"><b>{event.name}</b>{event.text}</p>
-              <p className="mt-1 text-xs text-muted">{timeAgo(event.at)}</p>
-              <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tagTones[event.tone]}`}>{event.tag}</span>
+        {/* On wide screens the feed is exactly as tall as the charts beside it, so its bottom edge lines up with the
+            Consultation / Revenue boxes. The wrapper takes its height from the grid row (set by the charts) and the
+            card fills it (`absolute inset-0`); extra entries scroll inside the card instead of stretching the page.
+            On narrow screens the card sits below the charts at its natural height. */}
+        <div className="relative">
+          <Card className="flex flex-col overflow-hidden !p-0 xl:absolute xl:inset-0">
+            <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-5">
+              <h2 className="text-lg font-extrabold">Recent Activity Feed</h2>
+              {data.feed.length > 5 ? (
+                <button type="button" className="text-xs font-bold text-brand hover:underline" onClick={() => setShowAll((open) => !open)}>
+                  {showAll ? 'Show less' : 'View All Logs'}
+                </button>
+              ) : null}
             </div>
-          ))}
-          {data.pending > 0 ? (
-            <Link to="/providers" className="block border-t border-gray-100 px-6 py-3 text-center text-sm font-bold text-brand hover:bg-gray-50">
-              Review {data.pending} pending doctor {data.pending === 1 ? 'approval' : 'approvals'} →
-            </Link>
-          ) : null}
-        </Card>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {feed.length === 0 ? (
+                <p className="px-6 py-10 text-center text-sm text-muted">Nothing has happened yet. New sign-ups, bookings and verifications show up here.</p>
+              ) : feed.map((event) => (
+                <div key={event.id} className="border-b border-gray-100 px-6 py-4 last:border-0">
+                  <p className="text-sm"><b>{event.name}</b>{event.text}</p>
+                  <p className="mt-1 text-xs text-muted">{timeAgo(event.at)}</p>
+                  <span className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${tagTones[event.tone]}`}>{event.tag}</span>
+                </div>
+              ))}
+            </div>
+            {data.pending > 0 ? (
+              <Link to="/providers" className="block shrink-0 border-t border-gray-100 px-6 py-3 text-center text-sm font-bold text-brand hover:bg-gray-50">
+                Review {data.pending} pending doctor {data.pending === 1 ? 'approval' : 'approvals'} →
+              </Link>
+            ) : null}
+          </Card>
+        </div>
       </div>
     </div>
   )

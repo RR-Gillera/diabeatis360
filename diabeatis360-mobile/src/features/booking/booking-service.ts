@@ -31,9 +31,12 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
       prcLicenseNumber: String(data.prc_license_number ?? ''),
       city: String(data.city ?? ''),
       consultationFee: Number(data.consultation_fee ?? 0),
+      hasPhoto: data.has_photo === true,
     }),
     availabilityMode: toAvailabilityMode(data.availability_mode),
     walletBlocked: data.wallet_blocked === true,
+    // Only the approved suffix (D55); a request still waiting for an admin is never shown to patients.
+    credentials: String(data.credentials ?? ''),
   };
 }
 
@@ -277,6 +280,9 @@ export function subscribeToBookingsForProvider(
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
             queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
+            createdAt: (data.created_at as Timestamp | undefined)?.toDate() ?? null,
+            endedAt: (data.consultation_ended_at as Timestamp | undefined)?.toDate() ?? null,
+            endedBy: data.consultation_ended_by === 'doctor' || data.consultation_ended_by === 'patient' ? data.consultation_ended_by : null,
           };
         }));
         entries.sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0));

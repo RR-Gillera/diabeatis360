@@ -32,8 +32,8 @@ fonts (Inter), card corners, and that every button in the frame exists.
 | A4 | `/providers` | Provider Management Page, -1 | Verified / Pending Approval tabs; **View Profile** opens the credential modal |
 | A5 | `/analytics` | Analytics Page | Today / This Week / This Month / This Year / Custom Range, 5 cards, 4 charts |
 | A6 | `/analytics` → Generate Report | Analytics Page-1 | modal with report type, dates, preview, Print, Export CSV |
-| A7 | `/revenue` | Revenue | 4 cards, growth chart (Monthly/Quarterly), payments table |
-| A8 | `/revenue` → View | Revenue-1 | Payment Details modal, Download Invoice, Report a Problem |
+| A7 | `/revenue` | Revenue | tabs under the header; **Overview** tab: 4 cards, growth chart (Monthly/Quarterly); **Consultation Payments** tab: payments table |
+| A8 | `/revenue` → Consultation Payments → View | Revenue-1 | Payment Details modal, Download Invoice, Report a Problem |
 | A9 | `/settings` | Settings | Create Announcement form, Publish Now, Save Draft, Previous Announcements |
 
 Known, deliberate differences are listed in `docs/FIGMA_MAP.md` (Reminders tab, scheduled publish date, templates,

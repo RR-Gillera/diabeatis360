@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, StyleSheet, Text, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
-import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { Animated, Platform, Pressable, StyleSheet, Text, View, type ScrollViewInstance, type StyleProp, type ViewStyle } from 'react-native';
+import { BottomSheetModal } from '@/components/ui/bottom-sheet-modal';
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
@@ -124,10 +124,10 @@ export function BirthdateWheels({ value, onChange, years = YEARS }: { value: str
 }
 
 /** Height of one row, and how many rows show at once (odd, so exactly one row sits in the middle). */
-const ROW_HEIGHT = 44;
-const VISIBLE_ROWS = 5;
+export const ROW_HEIGHT = 44;
+export const VISIBLE_ROWS = 5;
 /** Empty rows above the first item and below the last, so both ends can still reach the center band. */
-const PAD_ROWS = (VISIBLE_ROWS - 1) / 2;
+export const PAD_ROWS = (VISIBLE_ROWS - 1) / 2;
 
 /**
  * One scrolling wheel, like the iOS time picker.
@@ -140,8 +140,10 @@ const PAD_ROWS = (VISIBLE_ROWS - 1) / 2;
  *   momentum events alone, because those fire differently on iOS, Android and the web build.
  * - Only the person chooses (QA PAT-001, wheel-rules.ts): until a finger, a mouse wheel, a tap or a screen-reader step
  *   moves this wheel, a scroll event is not a choice, so the date never fills in by itself.
+ *
+ * Exported so the doctor's time picker (features/doctor/time-picker.tsx) uses the same wheel.
  */
-function Wheel<T>({ label, emptyLabel, items, selectedIndex, onSelect, render, style }: {
+export function Wheel<T>({ label, emptyLabel, items, selectedIndex, onSelect, render, style }: {
   label: string;
   /** What a screen reader says while nothing is chosen on this wheel (it used to say "undefined"). */
   emptyLabel: string;
@@ -282,24 +284,21 @@ export function BirthdateField({ value, onChange, title = 'Date of Birth', place
         {iconSide === 'right' ? <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={20} tintColor="#CBD5E1" /> : null}
       </Pressable>
 
-      <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
-        <View style={styles.overlay}>
-          <ModalBackdrop onClose={() => setOpen(false)} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{title}</Text>
-              <Pressable accessibilityRole="button" onPress={() => setOpen(false)} hitSlop={10}><Text style={styles.cancel}>{t('common.cancel')}</Text></Pressable>
-            </View>
-            <BirthdateWheels value={draft} onChange={setDraft} years={years} />
-            <View style={styles.preview}>
-              <Text style={styles.previewText}>{draft ? date(draft) : t('date.pickAll')}</Text>
-            </View>
-            <Pressable style={[styles.confirm, !draft && styles.confirmDisabled]} onPress={confirm} disabled={!draft}>
-              <Text style={styles.confirmText}>{t('common.done')}</Text>
-            </Pressable>
+      <BottomSheetModal visible={open} onClose={() => setOpen(false)}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>{title}</Text>
+            <Pressable accessibilityRole="button" onPress={() => setOpen(false)} hitSlop={10}><Text style={styles.cancel}>{t('common.cancel')}</Text></Pressable>
           </View>
+          <BirthdateWheels value={draft} onChange={setDraft} years={years} />
+          <View style={styles.preview}>
+            <Text style={styles.previewText}>{draft ? date(draft) : t('date.pickAll')}</Text>
+          </View>
+          <Pressable style={[styles.confirm, !draft && styles.confirmDisabled]} onPress={confirm} disabled={!draft}>
+            <Text style={styles.confirmText}>{t('common.done')}</Text>
+          </Pressable>
         </View>
-      </Modal>
+      </BottomSheetModal>
     </>
   );
 }
@@ -321,7 +320,6 @@ const styles = StyleSheet.create({
   field: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 56, paddingHorizontal: 16 },
   fieldText: { color: authColors.navy, flex: 1, fontFamily: Brand.font.medium, fontSize: 16 },
   fieldPlaceholder: { color: '#A7B8CD' },
-  overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   sheetTitle: { color: authColors.navy, fontSize: 18, fontFamily: Brand.font.extraBold },

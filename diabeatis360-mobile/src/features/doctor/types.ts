@@ -32,6 +32,14 @@ export type DoctorProfile = {
   weeklyHours: WeeklyHours;
   /** The doctor's wallet is below ₱0 (Providers.wallet_blocked, written only by the server, D47): patients cannot book them. */
   walletBlocked: boolean;
+  /** Providers.has_photo (D54): the doctor saved a profile photo in Profile_Photos. Patients see only doctors who did. */
+  hasPhoto: boolean;
+  /** The approved suffix patients see after the name, e.g. "MD, FPCP" (Providers.credentials, D55). '' = none. */
+  credentials: string;
+  /** What the doctor asked for, waiting for an admin (Providers.credentials_requested). '' = nothing waiting. */
+  credentialsRequested: string;
+  /** The admin's reason for not approving that request (Providers.credentials_rejection_reason). '' = not rejected. */
+  credentialsRejectionReason: string;
 };
 
 // A patient as the doctor sees them: identity from the Users doc plus the

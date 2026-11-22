@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BottomSheetModal } from '@/components/ui/bottom-sheet-modal';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
-import { doc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, updateDoc, writeBatch } from 'firebase/firestore';
 
 import { authColors, authStyles, AuthButton } from '@/features/auth/auth-ui';
 import { useAuth } from '@/features/auth/auth-context';
@@ -13,6 +13,9 @@ import { birthdateToTimestamp, parseBirthdate } from '@/features/auth/birthdate'
 import { completeOnboarding, saveOnboardingValue } from '@/features/auth/onboarding';
 import { SPECIALIZATIONS } from '@/features/doctor/doctor-profile';
 import { subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
+import { Avatar, useProfilePhoto } from '@/features/photos/avatar';
+import { addPhotoToBatch } from '@/features/photos/photo-service';
+import { PhotoSheet } from '@/features/photos/photo-sheet';
 import { Brand } from '@/constants/theme';
 import { db } from '@/firebase';
 import { useT } from '@/i18n/language-context';
@@ -30,6 +33,12 @@ export default function ProfessionalInfoScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [uploadNotice, setUploadNotice] = useState(false);
+  // The doctor's profile photo is required (D54): patients must be able to recognise their doctor. A photo picked here
+  // is saved together with the Providers profile on Submit; a doctor resubmitting after a rejection keeps their saved one.
+  const savedPhoto = useProfilePhoto(uid);
+  const [pickedPhoto, setPickedPhoto] = useState<string | null>(null);
+  const [photoSheet, setPhotoSheet] = useState(false);
+  const photo = pickedPhoto ?? savedPhoto;
 
   // Resubmitting after a rejection (Figma D-04): start from what the doctor sent before, so only the fix is typed.
   const seeded = useRef(false);
@@ -47,14 +56,15 @@ export default function ProfessionalInfoScreen() {
   const [today] = useState(() => { const day = new Date(); day.setHours(0, 0, 0, 0); return day; });
   const expiryDate = parseBirthdate(expiry);
   const expired = Boolean(expiryDate && expiryDate.getTime() < today.getTime());
-  const complete = Boolean(specialty && licenseNumber.trim() && expiry && !expired && agreed);
+  const complete = Boolean(photo && specialty && licenseNumber.trim() && expiry && !expired && agreed);
 
   const submit = async () => {
     if (saving) return;
     // The button stays tappable (as in the Figma frame) and says what is missing, instead of sitting greyed out with
     // no reason given (QA ACC-06). An expired licence already has its own message under the date.
     if (!complete) {
-      if (!expired) setError(t('setup.pro.incomplete'));
+      if (!photo) setError(t('photo.stepNeeded'));
+      else if (!expired) setError(t('setup.pro.incomplete'));
       return;
     }
     if (!email) return;
@@ -65,7 +75,12 @@ export default function ProfessionalInfoScreen() {
         // Providers doc ID == Auth UID, the same identity convention Users
         // follows. merge:true so a doctor redoing setup keeps fields they have
         // already edited elsewhere (consultation fee, city, availability).
-        await setDoc(doc(db, 'Providers', uid), {
+        // One write for the profile and the photo (D54): firestore.rules accept has_photo only when the photo exists
+        // after the same write, so a doctor can never be "has a photo" without one.
+        const batch = writeBatch(db);
+        if (pickedPhoto) addPhotoToBatch(batch, uid, pickedPhoto);
+        batch.set(doc(db, 'Providers', uid), {
+          has_photo: true,
           full_name: displayName ?? 'Diabeatis360 Doctor',
           specialty,
           prc_license_number: licenseNumber.trim(),
@@ -81,6 +96,7 @@ export default function ProfessionalInfoScreen() {
           rejection_reason: '',
           created_at: serverTimestamp(),
         }, { merge: true });
+        await batch.commit();
         await updateDoc(doc(db, 'Users', uid), { role: 'doctor' });
       }
       await saveOnboardingValue(email, 'specialty', specialty, uid);
@@ -113,7 +129,19 @@ export default function ProfessionalInfoScreen() {
         </View>
         <Text style={styles.subtitle}>{t('setup.pro.subtitle')}</Text>
 
-        <Text style={[styles.label, styles.firstLabel]}>{t('setup.pro.specialization')}</Text>
+        <Text style={[styles.label, styles.firstLabel]}>{t('photo.stepTitle')}</Text>
+        <View style={styles.photoRow}>
+          <Avatar photo={photo} name={displayName} style={styles.photo} textStyle={styles.photoInitials} />
+          <View style={styles.photoCopy}>
+            <Text style={styles.photoText}>{t('photo.stepText')}</Text>
+            <Pressable accessibilityRole="button" style={styles.photoButton} onPress={() => { setError(''); setPhotoSheet(true); }}>
+              <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={16} tintColor={authColors.green} />
+              <Text style={styles.photoButtonText}>{photo ? t('photo.stepChange') : t('photo.stepAdd')}</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <Text style={styles.label}>{t('setup.pro.specialization')}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={`${t('setup.pro.specialization')}: ${specialty || t('setup.pro.selectSpecialization')}`} style={styles.field} onPress={() => setPickerOpen(true)}>
           <Text style={styles.selectText}>{specialty || t('setup.pro.selectSpecialization')}</Text>
           <SymbolView name={{ ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }} size={20} tintColor="#64748B" />
@@ -169,23 +197,22 @@ export default function ProfessionalInfoScreen() {
         <AuthButton title={saving ? t('setup.pro.submitting') : t('setup.pro.submit')} onPress={submit} disabled={saving} style={styles.submit} />
       </KeyboardSafeScroll>
 
-      <Modal visible={pickerOpen} animationType="slide" transparent onRequestClose={() => setPickerOpen(false)}>
-        <View style={styles.overlay}>
-          <ModalBackdrop onClose={() => setPickerOpen(false)} />
-          <View style={styles.sheet}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{t('setup.pro.specialization')}</Text>
-              <Pressable accessibilityRole="button" onPress={() => setPickerOpen(false)} hitSlop={10}><Text style={styles.cancel}>{t('common.cancel')}</Text></Pressable>
-            </View>
-            {SPECIALIZATIONS.map((item) => (
-              <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: specialty === item }} style={styles.sheetRow} onPress={() => { setSpecialty(item); setPickerOpen(false); }}>
-                <Text style={[styles.sheetRowText, specialty === item && styles.sheetRowActive]}>{item}</Text>
-                {specialty === item ? <Text style={styles.sheetCheck}>✓</Text> : null}
-              </Pressable>
-            ))}
+      <PhotoSheet visible={photoSheet} onClose={() => setPhotoSheet(false)} uid={uid} isDoctor hasPhoto={photo !== null} onPicked={setPickedPhoto} />
+
+      <BottomSheetModal visible={pickerOpen} onClose={() => setPickerOpen(false)}>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>{t('setup.pro.specialization')}</Text>
+            <Pressable accessibilityRole="button" onPress={() => setPickerOpen(false)} hitSlop={10}><Text style={styles.cancel}>{t('common.cancel')}</Text></Pressable>
           </View>
+          {SPECIALIZATIONS.map((item) => (
+            <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: specialty === item }} style={styles.sheetRow} onPress={() => { setSpecialty(item); setPickerOpen(false); }}>
+              <Text style={[styles.sheetRowText, specialty === item && styles.sheetRowActive]}>{item}</Text>
+              {specialty === item ? <Text style={styles.sheetCheck}>✓</Text> : null}
+            </Pressable>
+          ))}
         </View>
-      </Modal>
+      </BottomSheetModal>
     </View>
   );
 }
@@ -206,6 +233,13 @@ const styles = StyleSheet.create({
   label: { color: authColors.navy, fontFamily: Brand.font.bold, fontSize: 15, marginBottom: 12, marginTop: 24 },
   firstLabel: { marginTop: 32 },
   uploadLabel: { marginTop: 14 },
+  photoRow: { alignItems: 'center', flexDirection: 'row', gap: 16 },
+  photo: { alignItems: 'center', backgroundColor: '#E8F5E9', borderRadius: 44, height: 88, justifyContent: 'center', width: 88 },
+  photoInitials: { color: authColors.green, fontFamily: Brand.font.extraBold, fontSize: 28 },
+  photoCopy: { flex: 1, gap: 10 },
+  photoText: { color: '#64748B', fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 19 },
+  photoButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#E8F5E9', borderRadius: 20, flexDirection: 'row', gap: 6, minHeight: 40, paddingHorizontal: 14 },
+  photoButtonText: { color: authColors.green, fontFamily: Brand.font.bold, fontSize: 14 },
   field: { alignItems: 'center', backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'space-between', minHeight: 56, paddingHorizontal: 16 },
   selectText: { color: authColors.navy, flex: 1, fontFamily: Brand.font.regular, fontSize: 16 },
   input: { color: authColors.navy, flex: 1, fontFamily: Brand.font.regular, fontSize: 16, minHeight: 54 },
@@ -222,7 +256,6 @@ const styles = StyleSheet.create({
   termsLink: { color: authColors.green, fontFamily: Brand.font.bold },
   error: { color: Brand.colors.danger, fontFamily: Brand.font.regular, fontSize: 13, marginTop: 16 },
   submit: { borderRadius: 28, marginTop: 40, minHeight: 56 },
-  overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   sheetTitle: { color: authColors.navy, fontSize: 18, fontFamily: Brand.font.extraBold },

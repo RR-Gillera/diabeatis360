@@ -6,15 +6,15 @@ import { SymbolView } from 'expo-symbols';
 import { RoundBackButton } from '@/components/ui/round-back-button';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { initialsOf } from '@/features/booking/appointment-tabs';
 import { subscribeToBooking } from '@/features/booking/booking-service';
-import { formatApptDate, formatApptTime } from '@/features/booking/booking-ui';
+import { formatApptDate, formatApptTime, providerName } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { durationLabel } from '@/features/consultation/consultation-format';
 import { subscribeToConsultation, subscribeToMessages, type ChatMessage, type ConsultationState } from '@/features/consultation/consultation-service';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
+import { Avatar } from '@/features/photos/avatar';
 
 // Consultation Summary (Figma P-25): who, when, how long, and the doctor's notes. Opened from "View Summary" on a
 // completed appointment, from the ended chat, and after a video call. The notes come from Consultation_Notes, which only
@@ -42,7 +42,7 @@ export default function ConsultationSummaryScreen() {
     return subscribeToMessages(id, setMessages, () => {});
   }, [id]);
 
-  const doctorName = booking?.provider?.fullName ?? t('call.fallbackDoctor');
+  const doctorName = booking?.provider ? providerName(booking.provider) : t('call.fallbackDoctor');
   const isDoctor = role === 'doctor';
   const title = isDoctor ? (booking?.patientName || t('call.fallbackPatient')) : doctorName;
   const subtitle = isDoctor ? t('summary.patient') : [booking?.provider?.specialty, booking?.provider?.city].filter(Boolean).join(' · ');
@@ -63,7 +63,7 @@ export default function ConsultationSummaryScreen() {
         <>
           <View style={styles.card}>
             <View style={styles.who}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(title)}</Text></View>
+              <Avatar uid={isDoctor ? booking?.patientId : booking?.provider?.id} name={title} style={styles.avatar} textStyle={styles.avatarText} />
               <View style={styles.whoText}>
                 <Text style={styles.name}>{title}</Text>
                 {subtitle ? <Text style={styles.meta}>{subtitle}</Text> : null}

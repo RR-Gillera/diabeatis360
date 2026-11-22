@@ -19,12 +19,12 @@ import { homeColors, WeeklyChart } from '@/features/home/home-ui';
 import { isChatAvailable } from '@/constants/enums';
 import { glucoseDirection } from '@/constants/glucose';
 import { useSafeBack } from '@/hooks/use-safe-back';
-import { initialsOf } from '@/features/booking/appointment-tabs';
 import { ageFrom, weeklyInsights } from '@/features/doctor/doctor-stats';
 import { ACTIVITY_LEVELS, DIETS, dislikedText, foodList, normalizeDiet } from '@/features/auth/health-profile';
 import { foodLabel } from '@/constants/food-words';
 import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type MessageKey } from '@/i18n/translate';
+import { Avatar } from '@/features/photos/avatar';
 
 // A doctor reads a patient's records only while that patient shares them, by booking this doctor (DECISIONS.md D22). After a
 // decline, or when the patient stops sharing, the database says "permission denied"; say what that means in plain words.
@@ -118,7 +118,7 @@ export default function DoctorPatientDetailScreen() {
           <>
             {/* Figma D-06: who, then Profile / Logs / Insights. */}
             <View style={[doctorStyles.card, styles.whoCard]}>
-              <View style={styles.whoAvatar}><Text style={styles.whoInitials}>{initialsOf(profile.fullName)}</Text></View>
+              <Avatar uid={id} name={profile.fullName} style={styles.whoAvatar} textStyle={styles.whoInitials} />
               <View style={styles.whoCopy}>
                 <Text style={styles.whoName}>{profile.fullName}</Text>
                 <Text style={styles.whoMeta}>{age !== null ? t('doctor.patient.age', { age }) : t('doctor.request.noAge')}</Text>

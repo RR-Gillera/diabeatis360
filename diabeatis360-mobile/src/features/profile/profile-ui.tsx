@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -75,17 +75,26 @@ export function MenuRow({ icon, title, subtitle, onPress, tone = 'normal', tint 
 
 /** The green gradient "Upgrade to Premium" card (drawn with react-native-svg, already in the app; no new package). */
 export function PremiumCard({ title, subtitle, onPress }: { title: string; subtitle: string; onPress: () => void }) {
+  // The gradient is drawn at the card's measured pixel size. With "100%" sizes, Android sometimes measured the SVG
+  // wrong and only part of the card got painted (the "cut in half" bug).
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width !== size.width || height !== size.height) setSize({ width, height });
+  };
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${title}, ${subtitle}`} onPress={onPress} style={({ pressed }) => [styles.premium, pressed && styles.pressed]}>
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
-        <Defs>
-          <LinearGradient id="premiumGradient" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#1C7A5A" />
-            <Stop offset="1" stopColor="#8CC63F" />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" rx="22" ry="22" fill="url(#premiumGradient)" />
-      </Svg>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${title}, ${subtitle}`} onPress={onPress} onLayout={onLayout} style={({ pressed }) => [styles.premium, pressed && styles.pressed]}>
+      {size.width > 0 ? (
+        <Svg style={StyleSheet.absoluteFill} width={size.width} height={size.height}>
+          <Defs>
+            <LinearGradient id="premiumGradient" x1="0" y1="0" x2={size.width} y2={size.height} gradientUnits="userSpaceOnUse">
+              <Stop offset="0" stopColor="#1C7A5A" />
+              <Stop offset="1" stopColor="#8CC63F" />
+            </LinearGradient>
+          </Defs>
+          <Rect x={0} y={0} width={size.width} height={size.height} rx={22} ry={22} fill="url(#premiumGradient)" />
+        </Svg>
+      ) : null}
       <View style={styles.premiumIcon}>
         <SymbolView name={{ ios: 'crown.fill', android: 'workspace_premium', web: 'workspace_premium' }} size={22} tintColor="#FBBF24" />
       </View>
@@ -192,7 +201,7 @@ const styles = StyleSheet.create({
   rowTitle: { color: NAVY, fontFamily: Brand.font.bold, fontSize: 16 },
   rowTitleDanger: { color: Brand.colors.danger },
   rowSubtitle: { color: GREEN, fontFamily: Brand.font.bold, fontSize: 11, letterSpacing: 0.4 },
-  premium: { alignItems: 'center', borderRadius: 22, flexDirection: 'row', gap: 14, minHeight: 76, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 14, elevation: 4, shadowColor: '#1C7A5A', shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.25, shadowRadius: 16 },
+  premium: { alignItems: 'center', backgroundColor: '#1C7A5A', borderRadius: 22, flexDirection: 'row', gap: 14, minHeight: 76, overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 14, elevation: 4, shadowColor: '#1C7A5A', shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.25, shadowRadius: 16 },
   premiumIcon: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 14, height: 44, justifyContent: 'center', width: 44 },
   premiumTitle: { color: '#FFFFFF', fontFamily: Brand.font.bold, fontSize: 16 },
   premiumSubtitle: { color: 'rgba(255,255,255,0.85)', fontFamily: Brand.font.regular, fontSize: 12 },

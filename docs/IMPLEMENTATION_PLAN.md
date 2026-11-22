@@ -51,7 +51,7 @@ data) · **Not finalized** (works but doesn't follow a CLOSED decision, or uses 
 | Appointment | Book Appointment | P | Not finalized | directory lists unverified/inactive doctors; no double-booking guard (UI greys slots only); no commission (D3); old test bookings still use pre-D6 `scheduled`/`accepted` | `features/booking/booking-service.ts`, `app/booking/*` |
 | Appointment | Accept or Decline | D | Done | D6 codes applied 09-25; untested on device | `app/doctor/appointments.tsx`, `app/doctor/index.tsx` |
 | Appointment | Manage Schedule | D | Done | — | `app/doctor/schedule.tsx`, `doctor-service.ts` (`updateDoctorAvailability`) |
-| Appointment | View Appointment History | P | Done | — | `features/booking/booking-history.tsx`, `app/booking/appointment.tsx` |
+| Appointment | View Appointment History | P | Done | — | `app/booking/my-appointments.tsx`, `app/booking/appointment.tsx` |
 | Appointment | View Appointment History | D | Done | — | `app/doctor/appointments.tsx` |
 | Appointment | View Appointment History | A | Missing | — | — |
 | Consultation Chat | Send Messages | P / D | Done | — | `app/consultation/[id].tsx`, `features/consultation/consultation-service.ts` |

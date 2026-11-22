@@ -6,6 +6,7 @@ import { SymbolView } from 'expo-symbols';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
+import { providerName } from '@/features/booking/booking-ui';
 import { manilaWallClock } from '@/features/booking/manila-time';
 import type { AppointmentHistoryEntry, Provider } from '@/features/booking/types';
 import { POINTS_PER_LOG } from '@/features/gamification/gamification-service';
@@ -89,7 +90,7 @@ export default function ActivityScreen() {
           <SymbolView name={{ ios: 'calendar', android: 'event', web: 'event' }} size={16} tintColor={homeColors.blue} />
         </View>
         <View style={styles.copy}>
-          <Text style={styles.rowTitle}>{t('activity.booking', { name: entry.provider?.fullName ?? t('activity.doctor') })}</Text>
+          <Text style={styles.rowTitle}>{t('activity.booking', { name: entry.provider ? providerName(entry.provider) : t('activity.doctor') })}</Text>
           <Text style={styles.rowMeta}>{label('bookingStatus', entry.status)}</Text>
           {/* An appointment's time is Philippine time on every screen (D26, D38); this row alone showed the phone's own zone. */}
           <Text style={styles.rowWhen}>{activityWhen(item.at ? manilaWallClock(item.at) : null, language, t)}</Text>

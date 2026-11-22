@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ModalBackdrop } from '@/components/ui/modal-backdrop';
-import { KeyboardSafeView } from '@/components/ui/keyboard-safe';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BottomSheetModal } from '@/components/ui/bottom-sheet-modal';
 import { SymbolView } from 'expo-symbols';
 
 import { AiDisclaimer } from '@/components/ui/ai-disclaimer';
@@ -121,58 +120,55 @@ export function AddReadingModal({ visible, onClose, onSaved, entry }: { visible:
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
-      <KeyboardSafeView style={styles.overlay}>
-        <ModalBackdrop onClose={close} />
-        <View style={styles.sheet}>
-          <View style={styles.header}>
-            <Text style={styles.title}>{editing ? t('glucose.form.edit') : t('glucose.form.add')}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={close} hitSlop={10}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" /></Pressable>
-          </View>
-          <View style={styles.readingRow}>
-            <TextInput value={reading} onChangeText={(value) => { setReading(value); setConfirming(false); }} placeholder="0" accessibilityLabel={t('glucose.form.inputA11y')} keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
-            <Text style={styles.readingUnit}>mg/dL</Text>
-            {livePreview ? <View style={[styles.previewBadge, { backgroundColor: livePreview.background }]}><Text style={[styles.previewBadgeText, { color: livePreview.color }]}>{livePreview.label}</Text></View> : null}
-          </View>
-          {check && !check.ok ? <Text style={styles.hint}>{check.reason === 'range' ? t('glucose.check.range', { min: READING_LIMITS.min, max: READING_LIMITS.max }) : t(check.reason === 'decimal' ? 'glucose.check.decimal' : 'glucose.check.notNumber')}</Text> : null}
-          <View style={styles.contextRow}>
-            {contexts.map((item) => (
-              <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: context === item }} onPress={() => setContext(item)} style={[styles.contextPill, context === item && styles.contextPillActive]}>
-                <Text style={[styles.contextText, context === item && styles.contextTextActive]}>{label('mealContext', item)}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <TextInput value={notes} onChangeText={setNotes} placeholder={t('glucose.form.notes')} accessibilityLabel={t('glucose.form.notes')} style={styles.notesInput} multiline />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          {confirming ? (
-            <View style={styles.confirmBox}>
-              <Text style={styles.confirmTitle}>{t('glucose.form.confirmTitle', { value: readingValue })}</Text>
-              <Text style={styles.confirmText}>
-                {readingValue < READING_LIMITS.confirmBelow ? t('glucose.form.rareLow') : t('glucose.form.rareHigh')}{t('glucose.form.checkMeter')}
-              </Text>
-            </View>
-          ) : null}
-          <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
-            <Text style={styles.saveButtonText}>{saving ? t('glucose.form.saving') : confirming ? t('glucose.form.confirmSave', { value: readingValue }) : editing ? t('glucose.form.saveChanges') : t('glucose.form.save')}</Text>
-          </Pressable>
-          {offline ? (
-            <View>
-              <Text accessibilityLiveRegion="polite" style={styles.offline}>{t('glucose.form.offline')}</Text>
-              <Pressable accessibilityRole="button" style={styles.offlineButton} onPress={continueOffline}>
-                <Text style={styles.offlineButtonText}>{t('common.continue')}</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          {editing ? (
-            <Pressable accessibilityRole="button" style={styles.deleteButton} onPress={remove} disabled={deleting}>
-              <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : confirmDelete ? t('glucose.form.deleteConfirm') : t('glucose.form.delete')}</Text>
-            </Pressable>
-          ) : null}
-          {/* Below the buttons, so it never pushes Save out of reach when the keyboard is open. */}
-          {entry ? <EditHistory logId={entry.id} /> : null}
+    <BottomSheetModal visible={visible} onClose={close}>
+      <View style={styles.sheet}>
+        <View style={styles.header}>
+          <Text style={styles.title}>{editing ? t('glucose.form.edit') : t('glucose.form.add')}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={close} hitSlop={10}><SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} size={18} tintColor="#64748B" /></Pressable>
         </View>
-      </KeyboardSafeView>
-    </Modal>
+        <View style={styles.readingRow}>
+          <TextInput value={reading} onChangeText={(value) => { setReading(value); setConfirming(false); }} placeholder="0" accessibilityLabel={t('glucose.form.inputA11y')} keyboardType="numeric" style={styles.readingInput} autoFocus={!editing} />
+          <Text style={styles.readingUnit}>mg/dL</Text>
+          {livePreview ? <View style={[styles.previewBadge, { backgroundColor: livePreview.background }]}><Text style={[styles.previewBadgeText, { color: livePreview.color }]}>{livePreview.label}</Text></View> : null}
+        </View>
+        {check && !check.ok ? <Text style={styles.hint}>{check.reason === 'range' ? t('glucose.check.range', { min: READING_LIMITS.min, max: READING_LIMITS.max }) : t(check.reason === 'decimal' ? 'glucose.check.decimal' : 'glucose.check.notNumber')}</Text> : null}
+        <View style={styles.contextRow}>
+          {contexts.map((item) => (
+            <Pressable key={item} accessibilityRole="radio" accessibilityState={{ checked: context === item }} onPress={() => setContext(item)} style={[styles.contextPill, context === item && styles.contextPillActive]}>
+              <Text style={[styles.contextText, context === item && styles.contextTextActive]}>{label('mealContext', item)}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <TextInput value={notes} onChangeText={setNotes} placeholder={t('glucose.form.notes')} accessibilityLabel={t('glucose.form.notes')} style={styles.notesInput} multiline />
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {confirming ? (
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>{t('glucose.form.confirmTitle', { value: readingValue })}</Text>
+            <Text style={styles.confirmText}>
+              {readingValue < READING_LIMITS.confirmBelow ? t('glucose.form.rareLow') : t('glucose.form.rareHigh')}{t('glucose.form.checkMeter')}
+            </Text>
+          </View>
+        ) : null}
+        <Pressable style={[styles.saveButton, (!isValidReading || saving) && styles.saveButtonDisabled]} onPress={save} disabled={!isValidReading || saving}>
+          <Text style={styles.saveButtonText}>{saving ? t('glucose.form.saving') : confirming ? t('glucose.form.confirmSave', { value: readingValue }) : editing ? t('glucose.form.saveChanges') : t('glucose.form.save')}</Text>
+        </Pressable>
+        {offline ? (
+          <View>
+            <Text accessibilityLiveRegion="polite" style={styles.offline}>{t('glucose.form.offline')}</Text>
+            <Pressable accessibilityRole="button" style={styles.offlineButton} onPress={continueOffline}>
+              <Text style={styles.offlineButtonText}>{t('common.continue')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        {editing ? (
+          <Pressable accessibilityRole="button" style={styles.deleteButton} onPress={remove} disabled={deleting}>
+            <Text style={styles.deleteButtonText}>{deleting ? t('glucose.form.deleting') : confirmDelete ? t('glucose.form.deleteConfirm') : t('glucose.form.delete')}</Text>
+          </Pressable>
+        ) : null}
+        {/* Below the buttons, so it never pushes Save out of reach when the keyboard is open. */}
+        {entry ? <EditHistory logId={entry.id} /> : null}
+      </View>
+    </BottomSheetModal>
   );
 }
 
@@ -260,7 +256,6 @@ export function AiRecommendations({ interpretation }: { interpretation: Interpre
 }
 
 const styles = StyleSheet.create({
-  overlay: { backgroundColor: 'rgba(15, 23, 42, 0.4)', flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: homeColors.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 18 },
