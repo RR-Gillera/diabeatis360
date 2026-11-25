@@ -44,8 +44,9 @@ export function AuthButton({ title, onPress, disabled, icon, style }: { title: s
 
 // The "G" and "f" buttons under the "OR CONNECT WITH" / "OR SIGN UP WITH" line on Login and Sign Up (DECISIONS.md D23;
 // Facebook replaced the Figma frame's Apple button on 2026-10-17). `busy` is the provider being signed in, if any.
-export function SocialButtons({ busy, onPress }: { busy: SocialProvider | null; onPress: (provider: SocialProvider) => void }) {
-  return <View style={styles.socials}>{(['google', 'facebook'] as const).map((provider) => {
+// `providers` limits the buttons (Forgot PIN shows only the account's own sign-in, D56); both by default.
+export function SocialButtons({ busy, onPress, providers = ['google', 'facebook'] }: { busy: SocialProvider | null; onPress: (provider: SocialProvider) => void; providers?: SocialProvider[] }) {
+  return <View style={styles.socials}>{providers.map((provider) => {
     const working = busy === provider;
     return <Pressable
       key={provider}

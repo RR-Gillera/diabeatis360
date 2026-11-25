@@ -119,14 +119,18 @@ export function PinSetup({ uid, title, onDone }: { uid: string; title?: string; 
   );
 }
 
-/** Asks for the saved PIN. onTooMany runs after the 5th wrong try (the PIN is already deleted by then). */
-export function PinLock({ uid, title, subtitle, onUnlocked, onTooMany, onForgot }: {
+/**
+ * Asks for the saved PIN. onTooMany runs after the 5th wrong try (the PIN is already deleted by then). The two optional
+ * links under the keypad: "Forgot PIN?" and "Log in with another account" (logs out, keeps the PIN; D56).
+ */
+export function PinLock({ uid, title, subtitle, onUnlocked, onTooMany, onForgot, onOtherAccount }: {
   uid: string;
   title?: string;
   subtitle?: string;
   onUnlocked: () => void;
   onTooMany: () => void;
   onForgot?: () => void;
+  onOtherAccount?: () => void;
 }) {
   const { t } = useT();
   const [error, setError] = useState('');
@@ -152,10 +156,19 @@ export function PinLock({ uid, title, subtitle, onUnlocked, onTooMany, onForgot 
       subtitle={subtitle ?? t('pin.lock.subtitle')}
       error={error}
       onComplete={handle}
-      footer={onForgot ? (
-        <Pressable accessibilityRole="button" onPress={onForgot} hitSlop={8} style={styles.forgot}>
-          <Text style={styles.forgotText}>{t('pin.forgot')}</Text>
-        </Pressable>
+      footer={onForgot || onOtherAccount ? (
+        <View style={styles.links}>
+          {onForgot ? (
+            <Pressable accessibilityRole="button" onPress={onForgot} hitSlop={8} style={styles.forgot}>
+              <Text style={styles.forgotText}>{t('pin.forgot')}</Text>
+            </Pressable>
+          ) : null}
+          {onOtherAccount ? (
+            <Pressable accessibilityRole="button" onPress={onOtherAccount} hitSlop={8} style={styles.forgot}>
+              <Text style={styles.otherText}>{t('pin.otherAccount')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     />
   );
@@ -178,6 +191,8 @@ const styles = StyleSheet.create({
   keyFace: { backgroundColor: Brand.colors.card, elevation: 1, shadowColor: '#94A3B8', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.12, shadowRadius: 6 },
   keyPressed: { opacity: 0.6 },
   keyText: { color: Brand.colors.text, fontFamily: Brand.font.bold, fontSize: 28 },
-  forgot: { marginTop: 18, paddingVertical: 8 },
+  links: { alignItems: 'center', marginTop: 10 },
+  forgot: { paddingVertical: 8 },
   forgotText: { color: Brand.colors.primary, fontFamily: Brand.font.bold, fontSize: 15 },
+  otherText: { color: Brand.colors.textMuted, fontFamily: Brand.font.bold, fontSize: 14 },
 });
