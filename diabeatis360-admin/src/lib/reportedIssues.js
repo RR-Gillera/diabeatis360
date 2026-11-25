@@ -12,6 +12,21 @@ export const reportCategoryLabels = {
 
 export const REPLY_MAX = 1000
 
+/**
+ * A report's status (D59): `open` is the admin's turn, `awaiting_reporter` means the admin asked the reporter something and
+ * is waiting for the answer, `resolved` is closed. Anything else (there should be nothing else) counts as open, so a report
+ * can never drop out of the admin's list.
+ */
+export const reportStatusLabels = {
+  open: 'Open',
+  awaiting_reporter: 'Waiting for reporter',
+  resolved: 'Resolved',
+}
+
+export function reportStatus(value) {
+  return value === 'resolved' || value === 'awaiting_reporter' ? value : 'open'
+}
+
 /** The account a conduct report flags, and which collection holds its active/inactive switch. */
 export function flaggedAccount(report) {
   if (report.category === 'doctor_conduct') return { id: report.reported_user_id || '', kind: 'doctor' }
@@ -33,7 +48,7 @@ export function issueRows(reports, users, providers) {
         category: report.category,
         categoryLabel: reportCategoryLabels[report.category] || 'Other',
         message: String(report.message || ''),
-        status: report.status === 'resolved' ? 'resolved' : 'open',
+        status: reportStatus(report.status),
         adminReply: String(report.admin_reply || ''),
         createdAt: report.created_at,
         resolvedAt: report.resolved_at,
@@ -59,6 +74,26 @@ function millis(value) {
   if (typeof value.toMillis === 'function') return value.toMillis()
   if (value instanceof Date) return value.getTime()
   return 0
+}
+
+/**
+ * The conversation on one report, oldest first (D59): the Report_Replies documents, plus the single `admin_reply` of a
+ * report resolved before D59, so an old answer still shows. A reply just sent has no server time yet and goes last.
+ */
+export function conversation(row, replies) {
+  const messages = replies.map((reply) => ({
+    id: reply.id,
+    from: reply.sender_role === 'admin' ? 'admin' : 'reporter',
+    message: String(reply.message || ''),
+    createdAt: reply.created_at,
+  }))
+  if (row.adminReply) messages.push({ id: 'admin_reply', from: 'admin', message: row.adminReply, createdAt: row.resolvedAt })
+  return messages.sort((a, b) => millis(a.createdAt) - millis(b.createdAt))
+}
+
+/** The in-app notification text the reporter receives when an admin replies and waits for their answer (D59). */
+export function replyMessage(reply) {
+  return `An admin replied to your report and is waiting for your answer: ${String(reply || '').trim()}`
 }
 
 /** The in-app notification text the reporter receives when an admin resolves their report. */

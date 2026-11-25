@@ -397,7 +397,7 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await allow('p1 reads chat of own booking', getDocs(query(collection(p1, 'Messages'), where('booking_id', '==', 'bConfirmed'))));
   await allow('d1 reads chat of own booking', getDocs(query(collection(d1, 'Messages'), where('booking_id', '==', 'bConfirmed'))));
   await deny('p2 reads chat of p1 booking', getDocs(query(collection(p2, 'Messages'), where('booking_id', '==', 'bConfirmed'))));
-  await deny('admin reads chat', getDocs(query(collection(a1, 'Messages'), where('booking_id', '==', 'bConfirmed'))));
+  await deny('admin reads a chat nobody reported (D58)', getDocs(query(collection(a1, 'Messages'), where('booking_id', '==', 'bConfirmed'))));
   await deny('edit a message', updateDoc(doc(p1, 'Messages/m1'), { message: 'changed' }));
   await deny('delete a message', require('firebase/firestore').deleteDoc(doc(p1, 'Messages/m1')));
 
@@ -628,7 +628,7 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await allow('the doctor reads their own note', getDoc(doc(d1, 'Consultation_Notes/bDone')));
   await deny('another patient cannot read it', getDoc(doc(p2, 'Consultation_Notes/bDone')));
   await deny('another doctor cannot read it', getDoc(doc(d9, 'Consultation_Notes/bDone')));
-  await deny('not even an admin can read it', getDoc(doc(a1, 'Consultation_Notes/bDone')));
+  await deny('an admin cannot read it while nobody has reported the consultation (D58)', getDoc(doc(a1, 'Consultation_Notes/bDone')));
   await deny('anonymous cannot read it', getDoc(doc(anon, 'Consultation_Notes/bDone')));
   await allow('the doctor edits their note', setDoc(doc(d1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 'Edited.' })));
   await deny('the patient cannot edit it', setDoc(doc(p1, 'Consultation_Notes/bDone'), note('bDone', 'p1', 'd1', { summary: 'Edited by patient.' })));
@@ -930,22 +930,141 @@ const without = (data, key) => Object.fromEntries(Object.entries(data).filter(([
   await deny('D51: the time must be the server\'s', setDoc(doc(p1, 'Reports/r8'), report('p1', { created_at: Timestamp.now() })));
   await deny('D51: no extra fields (e.g. admin_reply)', setDoc(doc(p1, 'Reports/r9'), report('p1', { admin_reply: 'Fixed!' })));
   await deny('D51: an app problem cannot name a person', setDoc(doc(p1, 'Reports/r10'), report('p1', { reported_user_id: 'd1', booking_id: 'bConfirmed' })));
-  await allow('D51: p1 flags the doctor of their booking', setDoc(doc(p1, 'Reports/rFlagDoctor'), flagDoctor()));
-  await allow('D51: the doctor flags the patient of their booking', setDoc(doc(d1, 'Reports/rFlagPatient'), flagPatient()));
-  await deny('D51: a conduct report needs the person', setDoc(doc(p1, 'Reports/r11'), without(flagDoctor(), 'reported_user_id')));
-  await deny('D51: a conduct report needs the booking', setDoc(doc(p1, 'Reports/r12'), without(flagDoctor(), 'booking_id')));
-  await deny('D51: p2 cannot flag a doctor through a booking that is not theirs', setDoc(doc(p2, 'Reports/r13'), { ...flagDoctor(), reporter_id: 'p2' }));
-  await deny('D51: p1 cannot flag a doctor who is not on the booking', setDoc(doc(p1, 'Reports/r14'), flagDoctor({ reported_user_id: 'd2' })));
-  await deny('D51: a patient cannot use "patient conduct" to flag another patient', setDoc(doc(p1, 'Reports/r15'), flagDoctor({ category: 'patient_conduct', reported_user_id: 'p2' })));
-  await deny('D51: a doctor cannot flag a patient through a booking that is not theirs', setDoc(doc(signedIn('d5').firestore(), 'Reports/r16'), { ...flagPatient(), reporter_id: 'd5' }));
+  // A conduct report is filed as "<bookingId>_<reporterId>" (D58), so the refusals below use that id: each is refused
+  // for the reason its name gives, not for a wrong id.
+  await deny('D51: a conduct report needs the person', setDoc(doc(p1, 'Reports/bConfirmed_p1'), without(flagDoctor(), 'reported_user_id')));
+  await deny('D51: a conduct report needs the booking', setDoc(doc(p1, 'Reports/bConfirmed_p1'), without(flagDoctor(), 'booking_id')));
+  await deny('D51: p2 cannot flag a doctor through a booking that is not theirs', setDoc(doc(p2, 'Reports/bConfirmed_p2'), { ...flagDoctor(), reporter_id: 'p2' }));
+  await deny('D51: p1 cannot flag a doctor who is not on the booking', setDoc(doc(p1, 'Reports/bConfirmed_p1'), flagDoctor({ reported_user_id: 'd2' })));
+  await deny('D51: a patient cannot use "patient conduct" to flag another patient', setDoc(doc(p1, 'Reports/bConfirmed_p1'), flagDoctor({ category: 'patient_conduct', reported_user_id: 'p2' })));
+  await deny('D51: a doctor cannot flag a patient through a booking that is not theirs', setDoc(doc(signedIn('d5').firestore(), 'Reports/bConfirmed_d5'), { ...flagPatient(), reporter_id: 'd5' }));
+  await deny('D58: a conduct report under any other id is refused', setDoc(doc(p1, 'Reports/rFlagDoctor'), flagDoctor()));
+  await deny('D58: ...including the id of the other person\'s report', setDoc(doc(p1, 'Reports/bConfirmed_d1'), flagDoctor()));
+  await deny('D58: a doctor cannot take the id of the patient\'s report with a general report (to stop them reporting)', setDoc(doc(d1, 'Reports/bDone_p1'), report('d1', { reporter_role: 'doctor' })));
+  await deny('D58: ...nor with a conduct report of their own', setDoc(doc(d1, 'Reports/bDone_p1'), flagPatient({ booking_id: 'bDone' })));
+  await allow('D51: p1 flags the doctor of their booking', setDoc(doc(p1, 'Reports/bConfirmed_p1'), flagDoctor()));
+  await allow('D51: the doctor flags the patient of their booking', setDoc(doc(d1, 'Reports/bConfirmed_d1'), flagPatient()));
+  await deny('D58: one conduct report per person per booking (a second one would overwrite the first)', setDoc(doc(p1, 'Reports/bConfirmed_p1'), flagDoctor({ message: 'And another thing happened.' })));
   await deny('D51: the reporter cannot change their report', updateDoc(doc(p1, 'Reports/r1'), { message: 'Something else entirely.' }));
   await deny('D51: the reporter cannot resolve their own report', updateDoc(doc(p1, 'Reports/r1'), { status: 'resolved' }));
   await allow('D51: an admin replies and resolves under their own name', updateDoc(doc(a1, 'Reports/r1'), { status: 'resolved', admin_reply: 'Fixed in the latest update.', resolved_by: 'a1', resolved_at: serverTimestamp() }));
-  await deny('D51: an admin cannot resolve in another admin\'s name', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { status: 'resolved', resolved_by: 'a-someone-else' }));
-  await deny('D51: an admin cannot rewrite what the reporter said', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { message: 'Edited by admin.' }));
-  await deny('D51: an admin reply over 1,000 characters is refused', updateDoc(doc(a1, 'Reports/rFlagDoctor'), { admin_reply: 'x'.repeat(1001) }));
+  await deny('D51: an admin cannot resolve in another admin\'s name', updateDoc(doc(a1, 'Reports/bConfirmed_p1'), { status: 'resolved', resolved_by: 'a-someone-else' }));
+  await deny('D51: an admin cannot rewrite what the reporter said', updateDoc(doc(a1, 'Reports/bConfirmed_p1'), { message: 'Edited by admin.' }));
+  await deny('D51: an admin reply over 1,000 characters is refused', updateDoc(doc(a1, 'Reports/bConfirmed_p1'), { admin_reply: 'x'.repeat(1001) }));
   await allow('D51: an admin reopens a report', updateDoc(doc(a1, 'Reports/r1'), { status: 'open' }));
   await deny('D51: nobody deletes a report, not even an admin', deleteDoc(doc(a1, 'Reports/r1')));
+
+  // ---- D58: an admin investigating a conduct report reads that consultation's chat and notes, after recording it
+  // bConfirmed now has reports both ways (bConfirmed_p1, bConfirmed_d1); bDone has none.
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'Admins/a1'), { full_name: 'Admin One', role: 'super_admin' });
+    await setDoc(doc(ctx.firestore(), 'Admins/a2'), { full_name: 'Admin Two', role: 'admin' });
+    await setDoc(doc(ctx.firestore(), 'Consultation_Notes/bConfirmed'), { booking_id: 'bConfirmed', patient_id: 'p1', provider_id: 'd1', summary: 'Notes.', updated_at: Timestamp.now() });
+  });
+  const a2 = signedIn('a2').firestore();
+  const chatOf = (db, bookingId) => getDocs(query(collection(db, 'Messages'), where('booking_id', '==', bookingId)));
+  const opening = (bookingId, admin = 'a1', over = {}) => ({
+    admin_id: admin, admin_name: admin === 'a1' ? 'Admin One' : 'Admin Two', booking_id: bookingId, report_id: `${bookingId}_p1`,
+    first_opened_at: serverTimestamp(), last_opened_at: serverTimestamp(), open_count: 1, ...over,
+  });
+  const logOf = (db, bookingId, admin = 'a1') => doc(db, `Admin_Access_Log/${bookingId}_${admin}`);
+
+  await deny('D58: before recording it, an admin cannot read the reported chat', chatOf(a1, 'bConfirmed'));
+  await deny('D58: ...nor the doctor\'s notes', getDoc(doc(a1, 'Consultation_Notes/bConfirmed')));
+  await deny('D58: no record for a consultation nobody reported', setDoc(logOf(a1, 'bDone'), opening('bDone')));
+  await deny('D58: no record that names a report on another booking', setDoc(logOf(a1, 'bDone'), opening('bDone', 'a1', { report_id: 'bConfirmed_p1' })));
+  await deny('D58: no record in another admin\'s name', setDoc(logOf(a1, 'bConfirmed', 'a2'), opening('bConfirmed', 'a2')));
+  await deny('D58: the name must be the one on the admin\'s own record', setDoc(logOf(a1, 'bConfirmed'), opening('bConfirmed', 'a1', { admin_name: 'Someone Else' })));
+  await deny('D58: the time must be the server\'s', setDoc(logOf(a1, 'bConfirmed'), opening('bConfirmed', 'a1', { first_opened_at: Timestamp.now() })));
+  await deny('D58: the count starts at 1', setDoc(logOf(a1, 'bConfirmed'), opening('bConfirmed', 'a1', { open_count: 0 })));
+  await deny('D58: no extra fields', setDoc(logOf(a1, 'bConfirmed'), opening('bConfirmed', 'a1', { note: 'just looking' })));
+  await deny('D58: a record must be filed under "<bookingId>_<adminUid>"', setDoc(doc(a1, 'Admin_Access_Log/anything'), opening('bConfirmed')));
+  await deny('D58: a patient cannot make a record (and so cannot open the chat this way)', setDoc(logOf(p1, 'bConfirmed', 'p1'), opening('bConfirmed', 'p1', { admin_name: '' })));
+  await allow('D58: an admin records opening the reported consultation', setDoc(logOf(a1, 'bConfirmed'), opening('bConfirmed')));
+  await allow('D58: ...then reads its chat', chatOf(a1, 'bConfirmed'));
+  await allow('D58: ...and the doctor\'s notes', getDoc(doc(a1, 'Consultation_Notes/bConfirmed')));
+  await deny('D58: still no chat nobody reported', chatOf(a1, 'bDone'));
+  await deny('D58: ...nor its notes', getDoc(doc(a1, 'Consultation_Notes/bDone')));
+  await deny('D58: another admin who has not recorded opening it cannot read it', chatOf(a2, 'bConfirmed'));
+  await deny('D58: the admin still cannot change a message', updateDoc(doc(a1, 'Messages/m1'), { message: 'changed by admin' }));
+  await deny('D58: ...or delete one', deleteDoc(doc(a1, 'Messages/m1')));
+  await deny('D58: ...or write the doctor\'s notes', setDoc(doc(a1, 'Consultation_Notes/bConfirmed'), { booking_id: 'bConfirmed', patient_id: 'p1', provider_id: 'd1', summary: 'Rewritten.', updated_at: serverTimestamp() }));
+  await allow('D58: each later opening adds one to the count', updateDoc(logOf(a1, 'bConfirmed'), { last_opened_at: serverTimestamp(), open_count: 2 }));
+  await allow('D58: ...and may name the other side\'s report', updateDoc(logOf(a1, 'bConfirmed'), { report_id: 'bConfirmed_d1', last_opened_at: serverTimestamp(), open_count: 3 }));
+  // Exactly what the admin panel sends (services/conversationReview.js): the count as increment(1). The count is now 4.
+  await allow('D58: the panel\'s increment(1) counts as one more opening', updateDoc(logOf(a1, 'bConfirmed'), { report_id: 'bConfirmed_p1', last_opened_at: serverTimestamp(), open_count: require('firebase/firestore').increment(1) }));
+  await deny('D58: the count cannot be reset', updateDoc(logOf(a1, 'bConfirmed'), { last_opened_at: serverTimestamp(), open_count: 1 }));
+  await deny('D58: the count goes up by exactly one', updateDoc(logOf(a1, 'bConfirmed'), { last_opened_at: serverTimestamp(), open_count: 10 }));
+  await deny('D58: the first-opened time never changes', updateDoc(logOf(a1, 'bConfirmed'), { first_opened_at: serverTimestamp(), last_opened_at: serverTimestamp(), open_count: 5 }));
+  await deny('D58: the later time must be the server\'s', updateDoc(logOf(a1, 'bConfirmed'), { last_opened_at: Timestamp.fromMillis(1), open_count: 5 }));
+  await deny('D58: another admin cannot add to this admin\'s record', updateDoc(logOf(a2, 'bConfirmed'), { last_opened_at: serverTimestamp(), open_count: 5 }));
+  await deny('D58: nobody deletes a record, not even its admin', deleteDoc(logOf(a1, 'bConfirmed')));
+  await allow('D58: an admin can check for their own record before it exists (the panel does, before the first opening)', getDoc(logOf(a2, 'bConfirmed', 'a2')));
+  await allow('D58: admins read the records of a consultation', getDocs(query(collection(a2, 'Admin_Access_Log'), where('booking_id', '==', 'bConfirmed'))));
+  await deny('D58: the reported doctor cannot read them', getDoc(logOf(d1, 'bConfirmed')));
+  await deny('D58: ...nor the patient', getDoc(logOf(p1, 'bConfirmed')));
+
+  // ---- D59: a conversation on a report (the admin asks for details without resolving; the reporter answers)
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const base = { reporter_role: 'patient', category: 'app_problem', message: 'The app is acting strange.', created_at: Timestamp.now() };
+    await setDoc(doc(ctx.firestore(), 'Reports/rAsk'), { ...base, reporter_id: 'p1', status: 'open' });
+    await setDoc(doc(ctx.firestore(), 'Reports/rClosed'), { ...base, reporter_id: 'p1', status: 'resolved' });
+  });
+  const reply = (reportId, sender, role, over = {}) => ({
+    report_id: reportId, reporter_id: 'p1', sender_id: sender, sender_role: role,
+    message: 'Which screen were you on when it happened?', created_at: serverTimestamp(), ...over,
+  });
+  // The admin's "Send reply": the reply and the new status in one write, as services/reportedIssues.js does it.
+  const adminAsks = (replyId, reportId = 'rAsk', over = {}) => {
+    const batch = writeBatch(a1);
+    batch.set(doc(a1, `Report_Replies/${replyId}`), reply(reportId, 'a1', 'admin', over));
+    batch.update(doc(a1, `Reports/${reportId}`), { status: 'awaiting_reporter' });
+    return batch.commit();
+  };
+  // The reporter's answer, as report-service.ts does it: back to the admin's Open list when the admin was waiting.
+  const reporterAnswers = (db, uid, replyId, { reopen = true, over = {} } = {}) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, `Report_Replies/${replyId}`), reply('rAsk', uid, 'reporter', { message: 'The Log screen, after I tap Save.', ...over }));
+    if (reopen) batch.update(doc(db, 'Reports/rAsk'), { status: 'open' });
+    return batch.commit();
+  };
+
+  await deny('D59: an admin cannot reply in another admin\'s name', setDoc(doc(a1, 'Report_Replies/x1'), reply('rAsk', 'a-someone-else', 'admin')));
+  await deny('D59: an admin cannot pose as the reporter', setDoc(doc(a1, 'Report_Replies/x2'), reply('rAsk', 'a1', 'reporter')));
+  await deny('D59: the reply must carry the report\'s own reporter', setDoc(doc(a1, 'Report_Replies/x3'), reply('rAsk', 'a1', 'admin', { reporter_id: 'p2' })));
+  await deny('D59: an empty reply is refused', setDoc(doc(a1, 'Report_Replies/x4'), reply('rAsk', 'a1', 'admin', { message: '' })));
+  await deny('D59: a reply over 1,000 characters is refused', setDoc(doc(a1, 'Report_Replies/x5'), reply('rAsk', 'a1', 'admin', { message: 'x'.repeat(1001) })));
+  await deny('D59: the time must be the server\'s', setDoc(doc(a1, 'Report_Replies/x6'), reply('rAsk', 'a1', 'admin', { created_at: Timestamp.now() })));
+  await deny('D59: no extra fields', setDoc(doc(a1, 'Report_Replies/x7'), reply('rAsk', 'a1', 'admin', { is_read: false })));
+  await deny('D59: no reply to a report that does not exist', setDoc(doc(a1, 'Report_Replies/x8'), reply('rMissing', 'a1', 'admin')));
+  await deny('D59: an unknown status is refused', updateDoc(doc(a1, 'Reports/rAsk'), { status: 'pending' }));
+  await allow('D59: an admin asks the reporter for details without resolving', adminAsks('q1'));
+  await allow('D59: the reporter reads the replies on their reports', getDocs(query(collection(p1, 'Report_Replies'), where('reporter_id', '==', 'p1'))));
+  await deny('D59: ...but cannot list everyone\'s replies', getDocs(collection(p1, 'Report_Replies')));
+  await allow('D59: an admin reads the conversation on a report', getDocs(query(collection(a1, 'Report_Replies'), where('report_id', '==', 'rAsk'))));
+  await deny('D59: another patient cannot read it', getDoc(doc(p2, 'Report_Replies/q1')));
+  await deny('D59: a doctor cannot read it', getDoc(doc(d1, 'Report_Replies/q1')));
+  await deny('D59: signed-out cannot read it', getDoc(doc(anon, 'Report_Replies/q1')));
+  await deny('D59: a patient cannot reply as an admin', setDoc(doc(p1, 'Report_Replies/x9'), reply('rAsk', 'p1', 'admin')));
+  await deny('D59: another patient cannot reply on p1\'s report', reporterAnswers(p2, 'p2', 'x10', { reopen: false }));
+  await deny('D59: ...nor put it back in the admin\'s list', updateDoc(doc(p2, 'Reports/rAsk'), { status: 'open' }));
+  await deny('D59: the reporter cannot resolve while the admin waits', updateDoc(doc(p1, 'Reports/rAsk'), { status: 'resolved' }));
+  await deny('D59: ...nor change their report while answering', updateDoc(doc(p1, 'Reports/rAsk'), { status: 'open', message: 'Rewritten report text.' }));
+  await allow('D59: the reporter answers, and the report goes back to Open', reporterAnswers(p1, 'p1', 'a1Answer'));
+  await deny('D59: the reporter cannot mark it waiting themselves', updateDoc(doc(p1, 'Reports/rAsk'), { status: 'awaiting_reporter' }));
+  await allow('D59: the reporter adds more details to an Open report', reporterAnswers(p1, 'p1', 'a2Answer', { reopen: false, over: { message: 'It also happens on the Home screen.' } }));
+  await deny('D59: nobody edits a sent reply', updateDoc(doc(p1, 'Report_Replies/a1Answer'), { message: 'Edited.' }));
+  await deny('D59: nobody deletes a reply, not even an admin', deleteDoc(doc(a1, 'Report_Replies/q1')));
+  await deny('D59: no reply on a resolved report, from the reporter', setDoc(doc(p1, 'Report_Replies/x11'), reply('rClosed', 'p1', 'reporter')));
+  await deny('D59: ...nor from an admin (reopen it first)', setDoc(doc(a1, 'Report_Replies/x12'), reply('rClosed', 'a1', 'admin')));
+  await allow('D59: an admin resolves with a closing message in one write', (() => {
+    const batch = writeBatch(a1);
+    batch.set(doc(a1, 'Report_Replies/closing'), reply('rAsk', 'a1', 'admin', { message: 'Fixed in version 1.2.1. Thank you!' }));
+    batch.update(doc(a1, 'Reports/rAsk'), { status: 'resolved', resolved_by: 'a1', resolved_at: serverTimestamp() });
+    return batch.commit();
+  })());
+  await deny('D59: once resolved, the reporter can no longer reply', reporterAnswers(p1, 'p1', 'x13', { reopen: false }));
+  await deny('D59: ...nor reopen it', updateDoc(doc(p1, 'Reports/rAsk'), { status: 'open' }));
 
   // ---- App_Pins (D53): the account's PIN hash, readable and writable by its owner only
   const pinDoc = (extra = {}) => ({ salt: 'a'.repeat(32), hash: 'b'.repeat(64), failed_attempts: 0, updated_at: serverTimestamp(), ...extra });

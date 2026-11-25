@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { flaggedAccount, issueRows, resolvedMessage } from './reportedIssues.js'
+import { conversation, flaggedAccount, issueRows, replyMessage, reportStatus, resolvedMessage } from './reportedIssues.js'
 
 const users = { p1: { full_name: 'Pat One', is_active: true }, d1: { full_name: 'Dr One (profile)' } }
 const providers = { d1: { full_name: 'Dr One', is_active: false } }
@@ -29,6 +29,31 @@ test('newest first, and a report without a server time yet comes first', () => {
     { id: 'pending' },
   ], users, providers)
   assert.deepEqual(rows.map((row) => row.id), ['pending', 'new', 'old'])
+})
+
+test('D59: the three statuses, and anything unknown counts as open (it never leaves the admin\'s list)', () => {
+  assert.equal(reportStatus('awaiting_reporter'), 'awaiting_reporter')
+  assert.equal(reportStatus('resolved'), 'resolved')
+  assert.equal(reportStatus('open'), 'open')
+  assert.equal(reportStatus(undefined), 'open')
+  assert.equal(issueRows([{ id: 'r1', status: 'awaiting_reporter' }], users, providers)[0].status, 'awaiting_reporter')
+})
+
+test('D59: the conversation is oldest first, keeps an old single reply, and puts a reply still sending last', () => {
+  const at = (ms) => ({ toMillis: () => ms })
+  const row = { adminReply: 'Fixed before replies existed.', resolvedAt: at(3) }
+  const thread = conversation(row, [
+    { id: 'answer', sender_role: 'reporter', message: 'The Log screen.', created_at: at(2) },
+    { id: 'sending', sender_role: 'admin', message: 'Thanks!' },
+    { id: 'ask', sender_role: 'admin', message: 'Which screen?', created_at: at(1) },
+  ])
+  assert.deepEqual(thread.map((item) => item.id), ['ask', 'answer', 'admin_reply', 'sending'])
+  assert.deepEqual(thread.map((item) => item.from), ['admin', 'reporter', 'admin', 'admin'])
+  assert.deepEqual(conversation({ adminReply: '' }, []), [])
+})
+
+test('D59: a reply that waits for an answer says so in the notification', () => {
+  assert.equal(replyMessage('  Can you tell us which screen?  '), 'An admin replied to your report and is waiting for your answer: Can you tell us which screen?')
 })
 
 test('the reporter is told the reply, or a plain thank-you without one', () => {

@@ -14,12 +14,14 @@ export default function PrivacyPolicyScreen() {
 }
 
 // Data Privacy Act (RA 10173): a patient must be told who can see their health data. This mirrors firestore.rules, so if
-// a rule there changes who can read Users, Glucose_Logs, Bookings, Messages or Consultation_Notes, change this text too.
+// a rule there changes who can read Users, Glucose_Logs, Bookings, Messages or Consultation_Notes, change this text too
+// (D57, D58).
 const WHO_CAN_SEE = 'Doctors: only a doctor you book can see your health profile and blood sugar readings. '
   + 'Diabeatis360 administrators: the project team runs the system and can view account details, health profiles, blood sugar readings, bookings, subscriptions and points. '
   + 'They use this only to verify doctors and guardians, answer your problem reports, keep accounts safe, and make usage reports. '
   + 'They can activate or deactivate an account but cannot change your health information or readings. '
-  + 'Private to you and your doctor: your consultation chat, video calls and the doctor\'s consultation notes. Administrators cannot open them. '
+  + 'Private to you and your doctor: your consultation chat, video calls and the doctor\'s consultation notes. Video calls are never recorded. '
+  + 'If you or your doctor reports the other, an administrator can read the chat and the doctor\'s notes of that one consultation to investigate the report. Each time an administrator opens them is recorded. No other chat can be opened by an administrator. '
   + 'Private to you only: your emergency contacts and your app PIN.';
 
 function PolicySection({ title, text }: { title: string; text: string }) { return <View style={styles.section}><Text style={styles.sectionTitle}>{title}</Text><Text style={styles.body}>{text}</Text></View>; }

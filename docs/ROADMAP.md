@@ -67,7 +67,7 @@ Update checkboxes as you go: [ ] todo · [~] built in code, not yet device-verif
 - [~] Video call signaling (DECISIONS D11, closed) [item 16]: ringing, Accept/Decline, cancel, 30 s missed call with notification, in-app Jitsi (WebView / iframe) with a random room token. Built and rules-tested (149/149); needs a two-phone test for camera, microphone and real-device ringing. Rings only while the app is open (no FCM).
 
 ## D51 (2026-11-20): features the manuscript promises, built beyond Table 24
-- [x] Report a problem / flag an account + admin Reported Issues (Table 31 #6) — built and browser-tested 2026-11-20
+- [x] Report a problem / flag an account + admin Reported Issues (Table 31 #6) — built and browser-tested 2026-11-20; admin replies without resolving + reporter answers (D59) built 2026-11-25, not yet browser-tested
 - [x] Gamification milestones (tier progress) and automatic weekly challenges (Gantt 5.5) — built and browser-tested 2026-11-20
 - [x] AI Diabetes Risk Prediction: rule-based level + Gemini advice (Gantt 5.3) — built and browser-tested 2026-11-20 (fake Gemini); **redeploy Vercel**
 

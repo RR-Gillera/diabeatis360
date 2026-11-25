@@ -34,6 +34,71 @@ export function reportProblem(category: string | null, message: string): ReportP
   return null;
 }
 
+// ---- The conversation on a report (DECISIONS.md D59): the admin can ask for more details before resolving it.
+
+/**
+ * `open`: the admin's turn. `awaiting_reporter`: the admin asked you something and is waiting for your answer.
+ * `resolved`: closed. Anything else counts as open.
+ */
+export type ReportStatus = 'open' | 'awaiting_reporter' | 'resolved';
+
+export function reportStatus(value: unknown): ReportStatus {
+  return value === 'resolved' || value === 'awaiting_reporter' ? value : 'open';
+}
+
+export const REPLY_MAX = 1000;
+
+/** The reporter may add to the conversation at any time until the report is resolved (team decision, D59). */
+export function canReply(status: ReportStatus) {
+  return status !== 'resolved';
+}
+
+export type ReplyProblem = 'empty' | 'tooLong' | null;
+
+/** What is wrong with a reply before it is sent, or null. Spaces at the ends do not count. */
+export function replyProblem(message: string): ReplyProblem {
+  const length = message.trim().length;
+  if (length === 0) return 'empty';
+  if (length > REPLY_MAX) return 'tooLong';
+  return null;
+}
+
+/** The fields of the reporter's Report_Replies document, without `created_at` (the service adds the server's time). */
+export function replyFields(reportId: string, reporterId: string, message: string) {
+  return {
+    report_id: reportId,
+    reporter_id: reporterId,
+    sender_id: reporterId,
+    sender_role: 'reporter' as const,
+    message: message.trim(),
+  };
+}
+
+export type ReplyEntry = { id: string; reportId: string; from: 'admin' | 'reporter'; message: string; createdAt: Date | null };
+
+/**
+ * One report's conversation, oldest first: its replies, plus the single `admin_reply` of a report answered before D59
+ * (dated when it was resolved), so an old answer still shows. A reply still sending has no server time yet: it goes last.
+ */
+export function conversationFor(
+  report: { id: string; adminReply: string; resolvedAt: Date | null },
+  replies: ReplyEntry[],
+): ReplyEntry[] {
+  const thread = replies.filter((reply) => reply.reportId === report.id);
+  if (report.adminReply) {
+    thread.push({ id: `${report.id}-admin_reply`, reportId: report.id, from: 'admin', message: report.adminReply, createdAt: report.resolvedAt });
+  }
+  const time = (entry: ReplyEntry) => entry.createdAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  return thread.sort((a, b) => time(a) - time(b));
+}
+
+/** "Your reports": the ones waiting for your answer first, then newest first. A report just sent counts as newest. */
+export function sortMyReports<T extends { status: ReportStatus; createdAt: Date | null }>(reports: T[]): T[] {
+  const waiting = (report: T) => (report.status === 'awaiting_reporter' ? 1 : 0);
+  const time = (report: T) => report.createdAt?.getTime() ?? Number.MAX_SAFE_INTEGER;
+  return [...reports].sort((a, b) => waiting(b) - waiting(a) || time(b) - time(a));
+}
+
 export type ReportDraft = {
   reporterId: string;
   reporterRole: ReporterRole;
@@ -58,4 +123,12 @@ export function reportFields(draft: ReportDraft) {
   };
   if (!isConductCategory(draft.category)) return base;
   return { ...base, reported_user_id: draft.reportedUserId ?? '', booking_id: draft.bookingId ?? '' };
+}
+
+/**
+ * The document id of a conduct report: "<bookingId>_<reporterId>" (DECISIONS.md D58). firestore.rules forces this id, so
+ * each person can report the other on a booking once, and an admin investigating it can open that booking's chat.
+ */
+export function conductReportId(bookingId: string, reporterId: string) {
+  return `${bookingId}_${reporterId}`;
 }

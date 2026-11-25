@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { conductCategoryFor, REPORT_MESSAGE_MAX, reportFields, reportProblem } from './report-form.ts';
+import { conductCategoryFor, conductReportId, REPORT_MESSAGE_MAX, reportFields, reportProblem } from './report-form.ts';
 
 test('a report needs a category the system knows', () => {
   assert.equal(reportProblem(null, 'The chart does not load.'), 'category');
@@ -33,4 +33,8 @@ test('a conduct report carries the person and the booking', () => {
   assert.equal(fields.reported_user_id, 'd1');
   assert.equal(fields.booking_id, 'b1');
   assert.equal(fields.status, 'open');
+});
+
+test('a conduct report is filed under "<bookingId>_<reporterId>" (D58), the id firestore.rules expects', () => {
+  assert.equal(conductReportId('bk123', 'p1'), 'bk123_p1');
 });
