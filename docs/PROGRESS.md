@@ -365,3 +365,9 @@ Append newest at the bottom. Format:
 - **Files:** mobile `features/pin/{pin-reset-rules.ts,pin-reset-rules.test.mjs,pin-reset-service.ts,pin-forgot.tsx}` (new), `features/pin/{pin-gate.tsx,pin-ui.tsx}`, `features/auth/{social-service.ts,auth-ui.tsx}`, `i18n/{en,fil}.ts`; docs DECISIONS D56, MANUSCRIPT_CHANGES.
 - **Verified:** mobile unit 277 pass / 6 skipped, `tsc` and lint clean. **Not run on a phone** (the PIN is off on web).
 - **To do:** APK test of each path; a native speaker checks the Filipino lines.
+
+## 2026-11-25 — Claude Code — What admins can see, and the privacy policy says so (D57)
+- **Done:** checked every admin power against `firestore.rules`. Admins can already do every admin function in MODULES.md, so no rule changed. The deliberate limits (chat, calls, consultation notes, editing health data, emergency contacts, PIN, making admins, deleting accounts) are written down with reasons in D57. The patient app's Privacy Policy now has "Who can see your information" (RA 10173).
+- **Files:** mobile `app/privacy-policy.tsx`; docs DECISIONS D57, MANUSCRIPT_CHANGES E3.
+- **Verified:** mobile `tsc` and lint clean. **Not run on a phone** (text-only change; can go out OTA).
+- **To do:** the team adds the admin-access line to the manuscript (E3).

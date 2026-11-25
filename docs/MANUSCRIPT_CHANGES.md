@@ -192,6 +192,7 @@ Unchanged in Capstone 2, so everything below is still open. Say once, above Tabl
   - Firestore security rules that deny by default. Roles are proven by the `Providers` and `Admins` documents (D9).
   - AI, scan and wallet records are written only by the server.
   - Booking privacy (D22): a doctor sees a patient's data only after being booked by them.
+  - Admin access (D57): admins (the team) can view account, health profile, blood sugar and booking data to run the system and make reports, but cannot change health data or open the consultation chat, calls or doctor's notes. The in-app Privacy Policy now says so.
   - A 6-digit app PIN; only a salted hash is kept, on the phone (D42).
   - Video rooms only the two people on an accepted call can enter, never recorded (D39).
   - Report access [AFTER BUILD]: only the reporter and admins can read a report.
