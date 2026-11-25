@@ -41,16 +41,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels and take your profile photo.",
-          "recordAudioAndroid": false
+          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels, take your profile photo and join video consultations.",
+          "microphonePermission": "Allow Diabeatis360 to use the microphone so your doctor can hear you during video consultations.",
+          "recordAudioAndroid": true
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Allow Diabeatis360 to use a photo from your library as your profile photo.",
-          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels and take your profile photo.",
-          "microphonePermission": false
+          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels, take your profile photo and join video consultations.",
+          "microphonePermission": "Allow Diabeatis360 to use the microphone so your doctor can hear you during video consultations."
         }
       ],
       [
