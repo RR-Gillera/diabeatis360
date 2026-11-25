@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext'
 import { EyeIcon, LockIcon, LogoMark, MailIcon } from '../components/icons'
 import { sendAdminPasswordReset, signInAdmin } from '../services/adminAccount'
 import { useResetEmail } from '../lib/useResetEmail'
+import LoginSlideshow from './login/LoginSlideshow'
 
 const LAST_EMAIL_KEY = 'diabeatis360:lastAdminEmail'
 
@@ -150,15 +151,24 @@ export default function LoginPage() {
   const loginInvalid = Boolean(error || authMessage)
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f5] px-4 py-6">
-      <div className="flex w-full max-w-[70rem] items-center justify-center gap-14">
-        {/* Left column: logo, heading, form card, footer */}
+    // Page grey #f1f2f4 is the background baked into public/login-hero.png, so the first slide's edges disappear.
+    <div className="flex min-h-screen items-center justify-center bg-[#f1f2f4] px-4 py-6">
+      <div className="flex w-full max-w-[76rem] items-center justify-center gap-16">
+        {/* Left: slideshow of what the portal does. Hidden below the lg breakpoint so the form gets the whole width. */}
+        <div className="hidden min-w-0 max-w-[39rem] flex-1 lg:block">
+          <LoginSlideshow />
+        </div>
+
+        {/* Right column: logo, heading, form card, footer */}
         <div className="flex w-full max-w-[27.5rem] shrink-0 flex-col items-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <LogoMark className="h-9 w-9 object-contain" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <LogoMark className="h-10 w-10 object-contain" />
           </div>
-          <h1 className="mt-3 text-[1.75rem] font-extrabold tracking-tight text-ink">Diabeatis360</h1>
-          <p className="mt-1 text-center text-[15px] text-gray-600">
+          {/* "360" uses the Figma green: allowed for large bold text (3.33:1 passes the 3:1 large-text rule, D37). */}
+          <h1 className="mt-4 text-[2.125rem] font-extrabold tracking-tight text-ink">
+            Diabeatis<span className="text-[#629c2c]">360</span>
+          </h1>
+          <p className="mt-2 text-center text-[15px] text-gray-600">
             {mode === 'login'
               ? 'Enter your credentials to access the admin portal.'
               : mode === 'reset'
@@ -166,7 +176,7 @@ export default function LoginPage() {
                 : 'Check your inbox for the next step.'}
           </p>
 
-          <div className="mt-5 w-full rounded-3xl border border-gray-200 bg-white p-7 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+          <div className="mt-8 w-full rounded-3xl border border-gray-200 bg-white p-9 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
             {mode === 'login' ? (
               <form onSubmit={submit} className="space-y-4" noValidate>
                 {/* Figma A-01: every login problem shows as one red banner at the top of the form. */}
@@ -244,39 +254,11 @@ export default function LoginPage() {
           </div>
 
           {/* There are no Terms / Privacy pages yet, so these are plain text (as drawn) rather than dead links. */}
-          <p className="mt-5 flex items-center gap-4 text-sm text-gray-400">
+          <p className="mt-14 flex items-center gap-4 text-sm text-gray-400">
             <span>Terms of Service</span>
             <span aria-hidden="true">•</span>
             <span>Privacy Policy</span>
           </p>
-        </div>
-
-        {/* Right: grey panel from the new Figma login export. Only the dashboard illustration is a picture
-            (public/login-hero.png, cropped from the export; its background is the panel grey #f1f2f4 so the edges
-            disappear). The heading and text are real text so they stay sharp and screen readers can read them.
-            The image shrinks on short windows so the page fits without scrolling; the panel is hidden below the
-            lg breakpoint so the form has the whole width on small screens. */}
-        <div className="hidden min-w-0 max-w-[39rem] flex-1 flex-col items-center justify-center rounded-[1.75rem] border border-gray-200 bg-[#f1f2f4] px-6 py-12 lg:flex lg:min-h-[min(50rem,calc(100vh-3rem))]">
-          <img
-            src="/login-hero.png"
-            alt="Preview of the admin dashboard: activity feed, user totals, consultation stats and a verified doctor notice"
-            draggable="false"
-            className="min-h-0 w-full max-w-[38rem] max-h-[calc(100vh-22rem)] select-none object-contain"
-          />
-          <h2 className="mt-8 text-center text-[1.75rem] font-extrabold leading-[1.2] tracking-tight text-ink">
-            Oversee Diabetes Care
-            <br />
-            with Clarity and Control
-          </h2>
-          <p className="mt-4 max-w-[22.5rem] text-center text-sm leading-[1.6] text-gray-500">
-            Review providers, monitor patient activity and keep every care team aligned from one secure admin console.
-          </p>
-          {/* The Figma frame draws carousel dots. There is only one slide, so they are decoration only. */}
-          <div aria-hidden="true" className="mt-8 flex items-center gap-2">
-            <span className="h-[5px] w-6 rounded-full bg-ink" />
-            <span className="h-[5px] w-[5px] rounded-full bg-gray-300" />
-            <span className="h-[5px] w-[5px] rounded-full bg-gray-300" />
-          </div>
         </div>
       </div>
     </div>
