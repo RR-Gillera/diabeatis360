@@ -8,6 +8,7 @@ import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
 
 import { withCredentials } from '@/features/doctor/credentials';
+import { doctorDisplayName } from '@/features/doctor/doctor-profile';
 
 import { manilaWallClock, slotInstant } from './manila-time';
 import type { PaymentMethod, Provider } from './types';
@@ -78,9 +79,12 @@ export function PrimaryButton({ title, onPress, disabled, loading }: { title: st
   );
 }
 
-/** The doctor's name as patients see it: "Dr. Juan Dela Cruz, MD, FPCP" once an admin approved the suffix (D55). */
+/**
+ * The doctor's name as patients see it: "Dr. Juan Dela Cruz, MD, FPCP" once an admin approved the suffix (D55).
+ * "Dr." is added here (only when the doctor did not type it), the same way the doctor's own profile header does.
+ */
 export function providerName(provider: Pick<Provider, 'fullName' | 'credentials'>) {
-  return withCredentials(provider.fullName, provider.credentials);
+  return withCredentials(doctorDisplayName(provider.fullName), provider.credentials);
 }
 
 export function formatFee(value: number) {

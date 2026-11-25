@@ -2,6 +2,7 @@ import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, Ti
 
 import { db } from '@/firebase';
 import { withCredentials } from '@/features/doctor/credentials';
+import { doctorDisplayName } from '@/features/doctor/doctor-profile';
 import { createNotification } from '@/features/notifications/notification-service';
 import { translate, type Language } from '@/i18n/translate';
 
@@ -67,7 +68,7 @@ export async function fetchDisplayName(userId: string) {
     }
   };
   const provider = await dataIn('Providers');
-  if (provider?.full_name) return withCredentials(String(provider.full_name), String(provider.credentials ?? ''));
+  if (provider?.full_name) return withCredentials(doctorDisplayName(String(provider.full_name)), String(provider.credentials ?? ''));
   return String((await dataIn('Users'))?.full_name || 'Diabeatis360 user');
 }
 
