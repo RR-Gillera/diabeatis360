@@ -4,9 +4,10 @@ const assert = require('node:assert/strict')
 const { test } = require('node:test')
 
 const {
-  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, containsAllergen, dislikedIngredients, parseAllergens,
+  buildLabelPrompt, buildRecommendationPrompt, cleanExercises, cleanLabel, cleanMeals, containsAllergen, dislikedIngredients, mealPhotoFor, mealSchema, parseAllergens,
   SYSTEM_RULES, TYPE_GUIDANCE,
 } = require('../lib/prompts')
+const { MEAL_PHOTO_KEYS } = require('../lib/meal-photos')
 
 test('parseAllergens splits, lowercases and ignores "none"', () => {
   assert.deepEqual(parseAllergens('Peanuts, Shellfish; dairy'), ['peanuts', 'shellfish', 'dairy'])
@@ -197,4 +198,31 @@ test('cleanLabel: a healthier alternative with an ingredient the person does not
   }, [], ['bitter gourd'])
   assert.deepEqual(result.allergen_warnings, [], 'an ingredient someone does not eat is not an allergy warning')
   assert.deepEqual(result.alternatives.map((entry) => entry.try), ['Water with calamansi'])
+})
+
+// ---- sample meal photos (DECISIONS.md D60)
+test('the meal prompt lists every sample photo, and the schema only accepts those keys', () => {
+  const { user } = buildRecommendationPrompt({ kind: 'meal', profile: {}, reading: null, foods: [] })
+  for (const key of MEAL_PHOTO_KEYS) assert.match(user, new RegExp(`- ${key}: `))
+  assert.deepEqual(mealSchema.properties.items.items.properties.photo.enum, MEAL_PHOTO_KEYS)
+  assert.ok(mealSchema.properties.items.items.required.includes('photo'))
+  const exercise = buildRecommendationPrompt({ kind: 'exercise', profile: {}, reading: null, foods: [] })
+  assert.doesNotMatch(exercise.user, /sample photo/, 'exercise suggestions have no photos')
+})
+
+test('cleanMeals keeps a known photo key and turns anything else into null', () => {
+  const meal = (photo) => ({ name: 'Chicken Tinola', tagline: 't', calories: 250, protein_g: 28, carbs_g: 12, fiber_g: 3, sugar_g: 4, insight: 'ok', ingredients: ['chicken'], photo })
+  const meals = cleanMeals([meal('tinola'), meal('pizza'), meal('constructor')], [])
+  assert.deepEqual(meals.map((entry) => entry.photo), ['tinola', null, null])
+  assert.equal(cleanMeals([{ name: 'No photo given', ingredients: [] }], [])[0].photo, null, 'older or incomplete answers get no photo')
+})
+
+test('a photo that shows something the person avoids is not used, under any of its names', () => {
+  assert.equal(mealPhotoFor('tortang_talong', ['Eggs']), null)
+  assert.equal(mealPhotoFor('fish', ['seafood']), null, 'seafood includes fish')
+  assert.equal(mealPhotoFor('fish', ['shellfish']), 'fish', 'fish is not shellfish')
+  assert.equal(mealPhotoFor('adobo', ['Soy']), null, 'the adobo photo shows soy sauce')
+  assert.equal(mealPhotoFor('bread', ['gluten']), null)
+  assert.equal(mealPhotoFor('tinola', ['manok']), null, 'an ingredient not eaten, by its Filipino name')
+  assert.equal(mealPhotoFor('pinakbet', ['Peanuts', 'Shrimp']), 'pinakbet')
 })

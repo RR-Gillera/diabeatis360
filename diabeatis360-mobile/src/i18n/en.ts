@@ -493,6 +493,10 @@ export const en = {
   'meal.sugar': 'Sugar',
   'meal.insight': 'AI Insight',
   'meal.ingredients': 'Ingredients',
+  // D60: the photo is one of the app's sample photos, picked as the closest dish, not a picture of this exact meal.
+  'meal.photoLabel': 'Sample photo of a similar dish',
+  'meal.photoNote': 'Sample photo. Your meal may look different.',
+  'meal.photoCredit': 'Photo: {credit}, Wikimedia Commons (cropped).',
   'exercise.title': 'Exercise Tips',
   'exercise.subtitle': 'Activities that can support your daily diabetes management.',
   'exercise.view': 'View Exercise',

@@ -115,7 +115,7 @@ Unchanged in Capstone 2, so everything below is still open. Say once, above Tabl
 | [ ] | 9 Admins | Delete `password_hash`. `role`: `super_admin` / `admin`. |
 | [ ] | 10 Glucose_Logs | Rename (D13): `user_id` → `patient_id`, `glucose_value` → `reading_mgdl` (whole number 20–600, D25), `meal_context` → `context` (`before_meal`/`after_meal`). Add `interpretation` (`low`/`normal`/`high`/`critical`), `created_at`, `edit_count` (D44). `logged_at` at most 5 minutes after the server's clock (D46). |
 | [ ] | 11 Food_Database | `status`: `active` / `hidden`; an admin can also delete. |
-| [ ] | 12 AI_Suggestions | `suggestion_type`: `meal` / `exercise` / `risk` (D51: one a day; `response` holds the rule's assessment and the advice) (no `chat`). `prompt` up to 1,500 characters; `response` is JSON text. Written only by the server. |
+| [ ] | 12 AI_Suggestions | `suggestion_type`: `meal` / `exercise` / `risk` (D51: one a day; `response` holds the rule's assessment and the advice) (no `chat`). `prompt` up to 1,500 characters; `response` is JSON text. Written only by the server. For meals, each item in `response` also has `photo`: the key of a bundled sample photo, or empty (D60). |
 | [ ] | 13 AI_Suggestions_Foods | No change. |
 | [ ] | 14 Nutrition_Scans | `image_url` optional and always empty (D2). Add `source` (`gemini_label`). `health_rating`: `suitable` / `caution` / `unsuitable`. Written only by the server. |
 | [ ] | 15 Bookings | `booking_id` is `<provider_id>_<slot as UTC yyyymmddHHmm>`. `status` adds **declined**: `pending` / `confirmed` / `completed` / `declined` / `cancelled`. Add `payment_status` (`unpaid`/`paid`/`onsite`), `payment_method`, `queue_number`, `platform_commission` (15%), `consultation_status`, `consultation_ended_at`, `consultation_ended_by`, `concern` (up to 300), `decline_reason` (up to 500). |
@@ -213,6 +213,7 @@ Unchanged in Capstone 2, so everything below is still open. Say once, above Tabl
   - Reminders can be turned off only in the phone's settings.
   - The family SMS alert is not an emergency service.
   - The risk level is a guide from the person's own readings, not a diagnosis, and does not use weight or BMI [AFTER BUILD].
+  - Meal photos are sample photos of a similar dish, shipped with the app, not pictures of the suggested meal (D60). Credit the photographers (Wikimedia Commons, CC licences; list in `assets/images/meals/CREDITS.md`) in the acknowledgements or references.
   - Reports are reviewed by an admin, not answered instantly [AFTER BUILD].
   - Passwords need 8 or more characters.
   - The Privacy Policy, the Terms and the admin panel are in English only.

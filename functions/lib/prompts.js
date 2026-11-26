@@ -11,6 +11,7 @@
 // "Pork" also catches "lechon" and "baboy".
 
 const { wordsFor } = require('./food-words')
+const { MEAL_PHOTOS, MEAL_PHOTO_KEYS, describeMealPhotos } = require('./meal-photos')
 
 const SYSTEM_RULES = [
   'You are a nutrition and physical-activity assistant inside a diabetes self-management app for Filipino patients.',
@@ -115,7 +116,8 @@ function describeFoods(foods) {
 function buildRecommendationPrompt({ kind, profile, reading, foods }) {
   const language = LANGUAGE_NAMES[profile.language_preference] ?? 'English'
   const task = kind === 'meal'
-    ? 'Suggest exactly 3 different meal options for the person\'s NEXT meal. For each give the nutrition per serving and 4 to 7 simple ingredients.'
+    ? 'Suggest exactly 3 different meal options for the person\'s NEXT meal. For each give the nutrition per serving and 4 to 7 simple ingredients.\n'
+      + `For each also set "photo" to the key of the sample photo closest to the meal (use rice_plate when none is close):\n${describeMealPhotos()}`
     : 'Suggest exactly 3 gentle physical activities suitable right now. For each give a short tagline, a one-sentence description, a realistic duration in minutes, exactly 3 short benefits, and a short caution. Never suggest strenuous exercise if the latest reading is low.'
   return {
     system: SYSTEM_RULES,
@@ -194,8 +196,9 @@ const mealSchema = {
         properties: {
           name: STRING, tagline: STRING, calories: NUMBER, protein_g: NUMBER, carbs_g: NUMBER, fiber_g: NUMBER, sugar_g: NUMBER,
           insight: STRING, ingredients: { type: 'ARRAY', items: STRING },
+          photo: { type: 'STRING', enum: MEAL_PHOTO_KEYS },
         },
-        required: ['name', 'tagline', 'calories', 'protein_g', 'carbs_g', 'fiber_g', 'sugar_g', 'insight', 'ingredients'],
+        required: ['name', 'tagline', 'calories', 'protein_g', 'carbs_g', 'fiber_g', 'sugar_g', 'insight', 'ingredients', 'photo'],
       },
     },
   },
@@ -248,6 +251,15 @@ const number = (value, max = 10000) => {
   return Number.isFinite(n) && n >= 0 ? Math.min(Math.round(n * 10) / 10, max) : 0
 }
 
+/**
+ * The sample photo for a meal (D60): the key Gemini picked if it is one of ours, or null when it is not, or when the
+ * photo shows something the person avoids (meal-photos.js `shows`).
+ */
+function mealPhotoFor(key, avoid) {
+  if (typeof key !== 'string' || !Object.hasOwn(MEAL_PHOTOS, key)) return null
+  return containsAllergen(MEAL_PHOTOS[key].shows.join(' '), avoid).length ? null : key
+}
+
 /** Meals: keep well-formed ones and drop any that mention something to avoid (an allergen or an ingredient not eaten). */
 function cleanMeals(items, avoid) {
   return (Array.isArray(items) ? items : [])
@@ -261,6 +273,7 @@ function cleanMeals(items, avoid) {
       sugar_g: number(item?.sugar_g, 300),
       insight: text(item?.insight, 300),
       ingredients: (Array.isArray(item?.ingredients) ? item.ingredients : []).map((entry) => text(entry, 60)).filter(Boolean).slice(0, 10),
+      photo: mealPhotoFor(item?.photo, avoid),
     }))
     .filter((meal) => meal.name && !containsAllergen(`${meal.name} ${meal.ingredients.join(' ')}`, avoid).length)
     .slice(0, 3)
@@ -333,5 +346,5 @@ function cleanRiskAdvice(raw, avoid) {
 module.exports = {
   buildRiskPrompt, riskSchema, cleanRiskAdvice,
   parseAllergens, dislikedIngredients, diabetesTypeOf, containsAllergen, buildRecommendationPrompt, buildLabelPrompt, TYPE_GUIDANCE,
-  mealSchema, exerciseSchema, labelSchema, cleanMeals, cleanExercises, cleanLabel, SYSTEM_RULES,
+  mealSchema, exerciseSchema, labelSchema, cleanMeals, mealPhotoFor, cleanExercises, cleanLabel, SYSTEM_RULES,
 }

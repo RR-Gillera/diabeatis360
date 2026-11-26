@@ -12,6 +12,9 @@ export type MealSuggestion = {
   sugar_g: number;
   insight: string;
   ingredients: string[];
+  /** Which bundled sample photo to show (features/ai/meal-photos.ts, D60). Missing on suggestions made before it, and
+   * null when no photo fits or the photo shows something the person avoids. */
+  photo?: string | null;
 };
 
 export type ExerciseSuggestion = {
