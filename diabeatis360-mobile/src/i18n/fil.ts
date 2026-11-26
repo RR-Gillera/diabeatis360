@@ -1210,6 +1210,8 @@ export const fil: Record<MessageKey, string> = {
   'doctor.notif.cancelledText': 'Kinansela ni {name} ang request niya para sa konsultasyon.',
   'doctor.notif.declined': 'Tinanggihan ang appointment',
   'doctor.notif.declinedText': 'Tinanggihan mo ang request ni {name} para sa konsultasyon.',
+  'doctor.notif.cancelledAnon': 'Kinansela ng isang pasyente ang request niya para sa konsultasyon.',
+  'doctor.notif.declinedAnon': 'Tinanggihan mo ang request ng isang pasyente para sa konsultasyon.',
   'doctor.notif.credWarn': 'Pagsusuri ng kredensyal: may kailangang baguhin',
   'doctor.notif.credOk': 'Na-verify ang mga kredensyal',
   'doctor.notif.critical': 'Kritikal na reading',

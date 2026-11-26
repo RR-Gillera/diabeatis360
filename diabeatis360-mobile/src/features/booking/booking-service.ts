@@ -251,6 +251,9 @@ export function subscribeToBooking(
   );
 }
 
+/** The name shown when the patient's profile can't be read, e.g. after a decline or cancel ends the share (D22). */
+export const UNKNOWN_PATIENT = 'Unknown patient';
+
 // The doctor-side mirror of subscribeToBookingHistory: same single-equality-filter,
 // no-orderBy, sort-client-side shape (this time on provider_id) to avoid needing a
 // composite index. Patient identity is resolved per booking via a Users lookup —
@@ -273,7 +276,7 @@ export function subscribeToBookingsForProvider(
           return {
             id: document.id,
             patientId,
-            patientName: String(patientSnapshot?.data()?.full_name ?? 'Unknown patient'),
+            patientName: String(patientSnapshot?.data()?.full_name ?? UNKNOWN_PATIENT),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
             status: (data.status ?? 'pending') as BookingStatus,

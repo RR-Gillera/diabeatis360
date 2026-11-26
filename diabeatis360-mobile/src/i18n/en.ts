@@ -1210,6 +1210,9 @@ export const en = {
   'doctor.notif.cancelledText': '{name} cancelled their consultation request.',
   'doctor.notif.declined': 'Appointment declined',
   'doctor.notif.declinedText': 'You declined {name}\'s consultation request.',
+  // The patient's name can no longer be read once a request is declined or cancelled (the share ends with it, D22).
+  'doctor.notif.cancelledAnon': 'A patient cancelled their consultation request.',
+  'doctor.notif.declinedAnon': 'You declined a patient\'s consultation request.',
   'doctor.notif.credWarn': 'Credential review: changes needed',
   'doctor.notif.credOk': 'Credentials verified',
   'doctor.notif.critical': 'Critical reading',
