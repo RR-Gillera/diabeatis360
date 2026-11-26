@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { CallEmergencyButton } from '@/components/ui/call-emergency-button';
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
@@ -14,6 +15,7 @@ import { subscribeToNotifications } from '@/features/notifications/notification-
 import type { GlucoseLogEntry, Interpretation } from '@/features/glucose/types';
 import { activityWhen } from '@/features/home/activity-feed';
 import { BottomNav, homeColors, Sparkline } from '@/features/home/home-ui';
+import { PhotoLayer } from '@/features/photos/avatar';
 import { weekSummary } from '@/features/home/week-summary';
 import { DAILY_REMINDERS } from '@/features/reminders/reminder-plan';
 import { useT } from '@/i18n/language-context';
@@ -91,22 +93,27 @@ export default function UserHomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.hello}>{t('home.hello')}</Text>
-            <Text style={styles.greeting}>{greeting},{'\n'}{firstName}!</Text>
-          </View>
-          <View style={styles.headerActions}>
+      {/* The same top bar as every other tab (components/ui/tab-header.tsx), fixed above the scroll. Figma has three
+          lines ("Hello," + "Good morning, / Russell!"); two fit the shared bar height, so the greeting is the small line
+          and the name the big one. "Good morning, Russell!" in one big line does not fit beside the buttons. */}
+      <TabHeader
+        eyebrow={`${greeting},`}
+        title={`${firstName}!`}
+        right={(
+          <>
             <Pressable accessibilityRole="button" accessibilityLabel={t('notif.title')} style={styles.bellButton} onPress={() => router.navigate('/notifications')} hitSlop={8}>
               <SymbolView name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }} size={16} tintColor="#64748B" />
               {unreadCount ? <View style={styles.bellDot}><Text style={styles.bellDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View> : null}
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={t('nav.profile')} style={styles.avatar} onPress={() => router.navigate('/profile')}>
               <Text style={styles.avatarText}>{initial}</Text>
+              {/* The saved profile photo (Profile_Photos/{uid}, D54) covers the initial once it loads; 22 = 24 radius minus the 2px ring. */}
+              <PhotoLayer uid={uid} radius={22} />
             </Pressable>
-          </View>
-        </View>
+          </>
+        )}
+      />
+      <ScrollView contentContainerStyle={styles.scroll}>
 
         {guardianVerification && guardianVerification.status !== 'approved' ? (
           <Pressable
@@ -266,14 +273,10 @@ export default function UserHomeScreen() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
   scroll: { paddingBottom: 130 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 12, paddingBottom: 24 },
-  hello: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14 },
-  greeting: { color: homeColors.textDark, fontFamily: Brand.font.extraBold, fontSize: 24, lineHeight: 32, marginTop: 2 },
-  headerActions: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   bellButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.border, borderRadius: 22, borderWidth: 1, height: 44, justifyContent: 'center', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2, width: 44 },
   bellDot: { alignItems: 'center', backgroundColor: homeColors.red, borderColor: '#FFF', borderRadius: 9, borderWidth: 2, height: 18, justifyContent: 'center', minWidth: 18, paddingHorizontal: 3, position: 'absolute', right: 4, top: 4 },
   bellDotText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 9 },
-  avatar: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.avatarRing, borderRadius: 24, borderWidth: 2, height: 48, justifyContent: 'center', width: 48 },
+  avatar: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.avatarRing, borderRadius: 24, borderWidth: 2, height: 48, justifyContent: 'center', overflow: 'hidden', width: 48 },
   avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 18 },
   emergency: { marginHorizontal: 24, marginTop: 12 },
   banner: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', gap: 12, marginHorizontal: 24, marginTop: 24, paddingHorizontal: 16, paddingVertical: 12 },

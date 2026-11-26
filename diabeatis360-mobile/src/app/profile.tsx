@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { TabHeader } from '@/components/ui/tab-header';
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
@@ -84,6 +85,8 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* The shared tab bar (components/ui/tab-header.tsx), so Profile's top matches the other tabs. */}
+      <TabHeader title={t('nav.profile')} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.person}>
           <Pressable accessibilityRole="button" accessibilityLabel={t('photo.change')} onPress={() => setPhotoSheet(true)} style={styles.avatarWrap}>

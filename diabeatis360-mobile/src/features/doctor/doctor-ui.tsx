@@ -10,6 +10,7 @@ import { subscribeToNotifications } from '@/features/notifications/notification-
 import type { BookingStatus } from '@/features/booking/types';
 import { useTabBarBottomPadding } from '@/components/ui/system-bars';
 import { useT } from '@/i18n/language-context';
+import { useTabBack } from '@/lib/use-tab-back';
 import type { MessageKey } from '@/i18n/translate';
 
 // The pill colours per status; the words come from constants/enums.ts in the person's language.
@@ -56,6 +57,8 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
   const { uid } = useAuth();
   // Taller when the phone shows the 3-button bar, so the tabs sit above it (constants/system-bars.ts).
   const navBottom = useTabBarBottomPadding();
+  // Android Back: other tabs go Home, Home needs a second press to exit (lib/tab-back.ts).
+  useTabBack('/doctor');
   // The red dot on Inbox: any Notifications doc this doctor has not opened yet (chat, credential review, critical reading).
   const [hasUnread, setHasUnread] = useState(false);
   useEffect(() => {

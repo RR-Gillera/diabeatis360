@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
 import { PLATFORM_COMMISSION_RATE } from '@/constants/commission';
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
@@ -100,28 +101,34 @@ export default function DoctorHomeScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text accessibilityRole="header" style={styles.greeting}>{t('doctor.greeting', { greeting, name: firstName })}</Text>
-            <Pressable
-              disabled={!status}
-              accessibilityRole={status ? 'button' : undefined}
-              accessibilityLabel={status ? `${dateLine}. ${status.text}. ${t('doctor.status.change')}` : dateLine}
-              onPress={() => router.push('/doctor/schedule')}
-              hitSlop={6}>
-              <Text style={styles.date}>
-                {dateLine}
-                {status ? <Text style={[styles.status, !status.on && styles.statusOff]}>{`  •  ${status.text}`}</Text> : null}
-              </Text>
-            </Pressable>
-          </View>
+      {/* The shared tab bar (components/ui/tab-header.tsx), fixed above the scroll: greeting small, name big, like
+          the patient Home. "Good morning, Dr. Name!" in one big line does not fit beside the photo. */}
+      <TabHeader
+        eyebrow={`${greeting},`}
+        title={t('doctor.greeting', { name: firstName })}
+        right={(
           <Pressable accessibilityRole="button" accessibilityLabel={t('nav.profile')} style={styles.me} onPress={() => router.navigate('/doctor/profile')}>
             <Text style={styles.meText}>{initialsOf(profile?.fullName ?? displayName)}</Text>
             <PhotoLayer uid={uid} radius={26} />
             {status ? <View style={[styles.meDot, { backgroundColor: status.on ? homeColors.greenBright : homeColors.textFaint }]} /> : null}
           </Pressable>
-        </View>
+        )}
+      />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Today's date and whether the doctor is taking requests now; tap to change the schedule. Just below the bar,
+            so the bar keeps the same height as the other tabs. */}
+        <Pressable
+          disabled={!status}
+          accessibilityRole={status ? 'button' : undefined}
+          accessibilityLabel={status ? `${dateLine}. ${status.text}. ${t('doctor.status.change')}` : dateLine}
+          onPress={() => router.push('/doctor/schedule')}
+          hitSlop={6}
+          style={styles.dateRow}>
+          <Text style={styles.date}>
+            {dateLine}
+            {status ? <Text style={[styles.status, !status.on && styles.statusOff]}>{`  •  ${status.text}`}</Text> : null}
+          </Text>
+        </Pressable>
 
         {failed ? <Text style={[doctorStyles.error, styles.gutter]}>{t('booking.history.loadFailed')}</Text> : null}
 
@@ -249,9 +256,7 @@ function startsInText(when: ReturnType<typeof startsIn>, t: Translate): string {
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 150 },
   gutter: { marginHorizontal: 24 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 20, paddingHorizontal: 24, paddingTop: 16 },
-  headerCopy: { flex: 1, gap: 4 },
-  greeting: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24 },
+  dateRow: { marginHorizontal: 24, marginTop: 16 },
   date: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14 },
   status: { color: homeColors.green, fontFamily: Brand.font.bold },
   statusOff: { color: homeColors.textMuted },

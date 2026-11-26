@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { SymbolView } from 'expo-symbols';
 
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { initialsOf } from '@/features/booking/appointment-tabs';
@@ -48,9 +49,8 @@ export default function DoctorRequestsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <View style={styles.top}>
-        <Text accessibilityRole="header" style={styles.title}>{t('doctor.req.title')}</Text>
-      </View>
+      {/* The shared tab bar (components/ui/tab-header.tsx); the Pending / Accepted / Declined switch sits under it. */}
+      <TabHeader title={t('doctor.req.title')} />
       <View style={styles.segmentWrap}>
         <View style={styles.segment}>
           {REQUEST_TABS.map((option) => (
@@ -168,9 +168,7 @@ export default function DoctorRequestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  top: { backgroundColor: homeColors.card, borderBottomColor: homeColors.border, borderBottomWidth: 1, paddingBottom: 18, paddingHorizontal: 24, paddingTop: 20 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 22 },
-  segmentWrap: { backgroundColor: homeColors.card, paddingBottom: 14, paddingHorizontal: 24, paddingTop: 20 },
+  segmentWrap: { backgroundColor: homeColors.card, paddingBottom: 14, paddingHorizontal: 24, paddingTop: 14 },
   segment: { backgroundColor: '#EEF0F3', borderRadius: 18, flexDirection: 'row', padding: 4 },
   segmentItem: { alignItems: 'center', borderRadius: 14, flex: 1, paddingVertical: 11 },
   segmentActive: { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.08, shadowRadius: 3 },

@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider, UNKNOWN_PATIENT } from '@/features/booking/booking-service';
@@ -276,15 +277,16 @@ export default function DoctorNotificationsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
+      {/* The shared tab bar (components/ui/tab-header.tsx); the filter chips sit under it. */}
+      <TabHeader
+        title={t('notif.title')}
+        right={unreadIds.length > 0 ? (
+          <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
+            <Text style={styles.markAll}>{marking ? t('notif.marking') : t('notif.markAll')}</Text>
+          </Pressable>
+        ) : null}
+      />
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text accessibilityRole="header" style={styles.headerTitle}>{t('notif.title')}</Text>
-          {unreadIds.length > 0 ? (
-            <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
-              <Text style={styles.markAll}>{marking ? t('notif.marking') : t('notif.markAll')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
         <View style={styles.chips}>
           {FILTERS.map((key) => (
             <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: filter === key }} style={[styles.chip, filter === key && styles.chipActive]} onPress={() => setFilter(key)}>
@@ -353,11 +355,9 @@ function BoldName({ text, name }: { text: string; name?: string }) {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: homeColors.card, paddingBottom: 16, paddingHorizontal: 24, paddingTop: 16 },
-  headerRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  headerTitle: { color: '#0F172A', flex: 1, fontFamily: Brand.font.extraBold, fontSize: 24 },
+  header: { backgroundColor: homeColors.card, paddingBottom: 16, paddingHorizontal: 24, paddingTop: 14 },
   markAll: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 14 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: '#EEF2F6', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
   chipActive: { backgroundColor: homeColors.green },
   chipText: { color: '#475569', fontFamily: Brand.font.bold, fontSize: 14 },

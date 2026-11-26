@@ -3,6 +3,7 @@ import { useRouter, type Href } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { formatDate, formatFee } from '@/features/booking/booking-ui';
@@ -73,15 +74,18 @@ export default function DoctorProfileScreen() {
 
   return (
     <View style={doctorStyles.screen}>
+      {/* The shared tab bar (components/ui/tab-header.tsx), with the edit pencil, fixed above the scroll. */}
+      <TabHeader
+        title={t('doctor.profile.title')}
+        right={(
+          <Pressable accessibilityRole="button" accessibilityLabel={t('doctor.profile.edit')} hitSlop={8} style={styles.editButton} onPress={() => router.push(EDIT_PROFILE)}>
+            <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} tintColor="#334155" />
+          </Pressable>
+        )}
+      />
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* The white top card: title and pencil, avatar, name with the verified check, specialty and city. */}
+        {/* The white top card: avatar, name with the verified check, specialty and city. */}
         <View style={styles.top}>
-          <View style={styles.titleRow}>
-            <Text accessibilityRole="header" style={styles.title}>{t('doctor.profile.title')}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('doctor.profile.edit')} hitSlop={8} style={styles.editButton} onPress={() => router.push(EDIT_PROFILE)}>
-              <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} tintColor="#334155" />
-            </Pressable>
-          </View>
           {/* The profile photo (D54), required for doctors: tapping it changes it. Initials show only until it loads. */}
           <Pressable accessibilityRole="button" accessibilityLabel={t('photo.change')} onPress={() => setPhotoSheet(true)} style={styles.avatarRing}>
             <Avatar uid={uid} name={profile?.fullName ?? ''} initials={doctorInitials(profile?.fullName ?? '')} style={styles.avatar} textStyle={styles.avatarText} />
@@ -206,9 +210,7 @@ export default function DoctorProfileScreen() {
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 140 },
-  top: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 20, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.05, shadowRadius: 6 },
-  titleRow: { alignItems: 'center', alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 22 },
+  top: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.05, shadowRadius: 6 },
   editButton: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
   avatarRing: { borderColor: '#FFFFFF', borderRadius: 52, borderWidth: 4, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.12, shadowRadius: 8 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 48, height: 96, justifyContent: 'center', width: 96 },

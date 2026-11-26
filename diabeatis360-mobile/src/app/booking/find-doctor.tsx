@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { BottomSheetModal } from '@/components/ui/bottom-sheet-modal';
 import { KeyboardSafeScroll } from '@/components/ui/keyboard-safe';
+import { TabHeader } from '@/components/ui/tab-header';
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -43,16 +44,17 @@ export default function FindDoctorScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        <View>
-          <Text accessibilityRole="header" style={styles.title}>{t('doctors.title')}</Text>
-          <Text style={styles.subtitle}>{t('doctors.subtitle')}</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <NotificationBell style={styles.headerButton} />
-          <MyAppointmentsButton style={styles.headerButton} />
-        </View>
-      </View>
+      {/* The shared tab bar (components/ui/tab-header.tsx): same height on every tab. */}
+      <TabHeader
+        title={t('doctors.title')}
+        subtitle={t('doctors.subtitle')}
+        right={(
+          <>
+            <NotificationBell style={styles.headerButton} />
+            <MyAppointmentsButton style={styles.headerButton} />
+          </>
+        )}
+      />
 
       <KeyboardSafeScroll contentContainerStyle={styles.scrollContent}>
         <View style={styles.searchBox}>
@@ -138,10 +140,6 @@ function DoctorProfileSheet({ doctor: openDoctor, onClose, onConsult }: { doctor
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24, shadowColor: '#000', shadowOffset: { height: 1, width: 0 }, shadowOpacity: 0.05, shadowRadius: 2 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24 },
-  subtitle: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14, marginTop: 2 },
-  headerActions: { flexDirection: 'row', gap: 12 },
   headerButton: { alignItems: 'center', backgroundColor: '#FFF', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
   scrollContent: { padding: 24, paddingBottom: 150, gap: 16 },
   searchBox: { alignItems: 'center', backgroundColor: 'rgba(98, 156, 44, 0.1)', borderColor: '#E2E8F0', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 10, paddingHorizontal: 16, minHeight: 48 },

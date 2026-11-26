@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SymbolView } from 'expo-symbols';
 
 import { PLATFORM_COMMISSION_RATE } from '@/constants/commission';
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
@@ -101,9 +102,10 @@ export default function DoctorHistoryScreen() {
 
   return (
     <View style={doctorStyles.screen}>
-      <View style={styles.top}>
-        <View style={styles.titleRow}>
-          <Text accessibilityRole="header" style={styles.title}>{t('doctor.history.title')}</Text>
+      {/* The shared tab bar (components/ui/tab-header.tsx); the search box and the two section tabs sit under it. */}
+      <TabHeader
+        title={t('doctor.history.title')}
+        right={(
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('doctor.history.search')}
@@ -113,7 +115,9 @@ export default function DoctorHistoryScreen() {
             hitSlop={6}>
             <SymbolView name={searchOpen ? { ios: 'xmark', android: 'close', web: 'close' } : { ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor="#0F172A" />
           </Pressable>
-        </View>
+        )}
+      />
+      <View style={styles.top}>
         {searchOpen ? (
           <TextInput
             autoFocus
@@ -262,9 +266,7 @@ export default function DoctorHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  top: { backgroundColor: homeColors.card, paddingHorizontal: 24, paddingTop: 16 },
-  titleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  title: { color: '#0F172A', flex: 1, fontFamily: Brand.font.extraBold, fontSize: 24 },
+  top: { backgroundColor: homeColors.card, paddingHorizontal: 24 },
   searchButton: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
   searchButtonOn: { backgroundColor: homeColors.greenTint },
   searchInput: { backgroundColor: '#F1F5F9', borderRadius: 14, color: '#0F172A', fontFamily: Brand.font.regular, fontSize: 15, marginTop: 12, minHeight: 46, paddingHorizontal: 14 },

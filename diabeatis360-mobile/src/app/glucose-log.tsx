@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGlucoseHistory } from '@/features/glucose/glucose-service';
@@ -111,26 +112,26 @@ export default function GlucoseLogScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.header}>
-        {/* The short line under the title says what the tab is for (team feedback on the 1.1 APK, 2026-11-22), like the
-            Doctors tab's "Consult with diabetes experts". flex: 1 lets a longer Filipino line wrap beside the buttons. */}
-        <View style={styles.headerCopy}>
-          <Text accessibilityRole="header" style={styles.headerTitle}>{t('glucose.title')}</Text>
-          <Text style={styles.headerSubtitle}>{t('glucose.subtitle')}</Text>
-        </View>
-        {/* Figma P-07 / P-13: the calendar (day filter) button; the old "more" button is gone (DECISIONS D24).
-            The bell matches the Home and Doctors headers, so notifications are one tap away from every tab. */}
-        <View style={styles.headerActions}>
-          <NotificationBell style={styles.headerButton} />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dayLabel ? t('glucose.filterShowing', { day: dayLabel }) : t('glucose.filter')}
-            style={[styles.headerButton, day ? styles.headerButtonActive : null]}
-            onPress={() => setPickingDay(true)}>
-            <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor={day ? '#FFFFFF' : '#64748B'} />
-          </Pressable>
-        </View>
-      </View>
+      {/* The shared tab bar (components/ui/tab-header.tsx). The short line under the title says what the tab is for
+          (team feedback on the 1.1 APK, 2026-11-22), like the Doctors tab's "Consult with diabetes experts".
+          Figma P-07 / P-13: the calendar (day filter) button; the old "more" button is gone (DECISIONS D24).
+          The bell matches the Home and Doctors headers, so notifications are one tap away from every tab. */}
+      <TabHeader
+        title={t('glucose.title')}
+        subtitle={t('glucose.subtitle')}
+        right={(
+          <>
+            <NotificationBell style={styles.headerButton} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={dayLabel ? t('glucose.filterShowing', { day: dayLabel }) : t('glucose.filter')}
+              style={[styles.headerButton, day ? styles.headerButtonActive : null]}
+              onPress={() => setPickingDay(true)}>
+              <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor={day ? '#FFFFFF' : '#64748B'} />
+            </Pressable>
+          </>
+        )}
+      />
 
       {entries.length === 0 ? (
         // Figma P-13: nothing logged yet.
@@ -243,11 +244,6 @@ export default function GlucoseLogScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: homeColors.background, flex: 1 },
-  header: { alignItems: 'center', backgroundColor: homeColors.card, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 24 },
-  headerCopy: { flex: 1, marginRight: 12 },
-  headerTitle: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 24, letterSpacing: -0.6 },
-  headerSubtitle: { color: homeColors.textMuted, fontFamily: Brand.font.medium, fontSize: 14, marginTop: 2 },
-  headerActions: { flexDirection: 'row', gap: 12 },
   headerButton: { alignItems: 'center', backgroundColor: '#F8FAFC', borderColor: homeColors.border, borderRadius: 20, borderWidth: 1, height: 40, justifyContent: 'center', width: 40 },
   headerButtonActive: { backgroundColor: homeColors.green, borderColor: homeColors.green },
   emptyScreen: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingBottom: 120, paddingHorizontal: 40 },
