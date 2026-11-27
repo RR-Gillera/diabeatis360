@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
@@ -10,6 +10,7 @@ import { subscribeToNotifications } from '@/features/notifications/notification-
 import type { BookingStatus } from '@/features/booking/types';
 import { useTabBarBottomPadding } from '@/components/ui/system-bars';
 import { useT } from '@/i18n/language-context';
+import { useTabBack } from '@/lib/use-tab-back';
 import type { MessageKey } from '@/i18n/translate';
 
 // The pill colours per status; the words come from constants/enums.ts in the person's language.
@@ -20,6 +21,20 @@ export const statusStyle: Record<BookingStatus, { color: string; background: str
   declined: { color: '#D9364F', background: '#FBE6E9' },
   cancelled: { color: '#D9364F', background: '#FBE6E9' },
 };
+
+/**
+ * The coloured icon tiles of the dashboard frame (its number cards and the Recent Activity rows). Text on them stays
+ * dark or uses the -600/-700 step, which passes WCAG AA on white (D37); the lighter steps are only for icons, which need 3:1.
+ */
+export const TONES = {
+  blue: { icon: '#2563EB', tile: '#EFF6FF' },
+  amber: { icon: '#B45309', tile: '#FEF3C7' },
+  purple: { icon: '#7C3AED', tile: '#F3E8FF' },
+  green: { icon: homeColors.green, tile: '#ECF5E1' },
+  red: { icon: '#DC2626', tile: '#FEE2E2' },
+  slate: { icon: '#475569', tile: '#F1F5F9' },
+};
+export type Tone = (typeof TONES)[keyof typeof TONES];
 
 type DoctorTab = 'home' | 'requests' | 'history' | 'notifications' | 'profile';
 
@@ -42,6 +57,8 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
   const { uid } = useAuth();
   // Taller when the phone shows the 3-button bar, so the tabs sit above it (constants/system-bars.ts).
   const navBottom = useTabBarBottomPadding();
+  // Android Back: other tabs go Home, Home needs a second press to exit (lib/tab-back.ts).
+  useTabBack('/doctor');
   // The red dot on Inbox: any Notifications doc this doctor has not opened yet (chat, credential review, critical reading).
   const [hasUnread, setHasUnread] = useState(false);
   useEffect(() => {
@@ -76,7 +93,8 @@ export function DoctorBottomNav({ active }: { active: DoctorTab }) {
 }
 
 // No bell here: the tab bar's Notifications tab (with its red dot) is the one way in, so the header does not repeat it.
-export function DoctorHeader({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack?: () => void }) {
+// `right` holds a screen's own button on the right of the header, like the calendar on "Health Logs".
+export function DoctorHeader({ title, subtitle, onBack, right }: { title: string; subtitle?: string; onBack?: () => void; right?: ReactNode }) {
   const { t } = useT();
   return (
     <View style={styles.header}>
@@ -91,6 +109,7 @@ export function DoctorHeader({ title, subtitle, onBack }: { title: string; subti
           {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
+      {right}
     </View>
   );
 }
@@ -120,14 +139,26 @@ export function EmptyState({ icon, iconAndroid, title, detail }: { icon: SFSymbo
 }
 
 // A child's account (D16, QA DOC-013): the doctor is told before chat or video that a parent or guardian runs this
-// account for a child. It comes from Users.account_type == 'minor', which a booked doctor can already read. The
-// guardian's own name is not shown yet: it is in Guardian_Verifications, which a doctor cannot read (team decision).
-export function ChildAccountBadge({ align = 'flex-start' }: { align?: 'flex-start' | 'center' }) {
-  const { t } = useT();
+// account for a child. It comes from Users.account_type == 'minor', which a booked doctor can already read.
+// DOC-013 part 2: the guardian's name and relationship are shown under it. They are a copy on the Users doc (a doctor
+// cannot read Guardian_Verifications), which firestore.rules keeps equal to the reviewed verification. An older child's
+// account saved before the copy existed has no name, so only the badge shows.
+export function ChildAccountBadge({ align = 'flex-start', guardianName = '', guardianRelationship = '' }: {
+  align?: 'flex-start' | 'center';
+  guardianName?: string;
+  guardianRelationship?: string;
+}) {
+  const { t, label } = useT();
+  const guardianLine = guardianName
+    ? t('doctor.child.guardian', { name: guardianName, relationship: label('guardianRelationship', guardianRelationship || 'other') })
+    : '';
   return (
-    <View accessible accessibilityLabel={t('doctor.child.badge')} style={[styles.childBadge, { alignSelf: align }]}>
+    <View accessible accessibilityLabel={guardianLine ? `${t('doctor.child.badge')}. ${guardianLine}` : t('doctor.child.badge')} style={[styles.childBadge, { alignSelf: align }]}>
       <SymbolView name={{ ios: 'figure.and.child.holdinghands', android: 'family_restroom', web: 'family_restroom' }} size={15} tintColor={CHILD_BLUE} />
-      <Text style={styles.childBadgeText}>{t('doctor.child.badge')}</Text>
+      <View style={styles.childBadgeBody}>
+        <Text style={styles.childBadgeText}>{t('doctor.child.badge')}</Text>
+        {guardianLine ? <Text style={styles.childGuardianText}>{guardianLine}</Text> : null}
+      </View>
     </View>
   );
 }
@@ -163,5 +194,7 @@ const styles = StyleSheet.create({
   emptyTitle: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 15, marginTop: 4 },
   emptyDetail: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 13, lineHeight: 20, maxWidth: 260, textAlign: 'center' },
   childBadge: { alignItems: 'center', backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, marginTop: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  childBadgeBody: { flexShrink: 1 },
   childBadgeText: { color: CHILD_BLUE, flexShrink: 1, fontFamily: Brand.font.extraBold, fontSize: 12 },
+  childGuardianText: { color: CHILD_BLUE, flexShrink: 1, fontFamily: Brand.font.regular, fontSize: 12, marginTop: 2 },
 });

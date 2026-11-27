@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -8,6 +9,7 @@ import { AppText } from '@/components/ui/app-text';
 import { Card } from '@/components/ui/card';
 import { Brand } from '@/constants/theme';
 import { subscribeToSuggestion } from '@/features/ai/ai-service';
+import { mealPhoto } from '@/features/ai/meal-photos';
 import type { MealSuggestion, SavedSuggestion } from '@/features/ai/types';
 import { BottomNav } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
@@ -23,8 +25,9 @@ function Tile({ label, value, unit, accent, wide }: { label: string; value: numb
 }
 
 // Meal Details (Figma 195:1011). Everything shown was generated together with the suggestion, so this screen makes no
-// new AI call. The design's photo and "Add to Meal Log" button are left out: no image storage (D2) and no meal log
-// module in Table 24.
+// new AI call. The photo is one of the sample photos shipped with the app, the one the server picked as the closest dish
+// (D60); a suggestion without one (made before D60, or none fits) keeps the icon. The "Add to Meal Log" button is left
+// out: no meal log module in Table 24.
 export default function MealDetailsScreen() {
   const { t } = useT();
   const goBack = useSafeBack('/meal-suggestions');
@@ -37,6 +40,7 @@ export default function MealDetailsScreen() {
   }, [id]);
 
   const meal = saved?.items[Number(index ?? 0)];
+  const photo = mealPhoto(meal?.photo);
 
   return (
     <View style={styles.screen}>
@@ -53,9 +57,16 @@ export default function MealDetailsScreen() {
 
         {meal ? (
           <>
-            <View style={styles.hero}>
-              <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={44} tintColor={Brand.colors.primary} />
-            </View>
+            {photo ? (
+              <View style={styles.pad}>
+                <Image source={photo.source} style={styles.photo} contentFit="cover" accessibilityLabel={t('meal.photoLabel')} />
+                <AppText style={styles.photoNote}>{`${t('meal.photoNote')} ${t('meal.photoCredit', { credit: photo.credit })}`}</AppText>
+              </View>
+            ) : (
+              <View style={styles.hero}>
+                <SymbolView name={{ ios: 'fork.knife', android: 'restaurant', web: 'restaurant' }} size={44} tintColor={Brand.colors.primary} />
+              </View>
+            )}
             <View style={styles.pad}>
               <AppText weight="extraBold" style={styles.name}>{meal.name}</AppText>
               <AppText style={styles.tagline}>{meal.tagline}</AppText>
@@ -115,6 +126,8 @@ const styles = StyleSheet.create({
   loader: { marginTop: 32 },
   empty: { color: Brand.colors.textMuted, fontSize: 15, lineHeight: 22, paddingHorizontal: Brand.sizes.screenPadding, textAlign: 'center' },
   hero: { alignItems: 'center', backgroundColor: Brand.colors.primaryTint, borderRadius: Brand.radius.card, height: 180, justifyContent: 'center', marginHorizontal: Brand.sizes.screenPadding },
+  photo: { backgroundColor: Brand.colors.primaryTint, borderRadius: Brand.radius.card, height: 220, width: '100%' },
+  photoNote: { color: Brand.colors.textFaint, fontSize: 11, lineHeight: 16, marginTop: 6 },
   name: { fontSize: 26, marginTop: 20 },
   tagline: { color: Brand.colors.textMuted, fontSize: 16, lineHeight: 24, marginTop: 4 },
   section: { fontSize: 18, marginBottom: 12, marginTop: 24 },

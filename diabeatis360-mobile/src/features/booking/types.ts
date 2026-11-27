@@ -15,12 +15,14 @@ export type Provider = {
   consultationFee: number;
   isVerified: boolean;
   isActive: boolean;
-  /** Specialty, PRC number, city and a fee are really filled in (profile-complete.ts), read before any display default. */
+  /** Specialty, PRC number, city, a fee and a profile photo are really there (profile-complete.ts), read before any display default. */
   profileComplete: boolean;
   /** 'always' when the doctor is open every day at any time (D43); shown as a chip on the Find a Doctor card. */
   availabilityMode: AvailabilityMode;
   /** The doctor's wallet is below ₱0 (D47): hidden from Find a Doctor until they top up. */
   walletBlocked: boolean;
+  /** The admin-approved suffix after the name, e.g. "MD, FPCP" (Providers.credentials, D55). '' = none. Shown with providerName(). */
+  credentials: string;
 };
 
 export type PaymentMethod = 'GCash' | 'Maya' | 'Credit / Debit Card' | 'Pay On-Site';
@@ -86,4 +88,9 @@ export type ProviderBookingEntry = {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod | null;
   queueNumber: number | null;
+  /** When the patient sent the request (Bookings.created_at): the time of its row in Recent Activity. */
+  createdAt: Date | null;
+  /** When the consultation ended (consultation_ended_at) and who ended it, for Recent Activity's "Consultation completed" row. */
+  endedAt: Date | null;
+  endedBy: 'doctor' | 'patient' | null;
 };

@@ -2,12 +2,19 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
-import { Button, TextField } from '../components/ui'
-import { LockIcon, MailIcon } from '../components/icons'
+import { EyeIcon, LockIcon, LogoMark, MailIcon } from '../components/icons'
 import { sendAdminPasswordReset, signInAdmin } from '../services/adminAccount'
 import { useResetEmail } from '../lib/useResetEmail'
+import LoginSlideshow from './login/LoginSlideshow'
 
 const LAST_EMAIL_KEY = 'diabeatis360:lastAdminEmail'
+
+/* Look of the Figma "Admin Login Page" export. Its button green (#629c2c) is slightly lighter than the theme's
+   --color-brand, so it is kept local to this page instead of changing the colour of every other admin page. */
+const GREEN_BG = 'bg-[#629c2c] hover:bg-[#558a25]'
+const FIELD =
+  'w-full rounded-xl border bg-white py-3 pl-11 pr-4 text-[15px] text-ink shadow-sm outline-none placeholder:text-gray-400 focus:border-[#629c2c] focus:ring-2 focus:ring-[#629c2c]/20'
+const LABEL = 'block text-[13px] font-semibold uppercase tracking-wide text-ink'
 
 function loginError(error) {
   const code = error?.code ?? ''
@@ -36,29 +43,41 @@ function ErrorBanner({ children }) {
   )
 }
 
-/** A brand-colored decorative panel standing in for the Figma login photo (no image asset to pull it from). */
-function BrandPanel() {
+/** The big rounded green button (Login / Send reset link / Back to login). */
+function PillButton({ className = '', ...props }) {
   return (
-    <div className="relative hidden flex-1 items-center justify-center overflow-hidden bg-brand-tint lg:flex">
-      <svg viewBox="0 0 400 400" className="absolute h-[34rem] w-[34rem] text-brand/10" fill="currentColor">
-        <circle cx="200" cy="200" r="200" />
-      </svg>
-      <svg viewBox="0 0 400 400" className="absolute h-96 w-96 text-brand/15" fill="currentColor">
-        <circle cx="200" cy="200" r="200" />
-      </svg>
-      <div className="relative flex flex-col items-center gap-6 px-10 text-center">
-        <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] bg-white shadow-lg">
-          <svg viewBox="0 0 24 24" className="h-14 w-14 text-brand" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 21s-7-4.6-7-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.4-7 10-7 10" />
-            <path d="M4.5 10.5h3l1.5-3 2 6 1.5-3h6" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-2xl font-extrabold text-ink">Track health, connect care</p>
-          <p className="mx-auto mt-2 max-w-xs text-sm text-muted">
-            The admin panel behind every doctor verification, appointment, and blood-sugar reading on Diabeatis360.
-          </p>
-        </div>
+    <button
+      type="button"
+      {...props}
+      className={`flex h-12 w-full items-center justify-center gap-2 rounded-full text-base font-semibold text-white shadow-lg shadow-[#629c2c]/25 transition disabled:cursor-not-allowed disabled:opacity-60 ${GREEN_BG} ${className}`}
+    />
+  )
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
+  )
+}
+
+/** Email input with the envelope icon inside it (used by the login and the reset form). */
+function EmailField({ value, onChange, invalid }) {
+  return (
+    <div>
+      <label htmlFor="admin-email" className={LABEL}>Email address</label>
+      <div className="relative mt-2">
+        <MailIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+        <input
+          id="admin-email"
+          type="email"
+          value={value}
+          onChange={onChange}
+          autoComplete="username"
+          placeholder="admin@diabeatis360.com"
+          className={`${FIELD} ${invalid ? 'border-red-300' : 'border-gray-200'}`}
+        />
       </div>
     </div>
   )
@@ -129,95 +148,119 @@ export default function LoginPage() {
     }
   }
 
+  const loginInvalid = Boolean(error || authMessage)
+
   return (
-    <div className="flex min-h-screen bg-page">
-      <div className="flex w-full flex-col justify-center px-8 py-12 sm:px-16 lg:w-[30rem] lg:shrink-0">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-tint text-xl">💚</div>
-          <p className="text-xl font-extrabold text-ink">Diabeatis<span className="text-brand">360</span></p>
+    // Page grey #f1f2f4 is the background baked into public/login-hero.png, so the first slide's edges disappear.
+    <div className="flex min-h-screen items-center justify-center bg-[#f1f2f4] px-4 py-6">
+      <div className="flex w-full max-w-[76rem] items-center justify-center gap-16">
+        {/* Left: slideshow of what the portal does. Hidden below the lg breakpoint so the form gets the whole width. */}
+        <div className="hidden min-w-0 max-w-[39rem] flex-1 lg:block">
+          <LoginSlideshow />
         </div>
-        <h1 className="text-2xl font-extrabold text-ink">{mode === 'login' ? 'Admin sign in' : mode === 'reset' ? 'Reset your password' : 'Check your email'}</h1>
-        <p className="mt-1 text-sm text-muted">
-          {mode === 'login'
-            ? 'Enter your credentials to access the admin portal.'
-            : mode === 'reset'
-              ? "Enter your email and we'll send you a reset link."
-              : 'Check your inbox for the next step.'}
-        </p>
 
-        {mode === 'login' ? (
-          <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
-            {/* Figma A-01: every login problem shows as one red banner at the top of the form. */}
-            {error ? <ErrorBanner>{error}</ErrorBanner> : null}
-            {!error && authMessage ? <ErrorBanner>{authMessage}</ErrorBanner> : null}
-            <div className="relative">
-              <TextField label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" className={`[&>input]:pl-11 ${error || authMessage ? '[&>input]:border-red-300' : ''}`} />
-              <MailIcon className="pointer-events-none absolute left-4 top-[2.35rem] h-4 w-4 text-muted" />
-            </div>
-            <div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="admin-password" className="text-sm font-medium text-ink">Password</label>
-                <button type="button" onClick={openReset} className="text-sm font-bold text-brand underline-offset-2 hover:underline">
-                  Forgot password?
-                </button>
-              </div>
-              <div className="relative mt-1">
-                <LockIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                <input
-                  id="admin-password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-11 pr-11 text-sm outline-none focus:border-brand"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted hover:text-ink"
-                >
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand" />
-              Keep me logged in
-            </label>
-
-            <Button type="submit" className="w-full" disabled={busy}>{busy ? 'Signing in…' : 'Login →'}</Button>
-          </form>
-        ) : null}
-
-        {mode === 'reset' ? (
-          // Figma A-02: the reset request has its own card instead of a note under the link.
-          <form onSubmit={sendReset} className="mt-8 space-y-4" noValidate>
-            {resetError ? <ErrorBanner>{resetError}</ErrorBanner> : null}
-            <div className="relative">
-              <TextField label="Email address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" className="[&>input]:pl-11" />
-              <MailIcon className="pointer-events-none absolute left-4 top-[2.35rem] h-4 w-4 text-muted" />
-            </div>
-            <Button type="submit" className="w-full" disabled={reset.busy}>{reset.label('Send reset link')}</Button>
-            <button type="button" onClick={() => setMode('login')} className="w-full text-sm font-bold text-brand hover:underline">Back to login</button>
-          </form>
-        ) : null}
-
-        {mode === 'sent' ? (
-          <div className="mt-8 space-y-4 text-center" role="status">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-tint text-2xl text-brand">✓</div>
-            <p className="text-lg font-extrabold text-ink">Check your email</p>
-            <p className="text-sm text-muted">We sent a reset link to {maskEmail(sentTo)}. If it has an admin account, the email arrives within a minute (look in Spam too).</p>
-            <Button type="button" className="w-full" onClick={() => { setMode('login'); setPassword('') }}>Back to login</Button>
-            <button type="button" onClick={(event) => sendReset(event)} disabled={reset.busy} className="w-full text-sm font-bold text-brand hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline">
-              {reset.label('Resend link')}
-            </button>
+        {/* Right column: logo, heading, form card, footer */}
+        <div className="flex w-full max-w-[27.5rem] shrink-0 flex-col items-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <LogoMark className="h-10 w-10 object-contain" />
           </div>
-        ) : null}
+          {/* "360" uses the Figma green: allowed for large bold text (3.33:1 passes the 3:1 large-text rule, D37). */}
+          <h1 className="mt-4 text-[2.125rem] font-extrabold tracking-tight text-ink">
+            Diabeatis<span className="text-[#629c2c]">360</span>
+          </h1>
+          <p className="mt-2 text-center text-[15px] text-gray-600">
+            {mode === 'login'
+              ? 'Enter your credentials to access the admin portal.'
+              : mode === 'reset'
+                ? "Enter your email and we'll send you a reset link."
+                : 'Check your inbox for the next step.'}
+          </p>
+
+          <div className="mt-8 w-full rounded-3xl border border-gray-200 bg-white p-9 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+            {mode === 'login' ? (
+              <form onSubmit={submit} className="space-y-4" noValidate>
+                {/* Figma A-01: every login problem shows as one red banner at the top of the form. */}
+                {error ? <ErrorBanner>{error}</ErrorBanner> : null}
+                {!error && authMessage ? <ErrorBanner>{authMessage}</ErrorBanner> : null}
+
+                <EmailField value={email} onChange={(e) => setEmail(e.target.value)} invalid={loginInvalid} />
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="admin-password" className={LABEL}>Password</label>
+                    <button type="button" onClick={openReset} className="text-[13px] font-medium text-[#629c2c] underline underline-offset-2 hover:text-[#558a25]">
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative mt-2">
+                    <LockIcon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                    <input
+                      id="admin-password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                      placeholder="••••••••"
+                      className={`${FIELD} pr-12 ${loginInvalid ? 'border-red-300' : 'border-gray-200'}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                      className={`absolute right-4 top-1/2 -translate-y-1/2 hover:text-ink ${showPassword ? 'text-[#629c2c]' : 'text-gray-500'}`}
+                    >
+                      <EyeIcon className="h-[18px] w-[18px]" />
+                    </button>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 text-[15px] text-gray-600">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-[#629c2c]" />
+                  Keep me logged in
+                </label>
+
+                <div className="pt-1">
+                  <PillButton type="submit" disabled={busy}>
+                    {busy ? 'Signing in…' : <>Login <ArrowRightIcon /></>}
+                  </PillButton>
+                </div>
+              </form>
+            ) : null}
+
+            {mode === 'reset' ? (
+              // Figma A-02: the reset request uses the same card.
+              <form onSubmit={sendReset} className="space-y-4" noValidate>
+                {resetError ? <ErrorBanner>{resetError}</ErrorBanner> : null}
+                <EmailField value={email} onChange={(e) => setEmail(e.target.value)} invalid={Boolean(resetError)} />
+                <div className="pt-2">
+                  <PillButton type="submit" disabled={reset.busy}>{reset.label('Send reset link')}</PillButton>
+                </div>
+                <button type="button" onClick={() => setMode('login')} className="w-full text-sm font-semibold text-[#629c2c] hover:underline">Back to login</button>
+              </form>
+            ) : null}
+
+            {mode === 'sent' ? (
+              <div className="space-y-4 text-center" role="status">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-tint text-2xl text-[#629c2c]">✓</div>
+                <p className="text-lg font-extrabold text-ink">Check your email</p>
+                <p className="text-sm text-gray-600">We sent a reset link to {maskEmail(sentTo)}. If it has an admin account, the email arrives within a minute (look in Spam too).</p>
+                <PillButton onClick={() => { setMode('login'); setPassword('') }}>Back to login</PillButton>
+                <button type="button" onClick={(event) => sendReset(event)} disabled={reset.busy} className="w-full text-sm font-semibold text-[#629c2c] hover:underline disabled:cursor-not-allowed disabled:text-muted disabled:no-underline">
+                  {reset.label('Resend link')}
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* There are no Terms / Privacy pages yet, so these are plain text (as drawn) rather than dead links. */}
+          <p className="mt-14 flex items-center gap-4 text-sm text-gray-400">
+            <span>Terms of Service</span>
+            <span aria-hidden="true">•</span>
+            <span>Privacy Policy</span>
+          </p>
+        </div>
       </div>
-      <BrandPanel />
     </div>
   )
 }

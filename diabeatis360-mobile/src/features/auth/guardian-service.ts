@@ -1,4 +1,4 @@
-import { doc, onSnapshot, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, Timestamp, writeBatch } from 'firebase/firestore';
 import { getDownloadURL, list, ref, uploadBytes } from 'firebase/storage';
 
 import { db, storage } from '@/firebase';
@@ -67,8 +67,13 @@ async function uploadGuardianId(uid: string, localUri: string): Promise<string> 
 
 /**
  * Submits (or resubmits after a rejection) the guardian verification for the signed-in child's own account.
- * A single `setDoc(..., { merge: true })` covers both cases: firestore.rules picks `allow create` the first
+ * `set(..., { merge: true })` covers both cases: firestore.rules picks `allow create` the first
  * time and `allow update` on a resubmission, based on whether the document already exists.
+ *
+ * The same batch copies the guardian's name and relationship (never the photo) onto the child's Users doc, so a
+ * doctor the child booked can see who runs the account (QA DOC-013 part 2): a doctor can read Users but not
+ * Guardian_Verifications. firestore.rules only accepts the copy when it equals the verification saved in the same
+ * write, which is why both go in one batch: either both are saved or neither.
  */
 export async function submitGuardianVerification(
   uid: string,
@@ -86,14 +91,18 @@ export async function submitGuardianVerification(
     const code = typeof error === 'object' && error && 'code' in error ? ` (${String((error as { code: unknown }).code)})` : '';
     throw new Error(`We could not upload the ID photo${code}. Please check your connection and try again.`);
   }
-  await setDoc(doc(db, 'Guardian_Verifications', uid), {
+  const name = guardianFullName.trim();
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'Guardian_Verifications', uid), {
     user_id: uid,
-    guardian_full_name: guardianFullName.trim(),
+    guardian_full_name: name,
     relationship_to_minor: relationship,
     guardian_id_photo_url: photoUrl,
     verification_status: 'pending',
     submitted_at: serverTimestamp(),
   }, { merge: true });
+  batch.set(doc(db, 'Users', uid), { guardian_full_name: name, guardian_relationship: relationship }, { merge: true });
+  await batch.commit();
 }
 
 export function subscribeToGuardianVerification(

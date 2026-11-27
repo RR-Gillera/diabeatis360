@@ -7,9 +7,12 @@ import { FREE_LIMITS, PREMIUM_FAIR_USE } from './plans.ts';
 
 const server = readFileSync(new URL('../../../functions/lib/limits.js', import.meta.url), 'utf8');
 
-/** "const NAME = { ai: 2, scan: 3 }" in the server file, as numbers. */
+/**
+ * "const NAME = { ai: 2, scan: 3, ... }" in the server file, as numbers. Later entries (risk: one daily assessment on
+ * every plan, D51) are not plan limits the app shows, so only ai and scan are compared.
+ */
 function serverLimits(name) {
-  const match = new RegExp(`const ${name} = \\{ ai: (\\d+), scan: (\\d+) \\}`).exec(server);
+  const match = new RegExp(`const ${name} = \\{ ai: (\\d+), scan: (\\d+)[, ]`).exec(server);
   assert.ok(match, `${name} not found in functions/lib/limits.js`);
   return { ai: Number(match[1]), scan: Number(match[2]) };
 }

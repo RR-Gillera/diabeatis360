@@ -3,9 +3,11 @@ import { useRouter, type Href } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
 import { formatDate, formatFee } from '@/features/booking/booking-ui';
+import { credentialsState, withCredentials } from '@/features/doctor/credentials';
 import { credentialStatus, doctorDisplayName, doctorInitials, licenseStatus } from '@/features/doctor/doctor-profile';
 import { InfoRow, LinkRow, ProfileSection } from '@/features/doctor/doctor-profile-ui';
 import { subscribeToDoctorPhone, subscribeToDoctorProfile } from '@/features/doctor/doctor-service';
@@ -13,12 +15,15 @@ import { DoctorBottomNav, doctorStyles } from '@/features/doctor/doctor-ui';
 import type { DoctorProfile } from '@/features/doctor/types';
 import { displayPhone } from '@/features/family/phone';
 import { homeColors } from '@/features/home/home-ui';
+import { Avatar } from '@/features/photos/avatar';
+import { PhotoSheet } from '@/features/photos/photo-sheet';
 import { formatPeso } from '@/features/wallet/wallet-format';
 import { subscribeToWalletBalance } from '@/features/wallet/wallet-service';
 import { useT } from '@/i18n/language-context';
 import { resetTo } from '@/lib/navigation';
 
 const EDIT_PROFILE = '/doctor/edit-profile' as Href;
+const CHANGE_PASSWORD = '/doctor/change-password' as Href;
 
 const PILL = {
   verified: { text: homeColors.green, background: '#E8F0DE' },
@@ -31,13 +36,13 @@ const PILL = {
 // wallet, PIN and language rows open their own screens. Differences from the frame are listed in docs/FIGMA_MAP.md.
 export default function DoctorProfileScreen() {
   const router = useRouter();
-  const { uid, email, signOut, resetPassword } = useAuth();
+  const { uid, email, signOut } = useAuth();
   const { t, language } = useT();
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [phone, setPhone] = useState('');
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [reset, setReset] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const [photoSheet, setPhotoSheet] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -50,41 +55,44 @@ export default function DoctorProfileScreen() {
     return () => stops.forEach((stop) => stop());
   }, [uid]);
 
-  // Change Password sends Firebase's reset link to the sign-in email (the same link as Forgot Password), so the app
-  // never handles the old or new password itself.
-  const changePassword = async () => {
-    if (!email || reset === 'sending') return;
-    setReset('sending');
-    try {
-      await resetPassword(email);
-      setReset('sent');
-    } catch {
-      setReset('failed');
-    }
-  };
-
-  const name = profile ? doctorDisplayName(profile.fullName) : '';
+  // The name as patients see it: with the credentials an admin approved (D55 part 1), never a request still waiting.
+  const name = profile ? withCredentials(doctorDisplayName(profile.fullName), profile.credentials) : '';
+  const suffix = profile ? credentialsState(profile) : 'none';
+  const suffixValue = !profile || suffix === 'none'
+    ? t('doctor.profile.notAdded')
+    : suffix === 'approved'
+      ? profile.credentials
+      : suffix === 'pending'
+        ? `${profile.credentialsRequested} · ${t('doctor.cred.statusPending')}`
+        : `${profile.credentialsRequested} · ${t('doctor.cred.statusRejected', { reason: profile.credentialsRejectionReason })}`;
   const subtitle = profile ? [profile.specialty, profile.city].filter(Boolean).join(' • ') : '';
   const credential = credentialStatus(profile?.isVerified ?? false, profile?.rejectionReason ?? '');
   const license = licenseStatus(profile?.licenseExpiry ?? null);
   const incomplete = profile !== null && (!profile.specialty || !profile.prcLicenseNumber || !profile.city || !profile.consultationFee);
+  const noPhoto = profile !== null && !profile.hasPhoto;
   const notAdded = t('doctor.profile.notAdded');
 
   return (
     <View style={doctorStyles.screen}>
+      {/* The shared tab bar (components/ui/tab-header.tsx), with the edit pencil, fixed above the scroll. */}
+      <TabHeader
+        title={t('doctor.profile.title')}
+        right={(
+          <Pressable accessibilityRole="button" accessibilityLabel={t('doctor.profile.edit')} hitSlop={8} style={styles.editButton} onPress={() => router.push(EDIT_PROFILE)}>
+            <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} tintColor="#334155" />
+          </Pressable>
+        )}
+      />
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* The white top card: title and pencil, avatar, name with the verified check, specialty and city. */}
+        {/* The white top card: avatar, name with the verified check, specialty and city. */}
         <View style={styles.top}>
-          <View style={styles.titleRow}>
-            <Text accessibilityRole="header" style={styles.title}>{t('doctor.profile.title')}</Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={t('doctor.profile.edit')} hitSlop={8} style={styles.editButton} onPress={() => router.push(EDIT_PROFILE)}>
-              <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={16} tintColor="#334155" />
-            </Pressable>
-          </View>
-          {/* Initials, not a photo: there is no photo field and no file storage on the Spark plan (D18). */}
-          <View style={styles.avatarRing}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{doctorInitials(profile?.fullName ?? '')}</Text></View>
-          </View>
+          {/* The profile photo (D54), required for doctors: tapping it changes it. Initials show only until it loads. */}
+          <Pressable accessibilityRole="button" accessibilityLabel={t('photo.change')} onPress={() => setPhotoSheet(true)} style={styles.avatarRing}>
+            <Avatar uid={uid} name={profile?.fullName ?? ''} initials={doctorInitials(profile?.fullName ?? '')} style={styles.avatar} textStyle={styles.avatarText} />
+            <View style={styles.avatarCamera}>
+              <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={13} tintColor="#FFFFFF" />
+            </View>
+          </Pressable>
           <View style={styles.nameRow}>
             <Text style={styles.name}>{name || t('doctor.profile.yourName')}</Text>
             {profile?.isVerified ? (
@@ -97,6 +105,12 @@ export default function DoctorProfileScreen() {
 
         <View style={styles.body}>
           {loadFailed ? <Text style={[doctorStyles.error, styles.gap]}>{t('doctor.profile.loadFailed')}</Text> : null}
+          {noPhoto ? (
+            <Pressable accessibilityRole="button" style={styles.notice} onPress={() => setPhotoSheet(true)}>
+              <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={15} tintColor={homeColors.orange} />
+              <Text style={styles.noticeText}>{`${t('doctor.photoTitle')}. ${t('doctor.photoText')}`}</Text>
+            </Pressable>
+          ) : null}
           {incomplete ? (
             <Pressable accessibilityRole="button" style={styles.notice} onPress={() => router.push(EDIT_PROFILE)}>
               <SymbolView name={{ ios: 'info.circle.fill', android: 'info', web: 'info' }} size={15} tintColor={homeColors.orange} />
@@ -116,7 +130,15 @@ export default function DoctorProfileScreen() {
           </ProfileSection>
 
           <ProfileSection icon={{ ios: 'briefcase.fill', android: 'work' }} title={t('doctor.profile.professional')}>
-            <InfoRow first edit label={t('doctor.profile.prc')} value={profile?.prcLicenseNumber || notAdded} valueTone={profile?.prcLicenseNumber ? undefined : 'muted'} onPress={() => router.push(EDIT_PROFILE)} />
+            <InfoRow
+              first
+              edit
+              label={t('doctor.cred.row')}
+              value={suffixValue}
+              valueTone={suffix === 'none' || suffix === 'pending' ? 'muted' : suffix === 'rejected' ? 'danger' : undefined}
+              onPress={() => router.push(EDIT_PROFILE)}
+            />
+            <InfoRow edit label={t('doctor.profile.prc')} value={profile?.prcLicenseNumber || notAdded} valueTone={profile?.prcLicenseNumber ? undefined : 'muted'} onPress={() => router.push(EDIT_PROFILE)} />
             <InfoRow
               edit
               label={t('doctor.profile.expiry')}
@@ -158,13 +180,8 @@ export default function DoctorProfileScreen() {
           </ProfileSection>
 
           <ProfileSection icon={{ ios: 'shield.fill', android: 'shield' }} title={t('doctor.profile.settings')}>
-            <LinkRow
-              first
-              icon={{ ios: 'lock.fill', android: 'lock' }}
-              title={t('doctor.profile.changePassword')}
-              detail={reset === 'sent' ? t('doctor.profile.resetSent', { email: email ?? '' }) : reset === 'failed' ? t('doctor.profile.resetFailed') : undefined}
-              onPress={changePassword}
-            />
+            {/* Opens its own screen (D55 part 3): current password, then the new one twice. */}
+            <LinkRow first icon={{ ios: 'lock.fill', android: 'lock' }} title={t('doctor.profile.changePassword')} onPress={() => router.push(CHANGE_PASSWORD)} />
             {/* The app PIN (D42) stays: the frame's "Notification Preferences" is left out, because notifications are
                 always on (D29) and the reminder settings screen is the patient's. */}
             <LinkRow icon={{ ios: 'circle.grid.3x3.fill', android: 'dialpad' }} title={t('pin.menu.change')} onPress={() => router.push('/change-pin')} />
@@ -176,6 +193,7 @@ export default function DoctorProfileScreen() {
               onPress={() => router.push('/doctor/wallet')}
             />
             <LinkRow icon={{ ios: 'globe', android: 'language' }} title={t('profile.menu.language')} value={language} onPress={() => router.push('/language-settings')} />
+            <LinkRow icon={{ ios: 'exclamationmark.bubble.fill', android: 'report' }} title={t('report.menu')} onPress={() => router.push('/report-problem')} />
           </ProfileSection>
 
           <Pressable accessibilityRole="button" style={styles.logout} onPress={() => { signOut(); resetTo(router, '/'); }}>
@@ -185,19 +203,19 @@ export default function DoctorProfileScreen() {
         </View>
       </ScrollView>
       <DoctorBottomNav active="profile" />
+      <PhotoSheet visible={photoSheet} onClose={() => setPhotoSheet(false)} uid={uid} isDoctor hasPhoto={profile?.hasPhoto ?? false} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 140 },
-  top: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 20, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.05, shadowRadius: 6 },
-  titleRow: { alignItems: 'center', alignSelf: 'stretch', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  title: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 22 },
+  top: { alignItems: 'center', backgroundColor: homeColors.card, borderBottomLeftRadius: 24, borderBottomRightRadius: 24, paddingBottom: 24, paddingHorizontal: 24, paddingTop: 16, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.05, shadowRadius: 6 },
   editButton: { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
   avatarRing: { borderColor: '#FFFFFF', borderRadius: 52, borderWidth: 4, shadowColor: '#000', shadowOffset: { height: 2, width: 0 }, shadowOpacity: 0.12, shadowRadius: 8 },
   avatar: { alignItems: 'center', backgroundColor: homeColors.greenTint, borderRadius: 48, height: 96, justifyContent: 'center', width: 96 },
   avatarText: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 32 },
+  avatarCamera: { alignItems: 'center', backgroundColor: homeColors.green, borderColor: '#FFFFFF', borderRadius: 15, borderWidth: 2, bottom: -2, height: 30, justifyContent: 'center', position: 'absolute', right: -2, width: 30 },
   nameRow: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 14 },
   name: { color: '#0F172A', fontFamily: Brand.font.extraBold, fontSize: 19, textAlign: 'center' },
   subtitle: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 14, marginTop: 4, textAlign: 'center' },

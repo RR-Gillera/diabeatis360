@@ -26,3 +26,9 @@ docs/reports/qa-*/**/*.mkv
 
 # Local QA tooling (Playwright for QA runs); not part of either app
 qa-tools/
+
+# The manuscript (Capstone 1 and 2 .docx files): 50+ MB each, so it is kept in Google Drive, not in git
+DIABEATIS360 CAPSTONE PROJECT *.docx
+
+# Local Firebase emulator export used for QA runs (firebase emulators:exec --import ./qa-emulator-data); test data, not source
+qa-emulator-data/

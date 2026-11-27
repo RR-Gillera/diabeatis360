@@ -6,7 +6,8 @@ import type { Interpretation, MealContext } from '@/constants/enums';
 import { translate, type Language } from '@/i18n/translate';
 
 export type NotificationType =
-  | 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification' | 'doctor_verification';
+  | 'glucose_alert' | 'booking_update' | 'message' | 'reminder' | 'announcement' | 'guardian_verification' | 'doctor_verification'
+  | 'report_update';
 
 export type NotificationEntry = {
   id: string;

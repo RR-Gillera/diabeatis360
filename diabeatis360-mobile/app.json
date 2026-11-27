@@ -2,7 +2,7 @@
   "expo": {
     "name": "Diabeatis360",
     "slug": "diabeatis360-mobile",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "diabeatis360mobile",
@@ -16,6 +16,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "allowBackup": false,
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -40,8 +41,17 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels.",
-          "recordAudioAndroid": false
+          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels, take your profile photo and join video consultations.",
+          "microphonePermission": "Allow Diabeatis360 to use the microphone so your doctor can hear you during video consultations.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Diabeatis360 to use a photo from your library as your profile photo.",
+          "cameraPermission": "Allow Diabeatis360 to use the camera to scan nutrition labels, take your profile photo and join video consultations.",
+          "microphonePermission": "Allow Diabeatis360 to use the microphone so your doctor can hear you during video consultations."
         }
       ],
       [

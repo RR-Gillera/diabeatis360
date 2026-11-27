@@ -120,3 +120,7 @@ export function LogoMark(props) {
     <img src="/logo-mark.png" alt="Diabeatis360 logo" {...props} />
   )
 }
+
+export function FlagIcon(props) {
+  return <Icon {...props}><path d="M5 21V4" /><path d="M5 4h11l-2 4 2 4H5" /></Icon>
+}

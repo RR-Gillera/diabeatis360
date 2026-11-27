@@ -2,6 +2,7 @@ import { addDoc, collection, doc, getDoc, onSnapshot, query, serverTimestamp, se
 
 import { db } from '@/firebase';
 import type { ConsultationStatus } from '@/constants/enums';
+import { doctorDisplayName } from '@/features/doctor/doctor-profile';
 import { createNotification } from '@/features/notifications/notification-service';
 import { settleWallet } from '@/features/wallet/wallet-service';
 
@@ -66,7 +67,8 @@ export async function sendMessage(bookingId: string, senderId: string, senderRol
     // Name the sender rather than their role — "Dr. Santos sent you a message"
     // is far more useful in a notification list than "Your doctor".
     const senderDoc = await getDoc(doc(db, senderRole === 'doctor' ? 'Providers' : 'Users', senderId));
-    const senderName = String(senderDoc.data()?.full_name ?? '').trim();
+    const rawName = String(senderDoc.data()?.full_name ?? '').trim();
+    const senderName = senderRole === 'doctor' ? doctorDisplayName(rawName) : rawName;
     const who = senderName || (senderRole === 'doctor' ? 'Your doctor' : 'Your patient');
     const preview = trimmed.length > 80 ? `${trimmed.slice(0, 80)}...` : trimmed;
     await createNotification(recipientId, 'message', `${who} sent you a message: "${preview}"`, 'info', bookingId);

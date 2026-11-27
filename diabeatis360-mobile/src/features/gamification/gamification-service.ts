@@ -1,6 +1,7 @@
 import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, Timestamp, where } from 'firebase/firestore';
 
 import { db } from '@/firebase';
+import { challengeBonus } from '@/features/gamification/challenges';
 import type { GlucoseLogEntry } from '@/features/glucose/types';
 
 export type Badge = {
@@ -22,6 +23,8 @@ export type WellnessStats = {
   bestStreak: number;
   totalLogs: number;
   daysLogged: number;
+  /** Bonus points from weekly challenges finished, this week and before (challenges.ts, D51). Included in `points`. */
+  challengePoints: number;
   points: number;
 };
 
@@ -39,7 +42,10 @@ function parseCriteria(criteria: string): { threshold: number; kind: BadgeKind }
   return { threshold: amount || 0, kind: 'other' };
 }
 
-/** Points are earned per reading logged, with a bonus for keeping a streak. Exported so screens quote the same number. */
+/**
+ * Points are earned per reading logged, with a bonus for keeping a streak and for each weekly challenge finished
+ * (challenges.ts, D51). Exported so screens quote the same number.
+ */
 export const POINTS_PER_LOG = 5;
 const POINTS_PER_STREAK_DAY = 2;
 
@@ -72,12 +78,14 @@ export function wellnessStats(entries: GlucoseLogEntry[]): WellnessStats {
     bestStreak = Math.max(bestStreak, run);
   }
 
+  const challengePoints = challengeBonus(entries);
   return {
     streak,
     bestStreak,
     totalLogs: entries.length,
     daysLogged: days.length,
-    points: entries.length * POINTS_PER_LOG + streak * POINTS_PER_STREAK_DAY,
+    challengePoints,
+    points: entries.length * POINTS_PER_LOG + streak * POINTS_PER_STREAK_DAY + challengePoints,
   };
 }
 

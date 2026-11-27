@@ -26,7 +26,8 @@ export type SocialSignIn = {
   verificationEmailSent: boolean | null;
 };
 
-function credentialFor({ provider, token }: SocialToken) {
+/** Turns Google's or Facebook's answer into a Firebase credential. Also used by "Forgot PIN?" (pin-reset-service.ts). */
+export function credentialFor({ provider, token }: SocialToken) {
   return provider === 'google' ? GoogleAuthProvider.credential(token) : FacebookAuthProvider.credential(token);
 }
 

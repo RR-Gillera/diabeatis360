@@ -5,12 +5,13 @@ import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { APPOINTMENT_TABS, initialsOf, tabFor, type AppointmentTab } from '@/features/booking/appointment-tabs';
+import { APPOINTMENT_TABS, tabFor, type AppointmentTab } from '@/features/booking/appointment-tabs';
 import { subscribeToBookingHistory, subscribeToProviders } from '@/features/booking/booking-service';
-import { formatApptDate, formatApptTime } from '@/features/booking/booking-ui';
+import { formatApptDate, formatApptTime, providerName } from '@/features/booking/booking-ui';
 import type { AppointmentHistoryEntry, Provider } from '@/features/booking/types';
 import { BottomNav, homeColors } from '@/features/home/home-ui';
 import { useT } from '@/i18n/language-context';
+import { Avatar } from '@/features/photos/avatar';
 
 // "My Appointments" (Figma P-21): every booking of the signed-in patient, split into Upcoming, Pending, Completed and
 // Declined. Opened from the "more" menu on Find a Doctor. Tapping a card opens its details.
@@ -67,11 +68,11 @@ export default function MyAppointmentsScreen() {
             // The card is a plain View: its top part opens the details and the action buttons sit beside it, because a
             // button inside a button is invalid on the web and confusing for screen readers.
             <View key={entry.id} style={styles.card}>
-              <Pressable accessibilityRole="button" accessibilityLabel={t('appt.cardLabel', { name: entry.provider?.fullName ?? t('appt.doctor') })} style={styles.details} onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('appt.cardLabel', { name: entry.provider ? providerName(entry.provider) : t('appt.doctor') })} style={styles.details} onPress={() => router.push({ pathname: '/booking/appointment', params: { id: entry.id } })}>
               <View style={styles.top}>
-                <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(entry.provider?.fullName)}</Text></View>
+                <Avatar uid={entry.provider?.id} name={entry.provider?.fullName} style={styles.avatar} textStyle={styles.avatarText} />
                 <View style={styles.who}>
-                  <Text style={styles.name}>{entry.provider?.fullName ?? t('appt.doctor')}</Text>
+                  <Text style={styles.name}>{entry.provider ? providerName(entry.provider) : t('appt.doctor')}</Text>
                   <Text style={styles.specialty}>{entry.provider?.specialty ?? ''}</Text>
                 </View>
                 <View style={[styles.pill, { backgroundColor: look.background }]}>

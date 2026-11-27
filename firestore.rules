@@ -20,6 +20,10 @@ rules_version = '2';
 // profile and blood sugar readings only through Care_Links, a share the patient makes by booking that doctor. The doctor's
 // written summary lives in Consultation_Notes, readable by the two people on the booking only.
 //
+// Reported consultations (D58): when the patient or the doctor on a booking reports the other, an admin may read THAT
+// booking's chat and consultation notes to investigate, after recording that they opened it (Admin_Access_Log). No other
+// chat is ever readable by an admin.
+//
 // KNOWN LIMITATIONS (be upfront about these in the defense):
 //   1. A doctor keeps seeing a patient's profile and readings after a CONSULTATION ENDS, until the patient removes the
 //      share (the rules allow it; the app has no button for it yet). A declined or cancelled booking removes it at once.
@@ -162,6 +166,22 @@ service cloud.firestore {
             || bookingData(bookingId).provider_id == request.auth.uid);
     }
 
+    // ---- admin review of a reported consultation (DECISIONS.md D58)
+
+    // The id of the conduct report one person on a booking filed about the other: "<bookingId>_<reporterId>". The Reports
+    // rules force this id, so these rules can find a report without searching the collection.
+    function conductReportId(bookingId, reporterId) {
+      return bookingId + '_' + reporterId;
+    }
+
+    // True when the caller is an admin who may read this booking's chat and consultation notes. That needs an
+    // Admin_Access_Log record of this admin opening it, and that record can only be made after the patient or the doctor
+    // on the booking reported the other. So an admin never reads a chat nobody reported, and never without a record.
+    function adminMayReview(bookingId) {
+      return isAdmin()
+        && exists(/databases/$(database)/documents/Admin_Access_Log/$(bookingId + '_' + request.auth.uid));
+    }
+
     // A well-formed new video call (D11): started by a person in a CONFIRMED booking, ringing the OTHER person on it,
     // who has confirmed their own email address (D21).
     function validNewCall(bookingId) {
@@ -237,6 +257,18 @@ service cloud.firestore {
         return !keys.hasAny(['phone_number'])
           || (data.phone_number is string && (data.phone_number == '' || data.phone_number.matches('^[+]639[0-9]{9}$')));
       }
+      // A child's account (D16) keeps a copy of its guardian's name and relationship (never the ID photo) so that a doctor
+      // the child booked can see who runs the account (QA DOC-013 part 2): a doctor can read this Users doc (canSeePatient)
+      // but not Guardian_Verifications. The copy may only be written on a 'minor' account, and only equal to the
+      // Guardian_Verifications document as it stands after the same write (the app saves both in one batch), so it
+      // can never say something the admin did not review.
+      function okGuardianCopy(data, keys) {
+        return !keys.hasAny(['guardian_full_name', 'guardian_relationship'])
+          || (data.get('account_type', 'self') == 'minor'
+              && existsAfter(/databases/$(database)/documents/Guardian_Verifications/$(userId))
+              && data.get('guardian_full_name', '') == getAfter(/databases/$(database)/documents/Guardian_Verifications/$(userId)).data.guardian_full_name
+              && data.get('guardian_relationship', '') == getAfter(/databases/$(database)/documents/Guardian_Verifications/$(userId)).data.relationship_to_minor);
+      }
       // A person reads their own profile; admins manage users; a doctor reads only the profiles of patients who shared
       // them by booking that doctor (Care_Links, D22), not every patient's.
       allow read: if isUser(userId) || isAdmin() || canSeePatient(userId);
@@ -245,7 +277,8 @@ service cloud.firestore {
       allow create: if isUser(userId) && request.resource.data.get('is_active', true) == true
                     && request.resource.data.get('account_type', 'self') in ['self', 'minor']
                     && okHealth(request.resource.data, request.resource.data.keys())
-                    && okPhone(request.resource.data, request.resource.data.keys());
+                    && okPhone(request.resource.data, request.resource.data.keys())
+                    && okGuardianCopy(request.resource.data, request.resource.data.keys());
       // Owners edit their own profile but cannot reactivate/deactivate themselves; only admins flip is_active.
       // account_type (D16) is set once — the Users doc already exists by the time onboarding chooses "For me" /
       // "For my child" (it is created earlier, at email verification), so this has to be an update, not a
@@ -255,6 +288,7 @@ service cloud.firestore {
                     || (isUser(userId) && !changedKeys().hasAny(['is_active'])
                         && okHealth(request.resource.data, changedKeys())
                         && okPhone(request.resource.data, changedKeys())
+                        && okGuardianCopy(request.resource.data, changedKeys())
                         && (!changedKeys().hasAny(['account_type'])
                             || (!('account_type' in resource.data) && request.resource.data.account_type in ['self', 'minor'])));
       // Accounts are deactivated, never deleted, so history (bookings, logs) stays intact.
@@ -270,6 +304,36 @@ service cloud.firestore {
         return !keys.hasAny(['consultation_fee'])
           || (data.consultation_fee is number && data.consultation_fee >= 0 && data.consultation_fee <= 20000);
       }
+      // has_photo (D54) puts a doctor on Find a Doctor, so it may only say true when the doctor's Profile_Photos document
+      // exists after the same write (the app saves both in one batch). A doctor cannot appear "with a photo" without one.
+      function okPhotoFlag(data, keys) {
+        return !keys.hasAny(['has_photo'])
+          || (data.has_photo is bool
+              && (data.has_photo == false || existsAfter(/databases/$(database)/documents/Profile_Photos/$(providerId))));
+      }
+      // The credentials after a doctor's name ("MD, FPCP", DECISIONS.md D55 part 1). Patients see only `credentials`,
+      // and only an admin can give it a value: by approving exactly what the doctor asked for in `credentials_requested`.
+      // Letters, spaces and . , ( ) - only, at most 60 characters (the app's own check is features/doctor/credentials.ts).
+      function okCredentialText(value) {
+        return value is string && value.size() <= 60 && (value == '' || value.matches('[A-Za-z][A-Za-z.,() -]*'));
+      }
+      // The doctor's side: ask for a suffix (or withdraw the request with ''), clear the admin's rejection reason when
+      // asking again, and remove an approved suffix. The doctor can never put a new value in `credentials` itself.
+      function okDoctorCredentials(data, keys) {
+        return (!keys.hasAny(['credentials_requested']) || okCredentialText(data.credentials_requested))
+          && (!keys.hasAny(['credentials']) || data.credentials == '')
+          && (!keys.hasAny(['credentials_rejection_reason']) || data.credentials_rejection_reason == '');
+      }
+      // The admin's side: approve (credentials := the request, the request is cleared), reject with a reason (the request
+      // stays, so the doctor sees what was refused), or remove a suffix that turns out to be false ('').
+      function okAdminCredentials(keys) {
+        return (!keys.hasAny(['credentials'])
+                || request.resource.data.credentials == ''
+                || request.resource.data.credentials == resource.data.get('credentials_requested', ''))
+          && (!keys.hasAny(['credentials_requested']) || request.resource.data.credentials_requested == '')
+          && (!keys.hasAny(['credentials_rejection_reason'])
+              || (request.resource.data.credentials_rejection_reason is string && request.resource.data.credentials_rejection_reason.size() <= 500));
+      }
       // Any signed-in user can browse the doctor directory (patients need it to book).
       allow read: if signedIn();
       // A doctor creates their own profile, but can never create it pre-verified or pre-approved, and can never
@@ -280,7 +344,9 @@ service cloud.firestore {
                     && request.resource.data.get('is_verified', false) == false
                     && request.resource.data.get('is_active', true) == true
                     && !request.resource.data.keys().hasAny(['verified_by', 'reviewed_by', 'reviewed_at', 'created_by_admin', 'wallet_blocked'])
-                    && okFee(request.resource.data, request.resource.data.keys());
+                    && okFee(request.resource.data, request.resource.data.keys())
+                    && okPhotoFlag(request.resource.data, request.resource.data.keys())
+                    && okDoctorCredentials(request.resource.data, request.resource.data.keys());
       // wallet_blocked (D47) is written only by the server, so a doctor cannot unblock themselves without topping up.
       // Doctors edit their profile/schedule but cannot verify/activate themselves or touch the admin review
       // trail; they MAY still clear rejection_reason themselves when they resubmit (module 10, admin Figma pass).
@@ -290,14 +356,41 @@ service cloud.firestore {
       // account did it instead of being any string an admin chooses. verified_by is pinned the same way. The fee is checked
       // only when it changes, so a doctor with an old out-of-range fee can still edit their other fields.
       allow update: if (isUser(providerId) && !changedKeys().hasAny(['is_verified', 'verified_by', 'is_active', 'reviewed_by', 'reviewed_at', 'created_by_admin', 'wallet_blocked'])
-                        && okFee(request.resource.data, changedKeys()))
-                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin'])
+                        && okFee(request.resource.data, changedKeys())
+                        && okPhotoFlag(request.resource.data, changedKeys())
+                        && okDoctorCredentials(request.resource.data, changedKeys()))
+                    || (isAdmin() && changedKeys().hasOnly(['is_verified', 'verified_by', 'is_active', 'rejection_reason', 'reviewed_by', 'reviewed_at', 'created_by_admin',
+                                                            'credentials', 'credentials_requested', 'credentials_rejection_reason'])
+                        && okAdminCredentials(changedKeys())
                         && (!changedKeys().hasAny(['created_by_admin'])
                             || (!('created_by_admin' in resource.data) && request.resource.data.created_by_admin == request.auth.uid))
                         && (!changedKeys().hasAny(['reviewed_by']) || request.resource.data.reviewed_by == request.auth.uid)
                         && (!changedKeys().hasAny(['verified_by']) || request.resource.data.verified_by == request.auth.uid));
       // Doctors are deactivated, not deleted.
       allow delete: if false;
+    }
+
+    // Profile photos (DECISIONS.md D54). One small JPEG per person, saved as text, because Firebase Storage needs the
+    // Blaze plan (D18). The document id IS the person's Auth UID. Kept apart from Users/Providers so the doctor
+    // directory does not download every photo, and so a patient's photo has its own, narrower readers.
+    match /Profile_Photos/{uid} {
+      // A doctor's photo belongs to the doctor directory, so any signed-in user may see it (patients choosing a doctor).
+      // A patient's photo is seen only by the patient, admins, and the doctors the patient shared their profile with
+      // by booking them (Care_Links, D22) — the same people who may read that patient's Users document.
+      allow read: if isUser(uid) || isAdmin()
+                  || (signedIn() && exists(/databases/$(database)/documents/Providers/$(uid)))
+                  || canSeePatient(uid);
+      // Only the person sets their own photo: exactly these two fields, a JPEG "data:" address of at most 200,000
+      // characters (about 150 KB; the app saves about 15-40 KB, photo-rules.ts), stamped with the server's clock.
+      allow create, update: if isUser(uid)
+                    && request.resource.data.keys().hasOnly(['photo', 'updated_at'])
+                    && request.resource.data.photo is string
+                    && request.resource.data.photo.size() <= 200000
+                    && request.resource.data.photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+                    && request.resource.data.updated_at == request.time;
+      // A patient may remove theirs (initials show again). A doctor can only replace it: patients must always be able
+      // to recognise their doctor, and Providers.has_photo would otherwise point at a photo that is gone.
+      allow delete: if isUser(uid) && !exists(/databases/$(database)/documents/Providers/$(uid));
     }
 
     match /Admins/{adminId} {
@@ -573,9 +666,10 @@ service cloud.firestore {
 
     // ------------------------------------------------------------------ the doctor's written summary (DECISIONS.md D22)
     // "Consultation_Notes/{bookingId}": what the doctor wrote when ending the consultation. It used to sit on the booking,
-    // which many people could read; now only the two people on that booking can (not even an admin).
+    // which many people could read; now only the two people on that booking can, and an admin investigating a report
+    // about that consultation (D58: adminMayReview).
     match /Consultation_Notes/{bookingId} {
-      allow read: if signedIn() && inBooking(bookingId);
+      allow read: if signedIn() && (inBooking(bookingId) || adminMayReview(bookingId));
       allow create, update: if verifiedEmail()
         && bookingData(bookingId).provider_id == request.auth.uid
         && bookingData(bookingId).status in ['confirmed', 'completed']
@@ -595,8 +689,10 @@ service cloud.firestore {
     }
 
     match /Messages/{messageId} {
-      // Chat is private: only the patient and doctor of the booking the message belongs to can read it (D8).
-      allow read: if signedIn() && inBooking(resource.data.booking_id);
+      // Chat is private: only the patient and doctor of the booking the message belongs to can read it (D8), and an admin
+      // investigating a report one of them filed about the other (D58: adminMayReview). Everyone's list query must name the
+      // booking (where booking_id ==).
+      allow read: if signedIn() && (inBooking(resource.data.booking_id) || adminMayReview(resource.data.booking_id));
       // You can send a message only as yourself, into your own booking, while it is confirmed (read-only once completed),
       // and only once your own email address is confirmed (D21).
       allow create: if verifiedEmail()
@@ -682,6 +778,137 @@ service cloud.firestore {
                     && (!('audience' in request.resource.data) || request.resource.data.audience in ['all', 'patient', 'doctor'])
                     && (!('status' in request.resource.data) || request.resource.data.status in ['draft', 'published']);
       allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------ reports (D51: "Report a problem", Table 31 #6)
+
+    // A patient or doctor reports a problem with the app, or flags the other person on a booking they share; an admin
+    // reviews it, replies, and marks it resolved. Nobody else can read a report, and nobody can delete one.
+    match /Reports/{reportId} {
+      // "Report this doctor" comes from the patient on that booking, "Report this patient" from its doctor, and the flagged
+      // person must be the other one on it. This is what stops anyone flagging a stranger.
+      function flagsTheOtherPerson(data) {
+        return (data.category == 'doctor_conduct'
+                  && bookingData(data.booking_id).patient_id == request.auth.uid
+                  && bookingData(data.booking_id).provider_id == data.reported_user_id)
+          || (data.category == 'patient_conduct'
+                  && bookingData(data.booking_id).provider_id == request.auth.uid
+                  && bookingData(data.booking_id).patient_id == data.reported_user_id);
+      }
+      function validNewReport(id, data) {
+        return data.keys().hasOnly(['reporter_id', 'reporter_role', 'category', 'message', 'reported_user_id', 'booking_id', 'status', 'created_at'])
+          && data.keys().hasAll(['reporter_id', 'reporter_role', 'category', 'message', 'status', 'created_at'])
+          && data.reporter_id == request.auth.uid
+          // Only a label for the admin's list; it must match the role on the reporter's own profile. A person who has not
+          // confirmed their email has no profile yet (D21), so they count as a patient.
+          && data.reporter_role in ['patient', 'doctor']
+          && data.reporter_role == (exists(/databases/$(database)/documents/Users/$(request.auth.uid))
+                ? get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.get('role', 'patient')
+                : 'patient')
+          && data.category in ['app_problem', 'payment', 'account', 'doctor_conduct', 'patient_conduct', 'other']
+          && data.message is string && data.message.size() >= 10 && data.message.size() <= 1000
+          && data.status == 'open'
+          && data.created_at == request.time
+          // A report about a person needs the booking that links you to them; every other category names nobody.
+          && (data.category in ['doctor_conduct', 'patient_conduct']
+                ? (data.reported_user_id is string && data.booking_id is string && flagsTheOtherPerson(data)
+                   // D58: one conduct report per person per booking, filed under "<bookingId>_<reporterId>", which is what
+                   // lets an admin open that booking's chat (Admin_Access_Log below).
+                   && id == conductReportId(data.booking_id, request.auth.uid))
+                // Any other report has an automatic id, which never contains "_". So nobody can take the id of a conduct
+                // report somebody else has not filed yet (and stop them from reporting).
+                : !('reported_user_id' in data) && !('booking_id' in data) && !id.matches('.*_.*'));
+      }
+
+      // The reporter sees their own reports (and the admin's reply); admins see all of them.
+      allow read: if signedIn() && (resource.data.reporter_id == request.auth.uid || isAdmin());
+      // Anyone signed in may report (even before confirming their email: "I never got the email" is a real problem).
+      allow create: if signedIn() && validNewReport(reportId, request.resource.data);
+      // status: open (the admin's turn) -> awaiting_reporter (the admin asked the reporter something, D59) -> resolved.
+      allow update: if (
+        // Only an admin moves a report between the three statuses and resolves it, under their own name. The report
+        // itself cannot be rewritten. admin_reply is the single reply from before D59: the panel now writes
+        // Report_Replies instead, and old reports keep theirs.
+        (isAdmin()
+          && changedKeys().hasOnly(['status', 'admin_reply', 'resolved_by', 'resolved_at'])
+          && request.resource.data.status in ['open', 'awaiting_reporter', 'resolved']
+          && request.resource.data.get('admin_reply', '') is string
+          && request.resource.data.get('admin_reply', '').size() <= 1000
+          && (!('resolved_by' in changedKeys()) || request.resource.data.resolved_by == request.auth.uid))
+        // The reporter answers the admin's question, which puts the report back in the admin's Open list (D59). This is the
+        // only change a reporter can make: never resolve, never reopen, never touch the text.
+        || (signedIn() && resource.data.reporter_id == request.auth.uid
+          && resource.data.status == 'awaiting_reporter'
+          && changedKeys().hasOnly(['status'])
+          && request.resource.data.status == 'open')
+      );
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------ report replies (D59)
+    // The conversation on a report: an admin asks for details, the reporter answers, until the report is resolved.
+    // A separate collection and not a list inside the report, for the same reason chat uses Messages: the rules can check
+    // every message (who sent it, how long, the server's time), and a sent message can never be edited or deleted.
+    match /Report_Replies/{replyId} {
+      function reportOf(reportId) {
+        return get(/databases/$(database)/documents/Reports/$(reportId)).data;
+      }
+      function validReply(data) {
+        return data.keys().hasOnly(['report_id', 'reporter_id', 'sender_id', 'sender_role', 'message', 'created_at'])
+          && data.keys().hasAll(['report_id', 'reporter_id', 'sender_id', 'sender_role', 'message', 'created_at'])
+          && data.report_id is string
+          && exists(/databases/$(database)/documents/Reports/$(data.report_id))
+          // A resolved report is closed: the reporter sends a new report, or an admin reopens this one first.
+          && reportOf(data.report_id).status != 'resolved'
+          // A copy of the report's reporter, so the reporter's app reads all its replies with one query (no index).
+          && data.reporter_id == reportOf(data.report_id).reporter_id
+          && data.sender_id == request.auth.uid
+          // An admin replies to any report; the reporter only to their own.
+          && ((data.sender_role == 'admin' && isAdmin())
+              || (data.sender_role == 'reporter' && data.reporter_id == request.auth.uid))
+          && data.message is string && data.message.size() >= 1 && data.message.size() <= 1000
+          && data.created_at == request.time;
+      }
+
+      // The same people who can read the report: its reporter and admins.
+      allow read: if signedIn() && (resource.data.reporter_id == request.auth.uid || isAdmin());
+      allow create: if signedIn() && validReply(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ------------------------------------------------------------------ admin access log (D58)
+    // "Admin_Access_Log/<bookingId>_<adminUid>": the record of one admin opening one reported consultation (its chat and the
+    // doctor's notes) to investigate a conduct report. It is the key that opens them (adminMayReview), so an admin cannot
+    // read them without leaving this record. Admins only; it is never changed except to count another opening, and never
+    // deleted, so it answers "which admin looked at this conversation, and when?".
+    match /Admin_Access_Log/{logId} {
+      // The report is a conduct report one of the two people on this booking filed about the other.
+      function reportOnBooking(data) {
+        return data.report_id in [conductReportId(data.booking_id, bookingData(data.booking_id).patient_id),
+                                  conductReportId(data.booking_id, bookingData(data.booking_id).provider_id)]
+          && exists(/databases/$(database)/documents/Reports/$(data.report_id));
+      }
+      allow read: if isAdmin();
+      // The first opening: under the admin's own uid and their name as it is on their Admins record, at the server's time.
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['admin_id', 'admin_name', 'booking_id', 'report_id', 'first_opened_at', 'last_opened_at', 'open_count'])
+        && request.resource.data.keys().hasAll(['admin_id', 'admin_name', 'booking_id', 'report_id', 'first_opened_at', 'last_opened_at', 'open_count'])
+        && request.resource.data.admin_id == request.auth.uid
+        && request.resource.data.admin_name == get(/databases/$(database)/documents/Admins/$(request.auth.uid)).data.get('full_name', '')
+        && request.resource.data.booking_id is string
+        && logId == request.resource.data.booking_id + '_' + request.auth.uid
+        && reportOnBooking(request.resource.data)
+        && request.resource.data.first_opened_at == request.time
+        && request.resource.data.last_opened_at == request.time
+        && request.resource.data.open_count == 1;
+      // Each later opening by the same admin: one more count and the time. It may name the other side's report, if both
+      // reported each other. Who, which booking and when it was first opened never change.
+      allow update: if isAdmin() && resource.data.admin_id == request.auth.uid
+        && changedKeys().hasOnly(['report_id', 'last_opened_at', 'open_count'])
+        && reportOnBooking(request.resource.data)
+        && request.resource.data.last_opened_at == request.time
+        && request.resource.data.open_count == resource.data.open_count + 1;
+      allow delete: if false;
     }
 
     // ------------------------------------------------------------------ gamification
@@ -810,6 +1037,21 @@ service cloud.firestore {
       allow read: if signedIn() && (resource.data.user_id == request.auth.uid || isAdmin());
       // Created only by the analyzeLabel Cloud Function (Admin SDK), never by an app.
       allow create, update, delete: if false;
+    }
+
+    match /App_Pins/{userId} {
+      // The app PIN belongs to the account (DECISIONS.md D53, amends D42). It holds only a random salt and a salted
+      // SHA-256 hash of the 6-digit PIN, never the PIN. A 6-digit PIN has only a million possibilities, so the hash
+      // could be guessed if it leaked: ONLY the owner may read or write it. Not doctors, not admins (no isAdmin() here).
+      allow read, delete: if isUser(userId);
+      allow create, update: if isUser(userId)
+                    && request.resource.data.keys().hasOnly(['salt', 'hash', 'failed_attempts', 'updated_at'])
+                    && request.resource.data.keys().hasAll(['salt', 'hash', 'failed_attempts', 'updated_at'])
+                    && request.resource.data.salt is string && request.resource.data.salt.size() == 32
+                    && request.resource.data.hash is string && request.resource.data.hash.size() == 64
+                    && request.resource.data.failed_attempts is int
+                    && request.resource.data.failed_attempts >= 0 && request.resource.data.failed_attempts <= 5
+                    && request.resource.data.updated_at == request.time;
     }
   }
 }

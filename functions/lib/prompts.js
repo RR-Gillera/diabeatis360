@@ -11,6 +11,7 @@
 // "Pork" also catches "lechon" and "baboy".
 
 const { wordsFor } = require('./food-words')
+const { MEAL_PHOTOS, MEAL_PHOTO_KEYS, describeMealPhotos } = require('./meal-photos')
 
 const SYSTEM_RULES = [
   'You are a nutrition and physical-activity assistant inside a diabetes self-management app for Filipino patients.',
@@ -31,16 +32,19 @@ const TYPE_GUIDANCE = {
     meal: 'Type 1 diabetes: keep the carbohydrates in each meal moderate and steady from meal to meal, and make carbs_g accurate, because the person plans their insulin around it. Never mention insulin amounts.',
     exercise: 'Type 1 diabetes: activity can lower blood sugar during it and for hours after. Every caution must remind the person to check their blood sugar before starting and to keep a fast-acting sugar snack, such as candy or juice, within reach.',
     label: 'Type 1 diabetes: judge the product mainly by its carbohydrates and sugar per serving, and give the grams of carbohydrate in one serving in the insight.',
+    risk: 'Type 1 diabetes: the risk is of poor blood sugar control and its complications, not of getting diabetes. Advice is about steady meals, regular checks, and planning activity safely. Never mention insulin amounts.',
   },
   'Type 2': {
     meal: 'Type 2 diabetes: favour high-fibre, low glycemic index meals with vegetables and lean protein, a controlled portion of rice (about one cup of cooked rice or less, brown rice when possible), and no sugary drinks.',
     exercise: 'Type 2 diabetes: favour regular moderate activity, such as a brisk walk after meals, which helps lower blood sugar. Every caution must say to stop and check their blood sugar if they feel shaky, dizzy or sweaty.',
     label: 'Type 2 diabetes: judge the product by its sugar, refined carbohydrates, fibre and sodium per serving.',
+    risk: 'Type 2 diabetes: the risk is of poor blood sugar control and its complications. Advice is about portion control, fibre, regular activity, regular checks and keeping follow-up visits with the doctor.',
   },
   Prediabetes: {
     meal: 'Prediabetes: the goal is to prevent type 2 diabetes. Suggest simple swaps the person can keep up: smaller portions of white rice, no sugary drinks, more vegetables, fibre and lean protein, and portions that support a healthy weight.',
     exercise: 'Prediabetes: the goal is to prevent type 2 diabetes. Encourage building up to about 150 minutes of moderate activity a week, such as brisk walking.',
     label: 'Prediabetes: judge the product by its added sugar, refined carbohydrates and fibre, and say how it fits eating to prevent type 2 diabetes.',
+    risk: 'Prediabetes: the risk is of progressing to type 2 diabetes. Advice is about preventing it: smaller portions of white rice, no sugary drinks, about 150 minutes of moderate activity a week, and a healthy weight.',
   },
 }
 
@@ -112,7 +116,8 @@ function describeFoods(foods) {
 function buildRecommendationPrompt({ kind, profile, reading, foods }) {
   const language = LANGUAGE_NAMES[profile.language_preference] ?? 'English'
   const task = kind === 'meal'
-    ? 'Suggest exactly 3 different meal options for the person\'s NEXT meal. For each give the nutrition per serving and 4 to 7 simple ingredients.'
+    ? 'Suggest exactly 3 different meal options for the person\'s NEXT meal. For each give the nutrition per serving and 4 to 7 simple ingredients.\n'
+      + `For each also set "photo" to the key of the sample photo closest to the meal (use rice_plate when none is close):\n${describeMealPhotos()}`
     : 'Suggest exactly 3 gentle physical activities suitable right now. For each give a short tagline, a one-sentence description, a realistic duration in minutes, exactly 3 short benefits, and a short caution. Never suggest strenuous exercise if the latest reading is low.'
   return {
     system: SYSTEM_RULES,
@@ -142,6 +147,41 @@ function buildLabelPrompt({ profile }) {
   }
 }
 
+// ---- AI Diabetes Risk Prediction (DECISIONS.md D51) ---------------------------------------------------------
+// The level was already decided by the rule in risk.js. Gemini only explains it in plain words and gives advice in the
+// three groups the manuscript names: prevention, correction and maintenance. The facts it gets are the rule's own
+// numbers, so it has nothing else to reason from, and it is told not to invent causes.
+const RISK_RULES = [
+  'The risk level below was already decided by the app from the person\'s own readings. Explain it; never change it or say it is wrong.',
+  'It is a guide, not a diagnosis: never say the person has a disease or a complication.',
+  'Only use the facts given. Never name a cause that is not in them (for example a meal, stress or an illness).',
+].join(' ')
+
+const FACT_LINES = {
+  in_range: (value) => `Readings in the normal range over the last 30 days: ${value.percent}%.`,
+  dangerous: (value) => `Critical readings: ${value.critical}. Low readings: ${value.low}.`,
+  average: (value) => `Average ${value.context === 'after_meal' ? 'after-meal' : 'before-meal'} reading: ${value.mgdl} mg/dL (the top of the normal range is ${value.limit}).`,
+  trend: (value) => (value.percent === null
+    ? 'Trend: not enough earlier readings to compare.'
+    : `Last 7 days compared with the weeks before: ${value.percent > 0 ? '+' : ''}${value.percent}%.`),
+  activity: (value) => `Activity level: ${value.level || 'not stated'}.`,
+}
+
+function buildRiskPrompt({ profile, assessment }) {
+  const language = LANGUAGE_NAMES[profile.language_preference] ?? 'English'
+  return {
+    system: `${SYSTEM_RULES} ${RISK_RULES}`,
+    user: [
+      `Respond in ${language}.`,
+      describeProfile(profile, 'risk'),
+      `Risk level: ${assessment.level.toUpperCase()} (score ${assessment.score} of ${assessment.max_score}, from ${assessment.readings_used} readings).`,
+      assessment.factors.map((factor) => FACT_LINES[factor.key]?.(factor.value)).filter(Boolean).join('\n'),
+      'Write a "summary" of 2 or 3 short sentences that explains the level from these facts.',
+      'Then give up to 3 short, practical tips in each group: "prevention" (to keep the risk from growing), "correction" (to improve what the facts show is off; leave it empty if nothing is off), and "maintenance" (habits to keep). Prefer common Filipino foods and activities.',
+    ].join('\n\n'),
+  }
+}
+
 // ---- response schemas (Gemini's OpenAPI subset) ------------------------------------------------------------
 const NUMBER = { type: 'NUMBER' }
 const STRING = { type: 'STRING' }
@@ -156,8 +196,9 @@ const mealSchema = {
         properties: {
           name: STRING, tagline: STRING, calories: NUMBER, protein_g: NUMBER, carbs_g: NUMBER, fiber_g: NUMBER, sugar_g: NUMBER,
           insight: STRING, ingredients: { type: 'ARRAY', items: STRING },
+          photo: { type: 'STRING', enum: MEAL_PHOTO_KEYS },
         },
-        required: ['name', 'tagline', 'calories', 'protein_g', 'carbs_g', 'fiber_g', 'sugar_g', 'insight', 'ingredients'],
+        required: ['name', 'tagline', 'calories', 'protein_g', 'carbs_g', 'fiber_g', 'sugar_g', 'insight', 'ingredients', 'photo'],
       },
     },
   },
@@ -192,11 +233,31 @@ const labelSchema = {
   required: ['readable'],
 }
 
+const riskSchema = {
+  type: 'OBJECT',
+  properties: {
+    summary: STRING,
+    prevention: { type: 'ARRAY', items: STRING },
+    correction: { type: 'ARRAY', items: STRING },
+    maintenance: { type: 'ARRAY', items: STRING },
+  },
+  required: ['summary', 'prevention', 'correction', 'maintenance'],
+}
+
 // ---- cleaning what the model returns -----------------------------------------------------------------------
 const text = (value, max = 240) => String(value ?? '').trim().slice(0, max)
 const number = (value, max = 10000) => {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? Math.min(Math.round(n * 10) / 10, max) : 0
+}
+
+/**
+ * The sample photo for a meal (D60): the key Gemini picked if it is one of ours, or null when it is not, or when the
+ * photo shows something the person avoids (meal-photos.js `shows`).
+ */
+function mealPhotoFor(key, avoid) {
+  if (typeof key !== 'string' || !Object.hasOwn(MEAL_PHOTOS, key)) return null
+  return containsAllergen(MEAL_PHOTOS[key].shows.join(' '), avoid).length ? null : key
 }
 
 /** Meals: keep well-formed ones and drop any that mention something to avoid (an allergen or an ingredient not eaten). */
@@ -212,6 +273,7 @@ function cleanMeals(items, avoid) {
       sugar_g: number(item?.sugar_g, 300),
       insight: text(item?.insight, 300),
       ingredients: (Array.isArray(item?.ingredients) ? item.ingredients : []).map((entry) => text(entry, 60)).filter(Boolean).slice(0, 10),
+      photo: mealPhotoFor(item?.photo, avoid),
     }))
     .filter((meal) => meal.name && !containsAllergen(`${meal.name} ${meal.ingredients.join(' ')}`, avoid).length)
     .slice(0, 3)
@@ -264,7 +326,25 @@ function cleanLabel(raw, allergens, disliked = []) {
   }
 }
 
+// Words that mean the model strayed into medicine. A tip that has one is dropped, whatever the model was told (root
+// CLAUDE.md: the AI never changes medication or gives insulin doses). English and Filipino.
+const MEDICINE_WORDS = /\b(insulin|metformin|medication|medicine|medicines|dose|doses|dosage|tablet|tablets|pill|pills|gamot|tableta)\b/i
+
+/** Risk advice: lengths capped, and a tip dropped if it names an allergen, an ingredient not eaten, or medicine. */
+function cleanRiskAdvice(raw, avoid) {
+  const safe = (value) => Boolean(value) && !MEDICINE_WORDS.test(value) && !containsAllergen(value, avoid).length
+  const list = (value) => (Array.isArray(value) ? value : []).map((entry) => text(entry, 200)).filter(safe).slice(0, 3)
+  const summary = text(raw?.summary, 600)
+  return {
+    summary: safe(summary) ? summary : '',
+    prevention: list(raw?.prevention),
+    correction: list(raw?.correction),
+    maintenance: list(raw?.maintenance),
+  }
+}
+
 module.exports = {
+  buildRiskPrompt, riskSchema, cleanRiskAdvice,
   parseAllergens, dislikedIngredients, diabetesTypeOf, containsAllergen, buildRecommendationPrompt, buildLabelPrompt, TYPE_GUIDANCE,
-  mealSchema, exerciseSchema, labelSchema, cleanMeals, cleanExercises, cleanLabel, SYSTEM_RULES,
+  mealSchema, exerciseSchema, labelSchema, cleanMeals, mealPhotoFor, cleanExercises, cleanLabel, SYSTEM_RULES,
 }

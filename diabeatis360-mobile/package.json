@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
-    "@expo/ui": "~58.0.28",
+    "@expo/ui": "~58.0.29",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "^58.0.0",
+    "expo": "~58.0.26",
     "expo-camera": "~58.0.14",
     "expo-constants": "~58.0.16",
     "expo-crypto": "~58.0.8",
@@ -14,16 +14,18 @@
     "expo-font": "~58.0.12",
     "expo-glass-effect": "~58.0.5",
     "expo-image": "~58.0.18",
+    "expo-image-manipulator": "~58.0.16",
+    "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.17",
     "expo-notifications": "~58.1.9",
-    "expo-router": "~58.0.31",
+    "expo-router": "~58.0.32",
     "expo-secure-store": "~58.0.3",
     "expo-splash-screen": "~58.0.14",
     "expo-status-bar": "~58.0.5",
     "expo-symbols": "~58.0.5",
     "expo-system-ui": "~58.0.7",
     "expo-updates": "~58.0.22",
-    "expo-web-browser": "~58.0.8",
+    "expo-web-browser": "~58.1.0",
     "firebase": "^12.18.0",
     "nativewind": "^4.2.6",
     "react": "19.3.0",
@@ -54,7 +56,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "node --import ./scripts/register-ts-alias.mjs --test \"src/constants/*.test.mjs\" \"src/lib/server-target.test.mjs\" \"src/features/auth/*.test.mjs\" \"src/features/booking/appointment-tabs.test.mjs\" \"src/features/booking/manila-time.test.mjs\" \"src/features/booking/booking-reference.test.mjs\" \"src/features/calls/join-error.test.mjs\" \"src/features/gamification/*.test.mjs\" \"src/features/glucose/doctor-alert.test.mjs\" \"src/features/home/*.test.mjs\" \"src/features/consultation/consultation-format.test.mjs\" \"src/features/doctor/*.test.mjs\" \"src/features/family/*.test.mjs\" \"src/features/notifications/*.test.mjs\" \"src/features/pin/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/features/subscription/plan-display.test.mjs\" \"src/features/wallet/*.test.mjs\" \"src/lib/*.test.mjs\" \"src/i18n/*.test.mjs\""
+    "test": "node --import ./scripts/register-ts-alias.mjs --test \"src/constants/*.test.mjs\" \"src/lib/server-target.test.mjs\" \"src/features/auth/*.test.mjs\" \"src/features/booking/appointment-tabs.test.mjs\" \"src/features/booking/manila-time.test.mjs\" \"src/features/booking/booking-reference.test.mjs\" \"src/features/calls/join-error.test.mjs\" \"src/features/gamification/*.test.mjs\" \"src/features/glucose/doctor-alert.test.mjs\" \"src/features/home/*.test.mjs\" \"src/features/consultation/consultation-format.test.mjs\" \"src/features/ai/*.test.mjs\" \"src/features/doctor/*.test.mjs\" \"src/features/family/*.test.mjs\" \"src/features/notifications/*.test.mjs\" \"src/features/photos/*.test.mjs\" \"src/features/pin/*.test.mjs\" \"src/features/reminders/*.test.mjs\" \"src/features/reports/*.test.mjs\" \"src/features/subscription/plan-display.test.mjs\" \"src/features/wallet/*.test.mjs\" \"src/lib/*.test.mjs\" \"src/i18n/*.test.mjs\""
   },
   "private": true
 }

@@ -5,7 +5,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { DemoPaymentNote } from '@/components/ui/demo-payment-note';
 import { bookingReference } from '@/features/booking/booking-reference';
-import { bookingColors, formatApptDate, formatApptTime, formatFee, PrimaryButton, styles as ui } from '@/features/booking/booking-ui';
+import { bookingColors, formatApptDate, formatApptTime, formatFee, PrimaryButton, providerName, styles as ui } from '@/features/booking/booking-ui';
 import { subscribeToBooking } from '@/features/booking/booking-service';
 import type { AppointmentHistoryEntry } from '@/features/booking/types';
 import { useT } from '@/i18n/language-context';
@@ -43,7 +43,7 @@ export default function PaymentSuccessfulScreen() {
         {provider && selectedDate && selectedTime ? (
           <View style={[ui.card, styles.receipt]}>
             <View style={styles.receiptHeader}>
-              <Text style={styles.doctorName}>{provider.fullName}</Text>
+              <Text style={styles.doctorName}>{providerName(provider)}</Text>
               <Text style={styles.doctorSpecialty}>{provider.specialty}</Text>
             </View>
             <View style={styles.receiptRow}>
@@ -70,7 +70,7 @@ export default function PaymentSuccessfulScreen() {
         {bookingId ? <Text style={styles.hint}>{t('paid.hint')}</Text> : null}
       </ScrollView>
       <View style={styles.button}>
-        <PrimaryButton title={t('booking.viewAppointment')} onPress={() => router.replace({ pathname: '/booking/appointment', params: { id: bookingId ?? '' } })} />
+        <PrimaryButton title={t('booking.viewAppointment')} onPress={() => router.dismissTo({ pathname: '/booking/appointment', params: { id: bookingId ?? '' } })} />
       </View>
     </View>
   );

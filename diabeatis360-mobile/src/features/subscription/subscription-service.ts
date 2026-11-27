@@ -147,6 +147,8 @@ export async function canUseFeature(userId: string, feature: LimitedFeature) {
   const { year, month, day } = manilaParts(new Date());
   const startOfDay = manilaInstant(year, month, day);
   const used = usage.docs.filter((document) => {
+    // A daily risk assessment (D51) is also saved in AI_Suggestions but does not use up a meal or exercise generation.
+    if (feature === 'ai' && document.data().suggestion_type === 'risk') return false;
     const at = (document.data()[dateField] as Timestamp | undefined)?.toDate?.();
     return at ? at >= startOfDay : false;
   }).length;

@@ -2,14 +2,16 @@ import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { MoreMenu } from '@/components/ui/more-menu';
 import { Brand, Spacing } from '@/constants/theme';
 import { NotificationBell } from '@/features/notifications/notification-bell';
 import { useT } from '@/i18n/language-context';
 import { clockTime, shortDay, type Language, type MessageKey } from '@/i18n/translate';
 
+import { withCredentials } from '@/features/doctor/credentials';
+import { doctorDisplayName } from '@/features/doctor/doctor-profile';
+
 import { manilaWallClock, slotInstant } from './manila-time';
-import type { PaymentMethod } from './types';
+import type { PaymentMethod, Provider } from './types';
 
 export const bookingColors = {
   navy: '#10182D',
@@ -42,26 +44,30 @@ export function BookingHeader({ title, subtitle, onBack, actions }: { title: str
   );
 }
 
-// Bell/overflow icon pair used in headers that match the tab-screen chrome
+// Bell + My Appointments icon pair used in headers that match the tab-screen chrome
 // (Home/Log/Doctors) — opt-in via BookingHeader's `actions` prop so screens
 // that haven't been redesigned to include it yet are unaffected.
 export function BookingHeaderActions() {
   return (
     <View style={styles.headerActions}>
       <NotificationBell style={styles.headerActionButton} />
-      <BookingMoreMenu style={styles.headerActionButton} />
+      <MyAppointmentsButton style={styles.headerActionButton} />
     </View>
   );
 }
 
-/** The three-dots menu on the patient's booking screens (DECISIONS D24): My appointments and Notifications. */
-export function BookingMoreMenu({ style }: { style?: StyleProp<ViewStyle> }) {
+/**
+ * Opens My Appointments in one tap. It replaced the three-dots menu, whose only other item (Notifications) already
+ * had its own bell beside it, so the menu was a detour to one screen.
+ */
+export function MyAppointmentsButton({ style }: { style?: StyleProp<ViewStyle> }) {
   const router = useRouter();
   const { t } = useT();
-  return <MoreMenu style={style} items={[
-    { label: t('appt.title'), icon: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }, onPress: () => router.push('/booking/my-appointments' as never) },
-    { label: t('notif.title'), icon: { ios: 'bell', android: 'notifications', web: 'notifications' }, onPress: () => router.push('/notifications') },
-  ]} />;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={t('appt.title')} hitSlop={8} onPress={() => router.push('/booking/my-appointments' as never)} style={style}>
+      <SymbolView name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }} size={16} tintColor="#64748B" />
+    </Pressable>
+  );
 }
 
 export function PrimaryButton({ title, onPress, disabled, loading }: { title: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
@@ -71,6 +77,14 @@ export function PrimaryButton({ title, onPress, disabled, loading }: { title: st
       <Text style={styles.primaryButtonText}>{loading ? t('common.pleaseWait') : title}</Text>
     </Pressable>
   );
+}
+
+/**
+ * The doctor's name as patients see it: "Dr. Juan Dela Cruz, MD, FPCP" once an admin approved the suffix (D55).
+ * "Dr." is added here (only when the doctor did not type it), the same way the doctor's own profile header does.
+ */
+export function providerName(provider: Pick<Provider, 'fullName' | 'credentials'>) {
+  return withCredentials(doctorDisplayName(provider.fullName), provider.credentials);
 }
 
 export function formatFee(value: number) {

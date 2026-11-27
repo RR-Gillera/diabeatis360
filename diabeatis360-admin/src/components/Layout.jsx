@@ -11,23 +11,27 @@ function useAdminBadges() {
   return {
     providers: useFilteredCount('Providers', 'is_verified', false),
     guardians: useFilteredCount('Guardian_Verifications', 'verification_status', 'pending'),
+    reports: useFilteredCount('Reports', 'status', 'open'),
   }
 }
 
 // Sidebar + page area shared by every admin screen. Menu entries live in src/nav.js.
 // Matches FIGMA/ADMIN: logo top-left, icon+label nav items, admin name/email and Sign out pinned to the bottom.
+// The sidebar is exactly one screen tall and `sticky`, so it stays put while a long page (e.g. Settings with a
+// long announcement history) scrolls; without this it grew with the page and Sign out slid out of view.
+// If the window is very short, only the menu list scrolls, so Sign out is still always visible.
 export default function Layout() {
   const { admin, logout } = useAuth()
   const badges = useAdminBadges()
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-gray-100 bg-white p-5 print:hidden">
+      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-gray-100 bg-white p-5 print:hidden">
         <div className="mb-8 flex items-center gap-2 px-1">
           <LogoMark className="h-10 w-10" />
           <p className="text-lg font-extrabold text-ink">Diabeatis<span className="text-brand">360</span></p>
         </div>
-        <nav className="flex flex-1 flex-col gap-1">
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon
             const count = item.badge ? badges[item.badge] : 0

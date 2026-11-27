@@ -7,20 +7,23 @@ import { useAuth } from '@/features/auth/auth-context';
 import { parseBirthdate } from '@/features/auth/birthdate';
 import { BirthdateField, FUTURE_YEARS } from '@/features/auth/birthdate-picker';
 import { birthdateText } from '@/features/auth/health-profile';
+import { CREDENTIALS_MAX_LENGTH, credentialsChange, credentialsProblem, credentialsState, type CredentialsFields } from '@/features/doctor/credentials';
 import { licenseStatus, SPECIALIZATIONS } from '@/features/doctor/doctor-profile';
-import { saveDoctorPhone, subscribeToDoctorPhone, subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor/doctor-service';
+import { saveDoctorCredentials, saveDoctorPhone, subscribeToDoctorPhone, subscribeToDoctorProfile, updateDoctorProfile } from '@/features/doctor/doctor-service';
 import { DoctorHeader, doctorStyles } from '@/features/doctor/doctor-ui';
 import { displayPhone, normalizePhilippineMobile } from '@/features/family/phone';
 import { homeColors } from '@/features/home/home-ui';
 import { useSafeBack } from '@/hooks/use-safe-back';
 import { useT } from '@/i18n/language-context';
 
-type Form = { fullName: string; specialty: string; prc: string; expiry: string; city: string; phone: string };
-const EMPTY: Form = { fullName: '', specialty: '', prc: '', expiry: '', city: '', phone: '' };
+type Form = { fullName: string; credentials: string; specialty: string; prc: string; expiry: string; city: string; phone: string };
+const EMPTY: Form = { fullName: '', credentials: '', specialty: '', prc: '', expiry: '', city: '', phone: '' };
+const NO_CREDENTIALS: CredentialsFields = { credentials: '', credentialsRequested: '', credentialsRejectionReason: '' };
 
 // "Edit Profile" (DECISIONS.md D49): opened by the pencil on My Profile. No frame of its own; built in the frames'
 // style. The fields patients see (name, specialty, city) and the PRC details are on Providers; the mobile number is on
 // the doctor's own Users document, which patients cannot read. The fee has its own screen (Set Consultation Fee).
+// The credentials after the name (D55 part 1) are only asked for here: patients see them once an admin approves them.
 export default function EditDoctorProfileScreen() {
   const goBack = useSafeBack('/doctor/profile');
   const { uid, email, updateDisplayName } = useAuth();
@@ -28,17 +31,24 @@ export default function EditDoctorProfileScreen() {
   const [form, setForm] = useState<Form>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // What is saved for the credentials right now, kept live, so saving compares against the latest admin decision.
+  const [savedCredentials, setSavedCredentials] = useState<CredentialsFields>(NO_CREDENTIALS);
   const loaded = useRef({ profile: false, phone: false });
 
   // Fill the form once from what is saved; later changes on the server do not overwrite what the doctor is typing.
   useEffect(() => {
     if (!uid) return;
     const stopProfile = subscribeToDoctorProfile(uid, (profile) => {
+      if (profile) {
+        setSavedCredentials({ credentials: profile.credentials, credentialsRequested: profile.credentialsRequested, credentialsRejectionReason: profile.credentialsRejectionReason });
+      }
       if (!profile || loaded.current.profile) return;
       loaded.current.profile = true;
       setForm((current) => ({
         ...current,
         fullName: profile.fullName,
+        // A request still waiting (or refused) is what the doctor last typed, so it is the one to show and correct.
+        credentials: profile.credentialsRequested || profile.credentials,
         specialty: profile.specialty,
         prc: profile.prcLicenseNumber,
         expiry: profile.licenseExpiry ? birthdateText(profile.licenseExpiry) : '',
@@ -55,6 +65,7 @@ export default function EditDoctorProfileScreen() {
 
   const set = (key: keyof Form) => (value: string) => { setForm((current) => ({ ...current, [key]: value })); setError(''); };
   const expiryDate = parseBirthdate(form.expiry);
+  const credentialStatus = credentialsState(savedCredentials);
   const expired = licenseStatus(expiryDate) === 'expired';
 
   const save = async () => {
@@ -65,6 +76,9 @@ export default function EditDoctorProfileScreen() {
     }
     if (expired) { setError(t('setup.pro.expired')); return; }
     if (form.phone.trim() && !normalizePhilippineMobile(form.phone)) { setError(t('doctor.edit.phoneInvalid')); return; }
+    const credentials = credentialsChange(savedCredentials, form.credentials);
+    const credentialsError = credentialsProblem(credentials.value);
+    if (credentialsError) { setError(t(credentialsError, { max: CREDENTIALS_MAX_LENGTH })); return; }
     setSaving(true); setError('');
     try {
       await updateDoctorProfile(uid, {
@@ -76,6 +90,7 @@ export default function EditDoctorProfileScreen() {
         city: form.city,
       });
       await saveDoctorPhone(uid, form.phone);
+      await saveDoctorCredentials(uid, credentials);
       // Keep the Auth display name and the Users doc in step with Providers, so the name reads the same everywhere.
       await updateDisplayName(form.fullName);
       goBack();
@@ -86,7 +101,7 @@ export default function EditDoctorProfileScreen() {
     }
   };
 
-  const field = (key: 'fullName' | 'prc' | 'city' | 'phone', label: string, placeholder: string, extra?: object) => (
+  const field = (key: 'fullName' | 'credentials' | 'prc' | 'city' | 'phone', label: string, placeholder: string, extra?: object) => (
     <View style={styles.field}>
       <Text style={doctorStyles.label}>{label}</Text>
       <TextInput
@@ -107,6 +122,14 @@ export default function EditDoctorProfileScreen() {
       <KeyboardSafeScroll contentContainerStyle={styles.scroll}>
         <View style={[doctorStyles.card, styles.form]}>
           {field('fullName', t('doctor.profile.fullName'), 'Dr. Juan Dela Cruz', { autoCapitalize: 'words', maxLength: 80 })}
+
+          <View style={styles.field}>
+            {field('credentials', t('doctor.cred.label'), 'MD, FPCP', { autoCapitalize: 'characters', autoCorrect: false, maxLength: CREDENTIALS_MAX_LENGTH + 20 })}
+            <Text style={styles.hint}>{t('doctor.cred.hint')}</Text>
+            {credentialStatus === 'pending' ? <Text style={styles.hint}>{t('doctor.cred.pending')}</Text> : null}
+            {credentialStatus === 'rejected' ? <Text style={doctorStyles.error}>{t('doctor.cred.rejected', { reason: savedCredentials.credentialsRejectionReason })}</Text> : null}
+            {credentialStatus === 'approved' ? <Text style={[styles.hint, styles.approved]}>{t('doctor.cred.approved')}</Text> : null}
+          </View>
 
           <View style={styles.field}>
             <Text style={doctorStyles.label}>{t('doctor.specialty')}</Text>
@@ -165,6 +188,7 @@ const styles = StyleSheet.create({
   chipText: { color: '#0F172A', fontFamily: Brand.font.bold, fontSize: 13 },
   chipTextOn: { color: homeColors.green },
   hint: { color: homeColors.textMuted, fontFamily: Brand.font.regular, fontSize: 12, lineHeight: 17 },
+  approved: { color: homeColors.green, fontFamily: Brand.font.bold },
   save: { alignItems: 'center', backgroundColor: homeColors.green, borderRadius: 14, justifyContent: 'center', minHeight: 52 },
   saveDisabled: { opacity: 0.6 },
   saveText: { color: '#FFF', fontFamily: Brand.font.extraBold, fontSize: 15 },

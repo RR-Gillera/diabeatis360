@@ -28,7 +28,9 @@ const label = {
   alternatives: [{ instead_of: 'Energy bar', try: 'Fresh guava' }],
 }
 
-let gemini, host, base, geminiCalls = 0, db, Timestamp, client
+const risk = { summary: 'Your readings are mostly in range.', prevention: ['Walk after dinner'], correction: [], maintenance: ['Keep logging'] }
+
+let gemini, host, base, geminiCalls = 0, db, Timestamp, client, clientApp
 const listen = (server) => new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server.address().port)))
 
 before(async () => {
@@ -39,7 +41,7 @@ before(async () => {
     req.on('data', (c) => { body += c })
     req.on('end', () => {
       geminiCalls += 1
-      const answer = body.includes('inlineData') ? label : body.includes('duration_minutes') ? exercises : meals
+      const answer = body.includes('inlineData') ? label : body.includes('prevention') ? risk : body.includes('duration_minutes') ? exercises : meals
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }))
     })
@@ -52,6 +54,7 @@ before(async () => {
     generateRecommendations: require('../api/generateRecommendations'),
     analyzeLabel: require('../api/analyzeLabel'),
     joinCall: require('../api/joinCall'),
+    predictRisk: require('../api/predictRisk'),
   }
   host = http.createServer((req, res) => {
     const name = (req.url || '').replace(/^\/api\//, '').split('?')[0]
@@ -74,6 +77,7 @@ before(async () => {
   const { getAuth, connectAuthEmulator, createUserWithEmailAndPassword, reload, sendEmailVerification, signOut } = require('firebase/auth')
   const { getFunctions, httpsCallableFromURL } = require('firebase/functions')
   const app = initializeApp({ apiKey: 'fake-key', projectId: PROJECT }, 'e2e')
+  clientApp = app
   const auth = getAuth(app)
   connectAuthEmulator(auth, `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`, { disableWarnings: true })
   const functions = getFunctions(app)
@@ -118,7 +122,15 @@ before(async () => {
   }
 })
 
-after(() => { gemini?.close(); host?.close() })
+// Close everything the tests opened: the two local servers, the Firebase client app (its Firestore keeps a connection
+// to the emulator) and the server's admin app. Without this, Node can stay running after the last test.
+after(async () => {
+  gemini?.close()
+  host?.close()
+  if (clientApp) await require('firebase/app').deleteApp(clientApp).catch(() => {})
+  const admin = require('firebase-admin/app')
+  await Promise.all(admin.getApps().map((app) => admin.deleteApp(app).catch(() => {})))
+})
 
 const failure = async (promise) => { try { await promise; return null } catch (error) { return error } }
 let n = 0
@@ -159,6 +171,7 @@ test('an account whose email is not confirmed is refused by every AI endpoint; n
   const calls = [
     ['generateRecommendations', { kind: 'exercise' }],
     ['analyzeLabel', { imageBase64: 'aGVsbG8=', mimeType: 'image/png' }],
+    ['predictRisk', {}],
   ]
   for (const [name, data] of calls) {
     const error = await failure(client.call(name, data))
@@ -287,4 +300,20 @@ test('signed out: refused with 401, the handler never runs', { skip }, async () 
   const error = await failure(client.call('generateRecommendations', { kind: 'meal' }))
   assert.equal(error && error.code, 'functions/unauthenticated')
   assert.equal(geminiCalls, before)
+})
+
+test('risk prediction through Vercel (D51): not enough readings, then a saved assessment shown again the same day', { skip }, async () => {
+  const uid = await patient({ allergies: 'None' })
+  assert.deepEqual(await client.call('predictRisk', {}), { status: 'not_enough', readings_recent: 1, needed: 5 })
+  for (let day = 1; day <= 5; day += 1) {
+    await db.collection('Glucose_Logs').add({ patient_id: uid, reading_mgdl: 112, context: 'before_meal', logged_at: Timestamp.fromDate(new Date(Date.now() - day * 86400000)) })
+  }
+  const before = geminiCalls
+  const first = await client.call('predictRisk', {})
+  assert.equal(first.status, 'ok')
+  assert.equal(first.assessment.level, 'low')
+  assert.equal(first.advice.summary, 'Your readings are mostly in range.')
+  const again = await client.call('predictRisk', {})
+  assert.equal(again.cached, true)
+  assert.equal(geminiCalls, before + 1, 'Gemini was asked once')
 })

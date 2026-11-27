@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ModalBackdrop } from '@/components/ui/modal-backdrop';
+import { TabHeader } from '@/components/ui/tab-header';
 import { SymbolView } from 'expo-symbols';
 
 import { Brand } from '@/constants/theme';
@@ -9,7 +10,8 @@ import { useAuth } from '@/features/auth/auth-context';
 import { subscribeToGuardianVerification, type GuardianVerification } from '@/features/auth/guardian-service';
 import { DIETS } from '@/features/auth/health-profile';
 import { useHealthProfile } from '@/features/auth/use-health-profile';
-import { initialsOf } from '@/features/booking/appointment-tabs';
+import { Avatar, useProfilePhoto } from '@/features/photos/avatar';
+import { PhotoSheet } from '@/features/photos/photo-sheet';
 import { wellnessStats } from '@/features/gamification/gamification-service';
 import { compactNumber, memberTier } from '@/features/gamification/member-tier';
 import { subscribeToFamilyContacts } from '@/features/family/family-service';
@@ -22,10 +24,10 @@ import { activeSubscription, subscribeToSubscriptions, type Subscription } from 
 import { resetTo } from '@/lib/navigation';
 import { useT } from '@/i18n/language-context';
 
-// Figma "Profile and Premium Screens": the person at the top (initials, name, email, membership tier), three stat tiles,
+// Figma "Profile and Premium Screens": the person at the top (photo, name, email, membership tier), three stat tiles,
 // then the menu. The health profile itself is on its own screens now (P-11 view, P-12 edit), and appointment history
-// lives on the Doctors tab (My appointments), as in Figma. The photo is replaced by initials: storing photos needs
-// Firebase Storage, which the free Spark plan does not include (DECISIONS.md D18, D31).
+// lives on the Doctors tab (My appointments), as in Figma. Tapping the avatar adds or changes the profile photo (D54: a
+// small photo saved in Firestore, because Storage needs the Blaze plan); without one, initials show.
 export default function ProfileScreen() {
   const router = useRouter();
   const { uid, email, displayName, signOut } = useAuth();
@@ -36,6 +38,8 @@ export default function ProfileScreen() {
   const [guardian, setGuardian] = useState<GuardianVerification | null>(null);
   const [reminders, setReminders] = useState<'on' | 'off' | 'unavailable'>('unavailable');
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [photoSheet, setPhotoSheet] = useState(false);
+  const photo = useProfilePhoto(uid);
 
   useEffect(() => {
     if (!uid) return;
@@ -81,12 +85,14 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* The shared tab bar (components/ui/tab-header.tsx), so Profile's top matches the other tabs. */}
+      <TabHeader title={t('nav.profile')} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.person}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('profile.editYourProfile')} onPress={() => router.push('/health-profile/edit')} style={styles.avatarWrap}>
-            <View style={styles.avatar}><Text style={styles.avatarText}>{initialsOf(name)}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('photo.change')} onPress={() => setPhotoSheet(true)} style={styles.avatarWrap}>
+            <Avatar photo={photo} name={name} style={styles.avatar} textStyle={styles.avatarText} />
             <View style={styles.avatarEdit}>
-              <SymbolView name={{ ios: 'pencil', android: 'edit', web: 'edit' }} size={13} tintColor="#FFFFFF" />
+              <SymbolView name={{ ios: 'camera.fill', android: 'photo_camera', web: 'photo_camera' }} size={13} tintColor="#FFFFFF" />
             </View>
           </Pressable>
           <View style={styles.personCopy}>
@@ -124,6 +130,7 @@ export default function ProfileScreen() {
           <MenuRow icon={{ ios: 'bell.fill', android: 'notifications' }} title={t('profile.menu.notifications')} subtitle={reminderStatus} onPress={() => router.push('/notification-settings')} />
           <MenuRow icon={{ ios: 'person.2.fill', android: 'family_restroom' }} title={t('family.title')} subtitle={(familyCount === 0 ? t('family.menuNone') : familyCount === 1 ? t('family.menuOne') : t('family.menuTwo')).toUpperCase()} onPress={() => router.push('/family-contacts')} />
           <MenuRow icon={{ ios: 'lock.fill', android: 'lock' }} title={t('pin.menu.change')} onPress={() => router.push('/change-pin')} />
+          <MenuRow icon={{ ios: 'exclamationmark.bubble.fill', android: 'report' }} title={t('report.menu')} onPress={() => router.push('/report-problem')} />
           <MenuRow icon={{ ios: 'gift.fill', android: 'redeem' }} tint="green" title={t('profile.menu.rewards')} subtitle={t('profile.rewardsLine', { tier: tier.toUpperCase(), points: compactNumber(stats.points) })} onPress={() => router.push('/rewards')} />
           {premium
             ? <PremiumCard title={t('profile.premium.member')} subtitle={t('profile.premium.manage')} onPress={() => router.push('/subscription')} />
@@ -138,6 +145,8 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
       <BottomNav active="profile" />
+
+      <PhotoSheet visible={photoSheet} onClose={() => setPhotoSheet(false)} uid={uid} isDoctor={false} hasPhoto={photo !== null} />
 
       <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => setConfirmLogout(false)}>
         <View style={styles.dim}>

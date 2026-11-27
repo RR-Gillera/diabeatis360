@@ -46,7 +46,14 @@ export default function TabLayout() {
               // (constants/screen-animation.ts explains why).
               animation: screenAnimation(route.name, reduceMotion, 'root'),
             })}
-          />
+          >
+            {/* One copy per booking in the history. Opening a booking's chat, call or appointment that is already open
+                further back brings that screen forward instead of stacking a second copy on top. Without this,
+                chat > call > "Back to chat" left two chats, and Back went to the old one. The id is the booking id. */}
+            <Stack.Screen name="consultation/[id]" dangerouslySingular />
+            <Stack.Screen name="video-call/[id]" dangerouslySingular />
+            <Stack.Screen name="booking/appointment" dangerouslySingular={(name, params) => `${name}/${params.id}`} />
+          </Stack>
           {/* Sends a patient away from doctor screens and a doctor away from patient-only ones (QA D-15). */}
           <RouteGuard />
           {/* Rings on top of any screen while the app is open (video call signaling, D11). */}

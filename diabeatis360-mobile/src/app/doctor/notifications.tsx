@@ -3,9 +3,10 @@ import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SymbolView, type AndroidSymbol, type SFSymbol } from 'expo-symbols';
 
+import { TabHeader } from '@/components/ui/tab-header';
 import { Brand } from '@/constants/theme';
 import { useAuth } from '@/features/auth/auth-context';
-import { subscribeToBookingsForProvider } from '@/features/booking/booking-service';
+import { subscribeToBookingsForProvider, UNKNOWN_PATIENT } from '@/features/booking/booking-service';
 import { formatApptTime, formatFee, shortApptDay } from '@/features/booking/booking-ui';
 import { DoctorBottomNav, doctorStyles, EmptyState } from '@/features/doctor/doctor-ui';
 import type { ProviderBookingEntry } from '@/features/booking/types';
@@ -36,6 +37,8 @@ type Notice = {
   /** Set when the notice is a stored Notifications doc rather than derived. */
   notificationId?: string;
   bookingId?: string;
+  /** A reply to the doctor's report (D51): tapping opens Report a problem. */
+  opensReports?: boolean;
   unread?: boolean;
   /** A booking request still waiting for an answer: listed first. */
   pending?: boolean;
@@ -52,22 +55,42 @@ type Notice = {
 
 type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
-// Notifications are derived from real booking activity rather than read from
-// the (still unused) Notifications collection — nothing writes that collection
-// yet, so deriving keeps this screen truthful instead of empty or seeded.
+// Booking rows are derived from the doctor's bookings (one row per booking, showing what became of it); everything
+// else comes from the Notifications collection.
 function toNotices(appointments: ProviderBookingEntry[], t: Translate, language: Language): Notice[] {
-  return appointments.map((entry) => ({ ...toNotice(entry, t, language), kind: 'appointment', highlight: entry.patientName }));
+  return appointments
+    // A consultation the patient ended already has a stored "Your patient ended the consultation." notice, so it is not
+    // listed twice (the same rule as Recent Activity, activity-feed.ts).
+    .filter((entry) => !(entry.status === 'completed' && entry.endedBy === 'patient'))
+    .map((entry) => ({
+      ...toNotice(entry, t, language),
+      kind: 'appointment',
+      highlight: entry.patientName === UNKNOWN_PATIENT ? undefined : entry.patientName,
+    }));
+}
+
+/**
+ * When the row's event happened. Never the appointment's own date: that is usually in the future, which showed as
+ * "Just now" and pushed the row to the top. Bookings store when the request was sent and when the consultation ended,
+ * not when it was accepted or declined, so those rows use the request time (the same time Recent Activity shows).
+ */
+function eventTime(entry: ProviderBookingEntry): Date | null {
+  if (entry.status === 'completed') return entry.endedAt ?? entry.createdAt;
+  return entry.createdAt;
 }
 
 function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language): Omit<Notice, 'kind'> {
   {
-    const when = entry.scheduledAt;
+    const appointmentAt = entry.scheduledAt;
+    const when = eventTime(entry);
+    // After a decline or cancel the patient's profile is no longer shared with this doctor (D22), so the name is unknown.
+    const nameKnown = entry.patientName !== UNKNOWN_PATIENT;
     if (entry.status === 'pending') {
       return {
         id: entry.id, patientId: entry.patientId,
         title: t('doctor.notif.newRequest'), pending: true,
-        detail: when
-          ? t('doctor.notif.requestOn', { name: entry.patientName, date: shortApptDay(when, language), time: formatApptTime(when), fee: formatFee(entry.fee) })
+        detail: appointmentAt
+          ? t('doctor.notif.requestOn', { name: entry.patientName, date: shortApptDay(appointmentAt, language), time: formatApptTime(appointmentAt), fee: formatFee(entry.fee) })
           : t('doctor.notif.request', { name: entry.patientName, fee: formatFee(entry.fee) }),
         when, icon: 'calendar.badge.plus', iconAndroid: 'event_available', color: homeColors.green, background: homeColors.greenTint,
       };
@@ -76,7 +99,7 @@ function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language)
       return {
         id: entry.id, patientId: entry.patientId,
         title: t('doctor.notif.confirmed'),
-        detail: when ? t('doctor.notif.confirmedOn', { name: entry.patientName, date: shortApptDay(when, language) }) : t('doctor.notif.confirmedText', { name: entry.patientName }),
+        detail: appointmentAt ? t('doctor.notif.confirmedOn', { name: entry.patientName, date: shortApptDay(appointmentAt, language) }) : t('doctor.notif.confirmedText', { name: entry.patientName }),
         when, icon: 'calendar.badge.checkmark', iconAndroid: 'event_available', color: homeColors.green, background: homeColors.greenTint,
       };
     }
@@ -92,14 +115,14 @@ function toNotice(entry: ProviderBookingEntry, t: Translate, language: Language)
       return {
         id: entry.id, patientId: entry.patientId,
         title: t('doctor.notif.cancelled'),
-        detail: t('doctor.notif.cancelledText', { name: entry.patientName }),
+        detail: nameKnown ? t('doctor.notif.cancelledText', { name: entry.patientName }) : t('doctor.notif.cancelledAnon'),
         when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
       };
     }
     return {
       id: entry.id, patientId: entry.patientId,
       title: t('doctor.notif.declined'),
-      detail: t('doctor.notif.declinedText', { name: entry.patientName }),
+      detail: nameKnown ? t('doctor.notif.declinedText', { name: entry.patientName }) : t('doctor.notif.declinedAnon'),
       when, icon: 'xmark.circle.fill', iconAndroid: 'cancel', color: '#D9364F', background: '#FBE6E9',
     };
   }
@@ -186,7 +209,49 @@ export default function DoctorNotificationsScreen() {
           background: criticalRed,
         };
       });
-    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...toNotices(appointments, t, language)];
+    // An admin answered one of the doctor's reports (D51); tapping opens Report a problem, where the reply is shown.
+    const reportNotices: Notice[] = stored
+      .filter((entry) => entry.type === 'report_update')
+      .map((entry) => ({
+        id: entry.id,
+        kind: 'other' as const,
+        patientId: '',
+        notificationId: entry.id,
+        opensReports: true,
+        unread: !entry.isRead,
+        title: t('notif.kind.report_update'),
+        detail: entry.message,
+        when: entry.sentAt,
+        icon: 'exclamationmark.bubble.fill' as const,
+        iconAndroid: 'report' as const,
+        color: '#64748B',
+        background: '#EEF1F5',
+      }));
+    // Every other stored notification: admin announcements, missed video calls, "Your patient ended the consultation.",
+    // reminders. These used to be left out, so the bell showed a red dot for something this list never showed.
+    const listedTypes: NotificationEntry['type'][] = ['message', 'doctor_verification', 'glucose_alert', 'report_update'];
+    const otherNotices: Notice[] = stored
+      .filter((entry) => !listedTypes.includes(entry.type))
+      .map((entry) => {
+        const isBooking = entry.type === 'booking_update';
+        return {
+          id: entry.id,
+          kind: isBooking ? 'appointment' as const : 'other' as const,
+          patientId: '',
+          notificationId: entry.id,
+          // A booking update (missed call, ended consultation) opens that consultation, like Recent Activity does.
+          bookingId: isBooking ? entry.relatedId || undefined : undefined,
+          unread: !entry.isRead,
+          title: t(`notif.kind.${entry.type}` as MessageKey),
+          detail: entry.message,
+          when: entry.sentAt,
+          icon: isBooking ? 'calendar.badge.clock' as const : 'bell.fill' as const,
+          iconAndroid: isBooking ? 'event_note' as const : 'notifications' as const,
+          color: '#64748B',
+          background: '#EEF1F5',
+        };
+      });
+    const list = [...criticalNotices, ...messageNotices, ...verificationNotices, ...reportNotices, ...otherNotices, ...toNotices(appointments, t, language)];
     // An unread critical reading first (D28), then pending requests and other unread notices, then the rest; newest
     // first within each — the doctor's action queue matters more than strict chronology (doctor-notices.ts).
     return sortNotices(list);
@@ -212,15 +277,16 @@ export default function DoctorNotificationsScreen() {
 
   return (
     <View style={doctorStyles.screen}>
+      {/* The shared tab bar (components/ui/tab-header.tsx); the filter chips sit under it. */}
+      <TabHeader
+        title={t('notif.title')}
+        right={unreadIds.length > 0 ? (
+          <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
+            <Text style={styles.markAll}>{marking ? t('notif.marking') : t('notif.markAll')}</Text>
+          </Pressable>
+        ) : null}
+      />
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <Text accessibilityRole="header" style={styles.headerTitle}>{t('notif.title')}</Text>
-          {unreadIds.length > 0 ? (
-            <Pressable accessibilityRole="button" onPress={markAll} disabled={marking} hitSlop={8}>
-              <Text style={styles.markAll}>{marking ? t('notif.marking') : t('notif.markAll')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
         <View style={styles.chips}>
           {FILTERS.map((key) => (
             <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: filter === key }} style={[styles.chip, filter === key && styles.chipActive]} onPress={() => setFilter(key)}>
@@ -250,6 +316,7 @@ export default function DoctorNotificationsScreen() {
                   if (notice.notificationId) void markNotificationRead(notice.notificationId);
                   if (notice.bookingId) router.push({ pathname: '/consultation/[id]', params: { id: notice.bookingId } });
                   else if (notice.patientId) router.push({ pathname: '/doctor/patient/[id]', params: { id: notice.patientId } });
+                  else if (notice.opensReports) router.push('/report-problem');
                 }}
               >
                 <View style={[styles.icon, { backgroundColor: notice.background }]}>
@@ -288,11 +355,9 @@ function BoldName({ text, name }: { text: string; name?: string }) {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: homeColors.card, paddingBottom: 16, paddingHorizontal: 24, paddingTop: 16 },
-  headerRow: { alignItems: 'center', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
-  headerTitle: { color: '#0F172A', flex: 1, fontFamily: Brand.font.extraBold, fontSize: 24 },
+  header: { backgroundColor: homeColors.card, paddingBottom: 16, paddingHorizontal: 24, paddingTop: 14 },
   markAll: { color: homeColors.green, fontFamily: Brand.font.extraBold, fontSize: 14 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 20 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: '#EEF2F6', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
   chipActive: { backgroundColor: homeColors.green },
   chipText: { color: '#475569', fontFamily: Brand.font.bold, fontSize: 14 },

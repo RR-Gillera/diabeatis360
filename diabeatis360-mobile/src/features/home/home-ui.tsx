@@ -7,6 +7,7 @@ import { GLUCOSE_THRESHOLDS } from '@/constants/glucose';
 import { Brand } from '@/constants/theme';
 import { useTabBarBottomPadding } from '@/components/ui/system-bars';
 import { useT } from '@/i18n/language-context';
+import { useTabBack } from '@/lib/use-tab-back';
 import type { MessageKey } from '@/i18n/translate';
 
 import { chartScale, type ChartDay } from './week-chart';
@@ -51,6 +52,8 @@ export function BottomNav({ active }: { active: NavTarget }) {
   // Taller when the phone shows the 3-button bar, so the tabs sit above it (constants/system-bars.ts).
   const navBottom = useTabBarBottomPadding();
   const [before, after] = [navItems.slice(0, 2), navItems.slice(2)];
+  // Android Back: other tabs go Home, Home needs a second press to exit (lib/tab-back.ts).
+  useTabBack('/user-home');
 
   // dismissTo, not push: a tab bar is not a history. push stacked a fresh copy
   // of every tab you touched, so bouncing Home → Profile → Home → Notifications

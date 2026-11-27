@@ -35,6 +35,10 @@ async function seed() {
     location: 'Cebu City',
     language_preference: 'English',
     account_type: 'minor',
+    // Copy of Guardian_Verifications.guardian_full_name / relationship_to_minor for the booked doctor (QA DOC-013 part 2);
+    // firestore.rules keeps it equal to the verification. full_name above is the CHILD's name (QA PAT-011).
+    guardian_full_name: 'Maria Dela Cruz',
+    guardian_relationship: 'parent',
     created_at: now,
     is_active: true,
   });
@@ -61,6 +65,10 @@ async function seed() {
     verified_by: 'test123',
     created_at: now,
     is_active: true,
+    // Credentials after the name (D55): approved suffix, the doctor's request, the admin's reason. '' = none.
+    credentials: '',
+    credentials_requested: '',
+    credentials_rejection_reason: '',
   });
 
   await db.collection('Admins').add({

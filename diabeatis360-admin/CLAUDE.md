@@ -20,7 +20,7 @@ pass"; screen → file map: `../docs/FIGMA_MAP.md`). Seven sidebar pages:
 | `/providers` | Providers | Verified / Pending Approval tabs, credential modal (verify, reject with reason, activate/deactivate), **+ Add Provider** |
 | `/content` | Content | Food Database (add / edit / hide / delete). Scanned Products was removed with barcode scanning (D12, 2026-11-19) |
 | `/analytics` | Analytics & Reports | period control, 5 stat cards, 4 charts, **Generate Report** modal (users, appointments & revenue, blood sugar trends; Print + CSV) |
-| `/revenue` | Revenue | 4 stat cards, growth chart (Monthly/Quarterly), tabs: Consultation Payments (payment-details modal, receipt, CSV) · Premium Subscribers · Membership Plans |
+| `/revenue` | Revenue | tabs under the header (like Providers, team review 2026-11-22): **Overview** (4 stat cards + growth chart, Monthly/Quarterly) · Consultation Payments (`?tab=payments`: payment-details modal, receipt, CSV) · Premium Subscribers · Membership Plans |
 | `/settings` | Settings | tabs: Announcements (publish, drafts, history) · My Account |
 
 Old routes (`/doctors`, `/guardians`, `/points`, `/plans`, `/subscribers`, `/products`, `/appointments`,

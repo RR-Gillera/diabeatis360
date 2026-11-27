@@ -21,11 +21,15 @@ import { Brand } from '@/constants/theme';
 export default function GuardianScreen() {
   const router = useRouter();
   const goBack = useSafeBack('/profile');
-  const { uid, email } = useAuth();
+  const { uid, email, displayName, updateDisplayName } = useAuth();
   const { t, label, language } = useT();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isResubmit = mode === 'resubmit';
 
+  // The child's own name (QA PAT-011): this account belongs to the child, so Users.full_name holds the child's name,
+  // not the guardian's (the guardian's name is kept in Guardian_Verifications). A new account starts empty, because the
+  // name typed at sign-up is usually the parent's; a resubmission starts from the name already saved.
+  const [childName, setChildName] = useState(isResubmit ? (displayName ?? '') : '');
   const [name, setName] = useState('');
   // Nothing is chosen in advance (D40); a resubmission starts from the relationship sent before.
   const [relationship, setRelationship] = useState<GuardianRelationship | null>(null);
@@ -63,7 +67,7 @@ export default function GuardianScreen() {
   };
 
   const submit = async () => {
-    if (!uid || !name.trim() || !photoPreview || !relationship || submitting) return;
+    if (!uid || !childName.trim() || !name.trim() || !photoPreview || !relationship || submitting) return;
     setSubmitting(true);
     setError('');
     try {
@@ -71,6 +75,7 @@ export default function GuardianScreen() {
       // 'minor' (DECISIONS.md D16). The birthdate step no longer links here (D41).
       if (email) await saveOnboardingValue(email, 'accountType', 'minor', uid);
       await submitGuardianVerification(uid, name, relationship, photoPreview);
+      if (childName.trim() !== (displayName ?? '').trim()) await updateDisplayName(childName);
       if (isResubmit) {
         goBack();
       } else {
@@ -112,6 +117,9 @@ export default function GuardianScreen() {
       <Text accessibilityRole="header" style={styles.title}>{isResubmit ? t('setup.guardian.resubmitTitle') : t('setup.guardian.title')}</Text>
       <Text style={styles.subtitle}>{isResubmit ? t('setup.guardian.resubmitText') : t('setup.guardian.text')}</Text>
 
+      <Text style={styles.label}>{t('setup.guardian.childName')}</Text>
+      <TextInput accessibilityLabel={t('setup.guardian.childName')} value={childName} onChangeText={setChildName} placeholder={t('setup.guardian.childNamePlaceholder')} placeholderTextColor="#A7B8CD" style={styles.input} />
+
       <Text style={styles.label}>{t('setup.guardian.name')}</Text>
       <TextInput accessibilityLabel={t('setup.guardian.name')} value={name} onChangeText={setName} placeholder={t('setup.guardian.namePlaceholder')} placeholderTextColor="#A7B8CD" style={styles.input} />
 
@@ -141,7 +149,7 @@ export default function GuardianScreen() {
 
       <View style={styles.bottom}>
         {submitting ? <ActivityIndicator color={authColors.green} /> : (
-          <AuthButton title={isResubmit ? t('setup.guardian.resubmit') : t('common.continue')} onPress={submit} disabled={!name.trim() || !photoPreview || !relationship} />
+          <AuthButton title={isResubmit ? t('setup.guardian.resubmit') : t('common.continue')} onPress={submit} disabled={!childName.trim() || !name.trim() || !photoPreview || !relationship} />
         )}
       </View>
     </KeyboardSafeScroll>

@@ -7,13 +7,13 @@ import { Brand } from './theme';
 
 /** Patient and shared screens (app/_layout.tsx) whose top is a white header bar. */
 const WHITE_TOP_ROOT = new Set([
-  'user-home', 'glucose-log', 'notifications', 'rewards', 'consultation/[id]',
+  'user-home', 'glucose-log', 'profile', 'notifications', 'rewards', 'consultation/[id]',
   'booking/find-doctor', 'booking/appointment', 'booking/consultation-fee', 'booking/select-date-time',
 ]);
 
 /** Doctor screens (app/doctor/_layout.tsx) whose top is a white header bar. */
 const WHITE_TOP_DOCTOR = new Set([
-  'index', 'notifications', 'consultation/[id]', 'fee', 'patient/[id]', 'patients', 'profile', 'request/[id]', 'schedule',
+  'index', 'appointments', 'history', 'notifications', 'consultation/[id]', 'fee', 'patient/[id]', 'patients', 'profile', 'request/[id]', 'schedule',
 ]);
 
 /** Screens that place their own content around the status bar: camera, video call, the landing page, and the doctor

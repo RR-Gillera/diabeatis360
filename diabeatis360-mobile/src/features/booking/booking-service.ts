@@ -31,9 +31,12 @@ function providerFromDoc(document: DocumentSnapshot): Provider {
       prcLicenseNumber: String(data.prc_license_number ?? ''),
       city: String(data.city ?? ''),
       consultationFee: Number(data.consultation_fee ?? 0),
+      hasPhoto: data.has_photo === true,
     }),
     availabilityMode: toAvailabilityMode(data.availability_mode),
     walletBlocked: data.wallet_blocked === true,
+    // Only the approved suffix (D55); a request still waiting for an admin is never shown to patients.
+    credentials: String(data.credentials ?? ''),
   };
 }
 
@@ -248,6 +251,9 @@ export function subscribeToBooking(
   );
 }
 
+/** The name shown when the patient's profile can't be read, e.g. after a decline or cancel ends the share (D22). */
+export const UNKNOWN_PATIENT = 'Unknown patient';
+
 // The doctor-side mirror of subscribeToBookingHistory: same single-equality-filter,
 // no-orderBy, sort-client-side shape (this time on provider_id) to avoid needing a
 // composite index. Patient identity is resolved per booking via a Users lookup —
@@ -270,13 +276,16 @@ export function subscribeToBookingsForProvider(
           return {
             id: document.id,
             patientId,
-            patientName: String(patientSnapshot?.data()?.full_name ?? 'Unknown patient'),
+            patientName: String(patientSnapshot?.data()?.full_name ?? UNKNOWN_PATIENT),
             scheduledAt: (data.scheduled_at as Timestamp | undefined)?.toDate() ?? null,
             fee: Number(data.fee ?? 0),
             status: (data.status ?? 'pending') as BookingStatus,
             paymentStatus: (data.payment_status ?? 'unpaid') as PaymentStatus,
             paymentMethod: (data.payment_method ?? null) as PaymentMethod | null,
             queueNumber: typeof data.queue_number === 'number' ? data.queue_number : null,
+            createdAt: (data.created_at as Timestamp | undefined)?.toDate() ?? null,
+            endedAt: (data.consultation_ended_at as Timestamp | undefined)?.toDate() ?? null,
+            endedBy: data.consultation_ended_by === 'doctor' || data.consultation_ended_by === 'patient' ? data.consultation_ended_by : null,
           };
         }));
         entries.sort((a, b) => (a.scheduledAt?.getTime() ?? 0) - (b.scheduledAt?.getTime() ?? 0));

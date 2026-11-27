@@ -18,9 +18,13 @@ const { HttpsError } = require('firebase-functions/v2/https')
 
 const { allowanceFor, manilaDayKey, projectDailyCap } = require('./limits')
 
-const WHAT = { ai: 'AI suggestions', scan: 'label scans' }
+const WHAT = { ai: 'AI suggestions', scan: 'label scans', risk: 'risk assessments' }
 
 function limitError(feature, limit, scope) {
+  // One risk assessment a day on every plan (D51): there is nothing to upgrade to, and today's result is already saved.
+  if (feature === 'risk') {
+    return new HttpsError('resource-exhausted', 'Your risk assessment for today is already being prepared. Open it again in a moment.', { limit, feature, scope: 'daily' })
+  }
   if (scope === 'free') {
     return new HttpsError(
       'resource-exhausted',
